@@ -186,8 +186,7 @@ Content detection follows encoding-over-content priority (compression → images
 #### Variants
 **Source**: [src/types/stage3.rs](src/types/stage3.rs)
 
-- `PPkRTStandard` - RT TLV data in `OP_RETURN` + 1-of-2 multisig (content-type: application/json)
-- `PPkRTP2MSEmbedded` - RT data split: 3rd pubkey + `OP_RETURN` completion, 1-of-3 multisig (content-type: application/json)
+- `PPkProfile` - JSON profile data via RT (Resource Tag) transport. RT data may be encoded in OP_RETURN (1-of-2 multisig) or split between P2MS pubkey #3 and OP_RETURN (1-of-3 multisig). Total: ~2,010 transactions. (content-type: application/json)
 - `PPkRegistration` - Quoted number strings like "313", "421" (content-type: text/plain)
 - `PPkMessage` - Promotional messages containing "PPk"/"ppk" OR ≥80% printable ASCII (content-type: text/plain)
 - `PPkUnknown` - Marker present but no specific variant detected (content-type: application/octet-stream)

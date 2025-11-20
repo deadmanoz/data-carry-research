@@ -312,3 +312,4 @@ MIT License - See LICENSE file for details
 - [OmniCore](https://github.com/OmniLayer/omnicore) - Omni Layer Bitcoin Core fork
 - [Omni Layer Spec](https://github.com/OmniLayer/spec) - Omni Layer protocol specification
 - [Chancecoin](https://github.com/chancecoin/chancecoinj) - Chancecoin protocol implementation
+- [PPk Protocol (English docs)](https://github.com/ppkpub/docs/tree/master/English)

@@ -187,7 +187,7 @@ decode-txid txid *args="":
         echo "Verbose mode: ENABLED"
     fi
     echo "This command uses Bitcoin Core RPC to:"
-    echo "  • Detect if the transaction is Bitcoin Stamps, Counterparty, or Omni"
+    echo "  • Detect protocol (Bitcoin Stamps, Counterparty, Omni, PPk, DataStorage, etc.)"
     echo "  • Decode and save the data to the appropriate subdirectory"
     echo ""
     mkdir -p "$OUTPUT_DIR"
