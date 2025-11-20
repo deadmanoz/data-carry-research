@@ -1,0 +1,50 @@
+# P2MS Analyser Configuration
+# Copy this file to config.toml and customize for your environment
+# config.toml is automatically ignored by git to protect your paths
+
+[paths]
+# Path to your UTXO CSV dump file
+utxo_csv = "/path/to/your/utxodump.csv"
+
+[database]
+# Default database path for analysis results
+# Use separate DBs for production vs testing
+default_path = "./test_output/testing.db"
+
+[processing]
+# Batch size for database inserts
+batch_size = 10000
+
+# Progress report interval (records)
+progress_interval = 100000
+
+# Checkpoint interval (records) 
+checkpoint_interval = 1000000
+
+# Bitcoin RPC Configuration (Stage 2 enrichment)
+# Required for Stage 2 transaction analysis and fee calculations
+[bitcoin_rpc]
+# Bitcoin Core RPC endpoint URL
+url = "http://localhost:8332"
+
+# RPC authentication credentials
+username = "your_rpc_username_here"
+password = "your_rpc_password_here"
+
+# Connection and retry settings
+timeout_seconds = 60
+max_retries = 10
+initial_backoff_ms = 100
+backoff_multiplier = 2.0
+max_backoff_seconds = 30
+
+# Concurrent request limit for batch processing
+concurrent_requests = 10
+
+# Alternative: Use environment variables instead of config file
+# BITCOIN_RPC_URL=http://localhost:8332
+# BITCOIN_RPC_USERNAME=your_rpc_username_here
+# BITCOIN_RPC_PASSWORD=your_rpc_password_here
+# BITCOIN_RPC_TIMEOUT_SECONDS=60
+# BITCOIN_RPC_MAX_RETRIES=10
+# BITCOIN_RPC_CONCURRENT_REQUESTS=10

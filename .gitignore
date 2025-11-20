@@ -1,0 +1,24 @@
+/target
+*.DS_Store
+*.bak
+.venv/
+/tmp/
+
+# Test outputs (all generated test databases)
+/test_output/
+
+# Production database only
+/*.db
+/*.db-journal
+
+# Configuration file with user-specific paths (not committed)
+config.toml
+
+# Output directories (protocol-specific decoded data)
+/output_data/
+
+# Visualisation outputs (generated)
+/plots/
+
+# Large test file
+/tests/test_data/utxo_1m.csv
