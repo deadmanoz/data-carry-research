@@ -14,7 +14,7 @@
 ///
 /// These transactions exist in test data but cannot be tested with the current P2MS-focused decoder.
 // Integration tests access common module through the parent path
-use crate::common::rpc_helpers::create_test_rpc_config;
+use crate::common::rpc_helpers::{create_test_rpc_config, skip_if_rpc_unavailable};
 use data_carry_research::decoder::ProtocolDecoder;
 use data_carry_research::decoder::{BitcoinStampsData, DecodedData};
 use sha2::{Digest, Sha256};
@@ -138,14 +138,6 @@ async fn create_test_decoder_with_project_dir() -> anyhow::Result<ProtocolDecode
     Ok(decoder)
 }
 
-/// Helper to skip test if RPC not available
-fn skip_if_rpc_unavailable(e: anyhow::Error, test_name: &str) {
-    eprintln!(
-        "⚠️  Skipping {} - Bitcoin RPC not available: {}",
-        test_name, e
-    );
-}
-
 // =============================================================================
 // BITCOIN STAMPS TESTS
 // =============================================================================
@@ -227,6 +219,9 @@ async fn test_decode_bitcoin_stamps_image_54fdeda9() -> anyhow::Result<()> {
         }
         Some(DecodedData::DataStorage(_)) => {
             panic!("❌ Unexpected DataStorage data");
+        }
+        Some(DecodedData::PPk { .. }) => {
+            panic!("❌ Unexpected PPk data");
         }
         None => {
             panic!("❌ Expected decoded data, got None");
@@ -336,6 +331,9 @@ async fn test_decode_bitcoin_stamps_src101_77fb147b() -> anyhow::Result<()> {
         }
         Some(DecodedData::DataStorage(_)) => {
             panic!("❌ Unexpected DataStorage data");
+        }
+        Some(DecodedData::PPk { .. }) => {
+            panic!("❌ Unexpected PPk data");
         }
         None => {
             panic!("❌ Expected decoded data, got None");
@@ -449,6 +447,9 @@ async fn test_decode_bitcoin_stamps_src20_eb96a65e() -> anyhow::Result<()> {
         }
         Some(DecodedData::DataStorage(_)) => {
             panic!("❌ Unexpected DataStorage data");
+        }
+        Some(DecodedData::PPk { .. }) => {
+            panic!("❌ Unexpected PPk data");
         }
         None => {
             panic!("❌ Expected decoded data, got None");
@@ -568,6 +569,9 @@ async fn test_decode_bitcoin_stamps_image_c129cc() -> anyhow::Result<()> {
         }
         Some(DecodedData::DataStorage(_)) => {
             panic!("❌ Unexpected DataStorage data");
+        }
+        Some(DecodedData::PPk { .. }) => {
+            panic!("❌ Unexpected PPk data");
         }
         None => {
             panic!("❌ Expected decoded data, got None");
@@ -691,6 +695,9 @@ async fn test_decode_bitcoin_stamps_multi_output_95dca4() -> anyhow::Result<()> 
         Some(DecodedData::DataStorage(_)) => {
             panic!("❌ Unexpected DataStorage data");
         }
+        Some(DecodedData::PPk { .. }) => {
+            panic!("❌ Unexpected PPk data");
+        }
         None => {
             panic!("❌ Expected decoded data, got None");
         }
@@ -749,6 +756,9 @@ async fn test_decode_counterparty_issuance_e5e9f6a6() -> anyhow::Result<()> {
         Some(DecodedData::DataStorage(_)) => {
             panic!("❌ Unexpected DataStorage data");
         }
+        Some(DecodedData::PPk { .. }) => {
+            panic!("❌ Unexpected PPk data");
+        }
         None => {
             panic!("❌ Expected decoded data, got None");
         }
@@ -802,6 +812,9 @@ async fn test_decode_counterparty_send_da3ed1ef() -> anyhow::Result<()> {
         }
         Some(DecodedData::DataStorage(_)) => {
             panic!("❌ Unexpected DataStorage data");
+        }
+        Some(DecodedData::PPk { .. }) => {
+            panic!("❌ Unexpected PPk data");
         }
         None => {
             panic!("❌ Expected decoded data, got None");
@@ -857,6 +870,9 @@ async fn test_decode_counterparty_broadcast_21c2cd5b() -> anyhow::Result<()> {
         Some(DecodedData::DataStorage(_)) => {
             panic!("❌ Unexpected DataStorage data");
         }
+        Some(DecodedData::PPk { .. }) => {
+            panic!("❌ Unexpected PPk data");
+        }
         None => {
             panic!("❌ Expected decoded data, got None");
         }
@@ -910,6 +926,9 @@ async fn test_decode_counterparty_olga_lock_34da6ecf() -> anyhow::Result<()> {
         }
         Some(DecodedData::DataStorage(_)) => {
             panic!("❌ Unexpected DataStorage data");
+        }
+        Some(DecodedData::PPk { .. }) => {
+            panic!("❌ Unexpected PPk data");
         }
         None => {
             panic!("❌ Expected decoded data, got None");
@@ -965,6 +984,9 @@ async fn test_decode_counterparty_salvation_541e640f() -> anyhow::Result<()> {
         Some(DecodedData::DataStorage(_)) => {
             panic!("❌ Unexpected DataStorage data");
         }
+        Some(DecodedData::PPk { .. }) => {
+            panic!("❌ Unexpected PPk data");
+        }
         None => {
             panic!("❌ Expected decoded data, got None");
         }
@@ -1018,6 +1040,9 @@ async fn test_decode_counterparty_type0_585f50f1() -> anyhow::Result<()> {
         }
         Some(DecodedData::DataStorage(_)) => {
             panic!("❌ Unexpected DataStorage data");
+        }
+        Some(DecodedData::PPk { .. }) => {
+            panic!("❌ Unexpected PPk data");
         }
         None => {
             panic!("❌ Expected decoded data, got None");
@@ -1073,6 +1098,9 @@ async fn test_decode_counterparty_type30_627ae48d() -> anyhow::Result<()> {
         Some(DecodedData::DataStorage(_)) => {
             panic!("❌ Unexpected DataStorage data");
         }
+        Some(DecodedData::PPk { .. }) => {
+            panic!("❌ Unexpected PPk data");
+        }
         None => {
             panic!("❌ Expected decoded data, got None");
         }
@@ -1112,6 +1140,9 @@ async fn test_decode_counterparty_subasset_793566ef() -> anyhow::Result<()> {
         }
         Some(DecodedData::DataStorage(_)) => {
             panic!("❌ Unexpected DataStorage data");
+        }
+        Some(DecodedData::PPk { .. }) => {
+            panic!("❌ Unexpected PPk data");
         }
         None => {
             panic!("❌ Expected decoded data, got None");
@@ -1205,6 +1236,9 @@ async fn test_decode_stamps_counterparty_transport_31a96a3b() -> anyhow::Result<
         Some(DecodedData::DataStorage(_)) => {
             panic!("❌ Unexpected DataStorage data");
         }
+        Some(DecodedData::PPk { .. }) => {
+            panic!("❌ Unexpected PPk data");
+        }
         None => {
             panic!("❌ Expected decoded data, got None");
         }
@@ -1244,6 +1278,9 @@ async fn test_decode_counterparty_modern_1of3_a63ee2b1() -> anyhow::Result<()> {
         }
         Some(DecodedData::DataStorage(_)) => {
             panic!("❌ Unexpected DataStorage data");
+        }
+        Some(DecodedData::PPk { .. }) => {
+            panic!("❌ Unexpected PPk data");
         }
         None => {
             panic!("❌ Expected decoded data, got None");
@@ -1362,6 +1399,9 @@ async fn test_decode_omni_multi_packet_153091() -> anyhow::Result<()> {
         Some(DecodedData::DataStorage(_)) => {
             panic!("❌ Expected Omni data, got DataStorage");
         }
+        Some(DecodedData::PPk { .. }) => {
+            panic!("❌ Unexpected PPk data");
+        }
         None => {
             panic!("❌ Expected decoded data, got None");
         }
@@ -1403,6 +1443,7 @@ async fn test_decode_omni_property_fixed_725ba7() -> anyhow::Result<()> {
         Some(DecodedData::DataStorage(_)) => panic!("❌ Unexpected DataStorage data"),
         Some(DecodedData::BitcoinStamps { .. }) => panic!("❌ Expected Omni data, got Stamps"),
         Some(DecodedData::Counterparty { .. }) => panic!("❌ Expected Omni data, got Counterparty"),
+        Some(DecodedData::PPk { .. }) => panic!("❌ Unexpected PPk data"),
         None => panic!("❌ Expected decoded data, got None"),
     }
 
@@ -1442,6 +1483,7 @@ async fn test_decode_omni_send_to_owners_0937f1() -> anyhow::Result<()> {
         Some(DecodedData::DataStorage(_)) => panic!("❌ Unexpected DataStorage data"),
         Some(DecodedData::BitcoinStamps { .. }) => panic!("❌ Expected Omni data, got Stamps"),
         Some(DecodedData::Counterparty { .. }) => panic!("❌ Expected Omni data, got Counterparty"),
+        Some(DecodedData::PPk { .. }) => panic!("❌ Unexpected PPk data"),
         None => panic!("❌ Expected decoded data, got None"),
     }
 
@@ -1489,6 +1531,7 @@ async fn test_decode_omni_dex_offer_9a0177() -> anyhow::Result<()> {
         Some(DecodedData::DataStorage(_)) => panic!("❌ Unexpected DataStorage data"),
         Some(DecodedData::BitcoinStamps { .. }) => panic!("❌ Expected Omni data, got Stamps"),
         Some(DecodedData::Counterparty { .. }) => panic!("❌ Expected Omni data, got Counterparty"),
+        Some(DecodedData::PPk { .. }) => panic!("❌ Unexpected PPk data"),
         None => panic!("❌ Expected decoded data, got None"),
     }
 
@@ -1541,6 +1584,7 @@ async fn test_decode_omni_variable_property_b01d15() -> anyhow::Result<()> {
         Some(DecodedData::DataStorage(_)) => panic!("❌ Unexpected DataStorage data"),
         Some(DecodedData::BitcoinStamps { .. }) => panic!("❌ Expected Omni data, got Stamps"),
         Some(DecodedData::Counterparty { .. }) => panic!("❌ Expected Omni data, got Counterparty"),
+        Some(DecodedData::PPk { .. }) => panic!("❌ Unexpected PPk data"),
         None => panic!("❌ Expected decoded data, got None"),
     }
 
@@ -1582,6 +1626,7 @@ async fn test_decode_omni_manual_property_73914f() -> anyhow::Result<()> {
         Some(DecodedData::DataStorage(_)) => panic!("❌ Unexpected DataStorage data"),
         Some(DecodedData::BitcoinStamps { .. }) => panic!("❌ Expected Omni data, got Stamps"),
         Some(DecodedData::Counterparty { .. }) => panic!("❌ Expected Omni data, got Counterparty"),
+        Some(DecodedData::PPk { .. }) => panic!("❌ Unexpected PPk data"),
         None => panic!("❌ Expected decoded data, got None"),
     }
 
@@ -1623,6 +1668,7 @@ async fn test_decode_omni_grant_tokens_1caf04() -> anyhow::Result<()> {
         Some(DecodedData::DataStorage(_)) => panic!("❌ Unexpected DataStorage data"),
         Some(DecodedData::BitcoinStamps { .. }) => panic!("❌ Expected Omni data, got Stamps"),
         Some(DecodedData::Counterparty { .. }) => panic!("❌ Expected Omni data, got Counterparty"),
+        Some(DecodedData::PPk { .. }) => panic!("❌ Unexpected PPk data"),
         None => panic!("❌ Expected decoded data, got None"),
     }
 
@@ -1664,6 +1710,7 @@ async fn test_decode_omni_revoke_tokens_742973() -> anyhow::Result<()> {
         Some(DecodedData::DataStorage(_)) => panic!("❌ Unexpected DataStorage data"),
         Some(DecodedData::BitcoinStamps { .. }) => panic!("❌ Expected Omni data, got Stamps"),
         Some(DecodedData::Counterparty { .. }) => panic!("❌ Expected Omni data, got Counterparty"),
+        Some(DecodedData::PPk { .. }) => panic!("❌ Unexpected PPk data"),
         None => panic!("❌ Expected decoded data, got None"),
     }
 
@@ -1705,6 +1752,7 @@ async fn test_decode_omni_dex_accept_3d7742() -> anyhow::Result<()> {
         Some(DecodedData::DataStorage(_)) => panic!("❌ Unexpected DataStorage data"),
         Some(DecodedData::BitcoinStamps { .. }) => panic!("❌ Expected Omni data, got Stamps"),
         Some(DecodedData::Counterparty { .. }) => panic!("❌ Expected Omni data, got Counterparty"),
+        Some(DecodedData::PPk { .. }) => panic!("❌ Unexpected PPk data"),
         None => panic!("❌ Expected decoded data, got None"),
     }
 
@@ -1746,6 +1794,7 @@ async fn test_decode_omni_crowdsale_creation_eda3d2() -> anyhow::Result<()> {
         Some(DecodedData::DataStorage(_)) => panic!("❌ Unexpected DataStorage data"),
         Some(DecodedData::BitcoinStamps { .. }) => panic!("❌ Expected Omni data, got Stamps"),
         Some(DecodedData::Counterparty { .. }) => panic!("❌ Expected Omni data, got Counterparty"),
+        Some(DecodedData::PPk { .. }) => panic!("❌ Unexpected PPk data"),
         None => panic!("❌ Expected decoded data, got None"),
     }
 
@@ -1789,6 +1838,7 @@ async fn test_decode_omni_crowdsale_participation_c1ff92() -> anyhow::Result<()>
         Some(DecodedData::DataStorage(_)) => panic!("❌ Unexpected DataStorage data"),
         Some(DecodedData::BitcoinStamps { .. }) => panic!("❌ Expected Omni data, got Stamps"),
         Some(DecodedData::Counterparty { .. }) => panic!("❌ Expected Omni data, got Counterparty"),
+        Some(DecodedData::PPk { .. }) => panic!("❌ Unexpected PPk data"),
         None => panic!("❌ Expected decoded data, got None"),
     }
 
@@ -1830,6 +1880,7 @@ async fn test_decode_omni_close_crowdsale_b88645() -> anyhow::Result<()> {
         Some(DecodedData::DataStorage(_)) => panic!("❌ Unexpected DataStorage data"),
         Some(DecodedData::BitcoinStamps { .. }) => panic!("❌ Expected Omni data, got Stamps"),
         Some(DecodedData::Counterparty { .. }) => panic!("❌ Expected Omni data, got Counterparty"),
+        Some(DecodedData::PPk { .. }) => panic!("❌ Unexpected PPk data"),
         None => panic!("❌ Expected decoded data, got None"),
     }
 
@@ -1885,6 +1936,7 @@ async fn test_decode_stamps_original_image() -> anyhow::Result<()> {
         Some(DecodedData::Omni { .. }) => panic!("Expected Stamps, got Omni"),
         Some(DecodedData::Chancecoin { .. }) => panic!("Expected Stamps, got Chancecoin"),
         Some(DecodedData::DataStorage(_)) => panic!("Expected Stamps, got DataStorage"),
+        Some(DecodedData::PPk { .. }) => panic!("❌ Unexpected PPk data"),
         None => panic!("Expected decoded data, got None"),
     }
     Ok(())
@@ -1939,6 +1991,7 @@ async fn test_decode_stamps_classic_4d89d7() -> anyhow::Result<()> {
         Some(DecodedData::Omni { .. }) => panic!("Expected Stamps, got Omni"),
         Some(DecodedData::Chancecoin { .. }) => panic!("Expected Stamps, got Chancecoin"),
         Some(DecodedData::DataStorage(_)) => panic!("Expected Stamps, got DataStorage"),
+        Some(DecodedData::PPk { .. }) => panic!("❌ Unexpected PPk data"),
         None => panic!("Expected decoded data, got None"),
     }
     Ok(())
@@ -1993,6 +2046,7 @@ async fn test_decode_stamps_classic_f35382() -> anyhow::Result<()> {
         Some(DecodedData::Omni { .. }) => panic!("Expected Stamps, got Omni"),
         Some(DecodedData::Chancecoin { .. }) => panic!("Expected Stamps, got Chancecoin"),
         Some(DecodedData::DataStorage(_)) => panic!("Expected Stamps, got DataStorage"),
+        Some(DecodedData::PPk { .. }) => panic!("❌ Unexpected PPk data"),
         None => panic!("Expected decoded data, got None"),
     }
     Ok(())
@@ -2047,6 +2101,7 @@ async fn test_decode_stamps_recent_c8c383() -> anyhow::Result<()> {
         Some(DecodedData::Omni { .. }) => panic!("Expected Stamps, got Omni"),
         Some(DecodedData::Chancecoin { .. }) => panic!("Expected Stamps, got Chancecoin"),
         Some(DecodedData::DataStorage(_)) => panic!("Expected Stamps, got DataStorage"),
+        Some(DecodedData::PPk { .. }) => panic!("❌ Unexpected PPk data"),
         None => panic!("Expected decoded data, got None"),
     }
     Ok(())
@@ -2101,6 +2156,7 @@ async fn test_decode_stamps_image_359aef() -> anyhow::Result<()> {
         Some(DecodedData::Omni { .. }) => panic!("Expected Stamps, got Omni"),
         Some(DecodedData::Chancecoin { .. }) => panic!("Expected Stamps, got Chancecoin"),
         Some(DecodedData::DataStorage(_)) => panic!("Expected Stamps, got DataStorage"),
+        Some(DecodedData::PPk { .. }) => panic!("❌ Unexpected PPk data"),
         None => panic!("Expected decoded data, got None"),
     }
     Ok(())
@@ -2155,6 +2211,7 @@ async fn test_decode_stamps_image_50aeb7() -> anyhow::Result<()> {
         Some(DecodedData::Omni { .. }) => panic!("Expected Stamps, got Omni"),
         Some(DecodedData::Chancecoin { .. }) => panic!("Expected Stamps, got Chancecoin"),
         Some(DecodedData::DataStorage(_)) => panic!("Expected Stamps, got DataStorage"),
+        Some(DecodedData::PPk { .. }) => panic!("❌ Unexpected PPk data"),
         None => panic!("Expected decoded data, got None"),
     }
     Ok(())
@@ -2209,6 +2266,7 @@ async fn test_decode_stamps_image_582a46() -> anyhow::Result<()> {
         Some(DecodedData::Omni { .. }) => panic!("Expected Stamps, got Omni"),
         Some(DecodedData::Chancecoin { .. }) => panic!("Expected Stamps, got Chancecoin"),
         Some(DecodedData::DataStorage(_)) => panic!("Expected Stamps, got DataStorage"),
+        Some(DecodedData::PPk { .. }) => panic!("❌ Unexpected PPk data"),
         None => panic!("Expected decoded data, got None"),
     }
     Ok(())
@@ -2263,6 +2321,7 @@ async fn test_decode_stamps_image_5e7d66() -> anyhow::Result<()> {
         Some(DecodedData::Omni { .. }) => panic!("Expected Stamps, got Omni"),
         Some(DecodedData::Chancecoin { .. }) => panic!("Expected Stamps, got Chancecoin"),
         Some(DecodedData::DataStorage(_)) => panic!("Expected Stamps, got DataStorage"),
+        Some(DecodedData::PPk { .. }) => panic!("❌ Unexpected PPk data"),
         None => panic!("Expected decoded data, got None"),
     }
     Ok(())
@@ -2367,6 +2426,9 @@ async fn test_decode_datastorage_bitcoin_whitepaper_pdf() -> anyhow::Result<()> 
         }
         Some(DecodedData::Chancecoin { .. }) => {
             panic!("❌ Expected DataStorage data, got Chancecoin");
+        }
+        Some(DecodedData::PPk { .. }) => {
+            panic!("❌ Unexpected PPk data");
         }
         None => {
             panic!("❌ Expected decoded data, got None");

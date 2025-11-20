@@ -152,8 +152,7 @@ pub fn verify_classification(
                     "Bet" => ProtocolVariant::ChancecoinBet,
                     "Cancel" => ProtocolVariant::ChancecoinCancel,
                     // PPk protocol variants (Display strings)
-                    "PPkRTStandard" => ProtocolVariant::PPkRTStandard,
-                    "PPkRTP2MSEmbedded" => ProtocolVariant::PPkRTP2MSEmbedded,
+                    "PPkProfile" => ProtocolVariant::PPkProfile,
                     "PPkRegistration" => ProtocolVariant::PPkRegistration,
                     "PPkMessage" => ProtocolVariant::PPkMessage,
                     "PPkUnknown" => ProtocolVariant::PPkUnknown,

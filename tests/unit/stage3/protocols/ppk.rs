@@ -6,8 +6,9 @@
 //! ## Test Coverage
 //!
 //! ### Transaction Patterns Tested:
-//! - **RT Standard**: RT TLV data in OP_RETURN with 1-of-2 multisig
-//! - **RT P2MS-Embedded**: RT data in 3rd pubkey + OP_RETURN completion (1-of-3 multisig)
+//! - **Profile**: JSON profile data via RT transport (two transport encodings tested):
+//!   - RT TLV in OP_RETURN with 1-of-2 multisig (OP_RETURN transport)
+//!   - RT data in 3rd pubkey + OP_RETURN completion with 1-of-3 multisig (P2MS-embedded transport)
 //! - **Registration**: Number string registrations (e.g., "313", "421")
 //! - **Message**: Promotional messages containing "PPk" or "ppk" substring
 //! - **Unknown**: Other PPk applications with marker pubkey
@@ -15,7 +16,7 @@
 //! ### PPk Marker Detection:
 //! - Primary identification via marker pubkey: `0320a0de360cc2ae8672db7d557086a4e7c8eca062c0a5a4ba9922dee0aacf3e12`
 //! - Marker appears in position 2 (second pubkey) of multisig outputs
-//! - 5 distinct protocol variants with different data encoding patterns
+//! - 4 distinct protocol variants organised by application purpose
 //!
 //! ### Real Bitcoin Transactions:
 //! All tests use authentic Bitcoin mainnet transaction data from JSON fixtures,
@@ -42,7 +43,7 @@ mod test_data {
         txid: &str,
         height: u32,
     ) -> Option<EnrichedTransaction> {
-        // Use standardized helper to load ALL outputs (P2MS, OP_RETURN, etc.)
+        // Use standardised helper to load ALL outputs (P2MS, OP_RETURN, etc.)
         let outputs = load_all_outputs_from_json(json_path, txid).ok()?;
 
         // Update heights (JSON fixtures use default height=0)
@@ -104,8 +105,7 @@ mod test_data {
 
         // Verify classification occurred
         let expected_count = match expected_variant {
-            ProtocolVariant::PPkRTStandard
-            | ProtocolVariant::PPkRTP2MSEmbedded
+            ProtocolVariant::PPkProfile
             | ProtocolVariant::PPkRegistration
             | ProtocolVariant::PPkMessage
             | ProtocolVariant::PPkUnknown => 1,
@@ -143,7 +143,7 @@ async fn test_ppk_rt_standard() {
         "tests/test_data/ppk/ppk_rt_standard.json",
         "ed95e04018dcc2f01ba8cd699d86852f85ca0af63d05f715a9b2701bb61c6b00",
         345953,
-        ProtocolVariant::PPkRTStandard,
+        ProtocolVariant::PPkProfile,
         "application/json", // RT contains JSON data
         "test_ppk_rt_standard",
     )
@@ -151,7 +151,7 @@ async fn test_ppk_rt_standard() {
 
     assert!(
         result.is_ok(),
-        "PPk RT Standard classification failed: {:?}",
+        "PPk Profile (OP_RETURN transport) classification failed: {:?}",
         result.err()
     );
 }
@@ -163,7 +163,7 @@ async fn test_ppk_rt_p2ms_embedded() {
         "tests/test_data/ppk/ppk_rt_p2ms_embedded.json",
         "20cb5958edce385c3fa3ec7f3b12391f158442c7a742a924312556eca891f400",
         382033,
-        ProtocolVariant::PPkRTP2MSEmbedded,
+        ProtocolVariant::PPkProfile,
         "application/json", // RT contains JSON data
         "test_ppk_rt_p2ms_embedded",
     )
@@ -171,7 +171,7 @@ async fn test_ppk_rt_p2ms_embedded() {
 
     assert!(
         result.is_ok(),
-        "PPk RT P2MS-Embedded classification failed: {:?}",
+        "PPk Profile (P2MS-embedded transport) classification failed: {:?}",
         result.err()
     );
 }

@@ -138,29 +138,30 @@ fn test_rpc_connectivity(config: &BitcoinRpcConfig) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Skip test if RPC is unavailable (convenience wrapper)
+/// Print skip message when RPC is unavailable
 ///
-/// Returns `true` if the test should be skipped.
+/// Used in integration tests to gracefully skip when Bitcoin Core RPC is not available.
+/// Prints a warning message and should be followed by early return.
 ///
 /// # Arguments
-/// * `result` - Result from RPC operation
-/// * `test_name` - Name of the test
+/// * `e` - The error from RPC operation
+/// * `test_name` - Name of the test being skipped
 ///
 /// # Example
 /// ```rust
-/// let result = some_rpc_operation().await;
-/// if skip_if_rpc_unavailable(result, "my_test") {
-///     return Ok(());
-/// }
+/// let decoder = match create_test_decoder().await {
+///     Ok(d) => d,
+///     Err(e) => {
+///         skip_if_rpc_unavailable(e, "test_my_feature");
+///         return Ok(());
+///     }
+/// };
 /// ```
-pub fn skip_if_rpc_unavailable<T>(result: anyhow::Result<T>, test_name: &str) -> Result<T, bool> {
-    match result {
-        Ok(val) => Ok(val),
-        Err(e) => {
-            eprintln!("⚠️  Skipping {} - Bitcoin RPC error: {}", test_name, e);
-            Err(true) // true = skipped
-        }
-    }
+pub fn skip_if_rpc_unavailable(e: anyhow::Error, test_name: &str) {
+    eprintln!(
+        "⚠️  Skipping {} - Bitcoin RPC not available: {}",
+        test_name, e
+    );
 }
 
 #[cfg(test)]

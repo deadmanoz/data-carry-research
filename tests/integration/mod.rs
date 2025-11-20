@@ -6,6 +6,7 @@
 pub mod arc4_tool;
 pub mod cli_smoke_test;
 pub mod content_type_queries;
+pub mod ppk_decoder;
 pub mod spendability_queries;
 pub mod stage2_pipeline;
 pub mod stage3_pipeline;

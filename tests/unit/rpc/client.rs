@@ -98,6 +98,12 @@ async fn test_rpc_channel_communication() -> Result<()> {
                 RpcRequest::TestConnection { tx } => {
                     let _ = tx.send(Ok(()));
                 }
+                RpcRequest::GetBlock { .. } => {
+                    // Not used in this test
+                }
+                RpcRequest::GetTransactionVerbose { .. } => {
+                    // Not used in this test
+                }
             }
         }
     });
