@@ -2,14 +2,19 @@
 
 A research tool for analysing Pay-to-Multisig (P2MS) outputs in the UTXO set to identify and classify data-carrying protocols.
 
-P2MS outputs are also known as "bare multisig" or "raw multisig", and are NOT to be confused with the modern, standard use of multisig, which relies P2SH or P2WSH script types.
+P2MS outputs are also known as "bare multisig" or "raw multisig", and are NOT to be confused with the modern, standard use of multisig, which relies on P2SH or P2WSH script types.
+
+This repository was used to produce the research findings in the "P2MS Data Carry" post series:
+- [P2MS Data Carry Part 1: Fundamentals and Examples](https://deadmanoz.xyz/posts/p2ms-data-carry-1)
+- [P2MS Data Carry Part 2: UTXO set analysis](https://deadmanoz.xyz/posts/p2ms-data-carry-2)
 
 This tool may be extended in the future to:
 - Support script types beyond P2MS
 - Process the blockchain (alongside the UTXO set)
 - Support Bitcoin Core's UTXO set dump format
 
-This project also served as an experiment in AI-assisted design and development and was co-authored by Claude Code. Enjoy the emojis! 🤖✨
+This project also served as an experiment in AI-assisted design and development and was co-authored by Claude Code.
+Enjoy the comprehensive tests to keep the AI on the rails and the excessive emojis! 🤖✨
 
 ## Overview
 
