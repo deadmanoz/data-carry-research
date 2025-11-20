@@ -335,11 +335,10 @@ pub enum ProtocolVariant {
     ChancecoinUnknown, // Unknown Chancecoin message type
 
     // PPk protocol variants (infrastructure with RT and other applications)
-    PPkRTStandard,      // RT in OP_RETURN + PPk marker pubkey (1,391 txs)
-    PPkRTP2MSEmbedded,  // RT in P2MS pubkey #3 + OP_RETURN + PPk marker (619 txs)
-    PPkRegistration,    // Number string registrations (~1,000 txs)
-    PPkMessage,         // PPk promotional messages (~500 txs)
-    PPkUnknown,         // Other PPk applications (~1,196 txs)
+    PPkProfile,      // JSON profile data via RT transport (2,010 txs total - combines OP_RETURN and P2MS-embedded)
+    PPkRegistration, // Number string registrations (~1,000 txs)
+    PPkMessage,      // PPk promotional messages (~500 txs)
+    PPkUnknown,      // Other PPk applications (~1,196 txs)
 
     // OP_RETURN-signalled protocol variants
     OpReturnProtocol47930, // 0xbb3a marker (2-of-2 P2MS, ~9000 sats, blocks 554753+)
@@ -399,8 +398,7 @@ impl std::fmt::Display for ProtocolVariant {
             ProtocolVariant::ChancecoinBet => "Bet",
             ProtocolVariant::ChancecoinCancel => "Cancel",
             ProtocolVariant::ChancecoinUnknown => "Unknown",
-            ProtocolVariant::PPkRTStandard => "PPkRTStandard",
-            ProtocolVariant::PPkRTP2MSEmbedded => "PPkRTP2MSEmbedded",
+            ProtocolVariant::PPkProfile => "PPkProfile",
             ProtocolVariant::PPkRegistration => "PPkRegistration",
             ProtocolVariant::PPkMessage => "PPkMessage",
             ProtocolVariant::PPkUnknown => "PPkUnknown",

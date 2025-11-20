@@ -25,6 +25,7 @@ pub mod chancecoin;
 pub mod content_detection;
 pub mod counterparty;
 pub mod omni;
+pub mod ppk;
 pub mod spendability;
 pub mod stamps;
 

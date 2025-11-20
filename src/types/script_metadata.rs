@@ -395,7 +395,7 @@ pub fn parse_p2ms_script(
 }
 
 /// Parsed OP_RETURN output data
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct OpReturnData {
     /// Full OP_RETURN script (hex-encoded)
     pub op_return_hex: String,

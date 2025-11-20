@@ -1,5 +1,6 @@
 use crate::errors::AppResult;
 use clap::{Parser, Subcommand};
+use tracing_subscriber;
 
 pub mod commands;
 
@@ -24,7 +25,7 @@ pub enum Commands {
     Stage3(commands::stage3::Stage3Command),
     /// Test Bitcoin RPC connectivity
     TestRpc(commands::decoder::TestRpcCommand),
-    /// Decode data from a specific transaction ID using RPC
+    /// Decode protocol data from transaction (Bitcoin Stamps, Counterparty, Omni, PPk, DataStorage, etc.)
     DecodeTxid(commands::decoder::DecodeTxidCommand),
     /// Fetch transaction data from Bitcoin Core RPC
     Fetch(commands::decoder::FetchCommand),
@@ -35,6 +36,15 @@ pub enum Commands {
 }
 
 pub async fn run() -> AppResult<()> {
+    // Initialise tracing subscriber to capture info!() macros
+    // Uses RUST_LOG environment variable (defaults to "error" if not set)
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("error")),
+        )
+        .try_init();
+
     let cli = Cli::parse();
 
     match cli.command {

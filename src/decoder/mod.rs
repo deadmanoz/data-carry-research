@@ -21,6 +21,7 @@ use tracing::{debug, info, warn};
 use self::chancecoin::try_chancecoin;
 use self::image_formats::{is_base64_data, ImageFormat};
 use self::output::{JsonType, OutputManager};
+use self::ppk::try_ppk;
 use self::protocol_detection::{
     fetch_transaction, try_bitcoin_stamps, try_counterparty, try_likely_data_storage,
     try_likely_legitimate_p2ms, try_omni, DecodedProtocol,
@@ -42,6 +43,7 @@ pub mod debug_display;
 pub mod image_formats;
 pub mod omni_parser;
 pub mod output;
+pub mod ppk;
 pub mod protocol_detection;
 pub mod protocol_detection_verbose;
 
@@ -77,6 +79,7 @@ pub enum DecodedData {
     Counterparty { data: CounterpartyData },
     Omni { data: OmniData },
     Chancecoin { data: ChancecoinData },
+    PPk { data: PPkData },
     DataStorage(DataStorageData),
 }
 
@@ -117,6 +120,17 @@ pub struct ChancecoinData {
     pub file_path: PathBuf,
     pub message_type: crate::types::chancecoin::ChancecoinMessageType,
     pub data: Vec<u8>,
+}
+
+/// PPk protocol data
+#[derive(Debug, Clone)]
+pub struct PPkData {
+    pub txid: String,
+    pub file_path: PathBuf,
+    pub variant: crate::types::ProtocolVariant,
+    pub rt_json: Option<serde_json::Value>,
+    pub odin_identifier: Option<crate::types::ppk::OdinIdentifier>,
+    pub content_type: String,
 }
 
 /// DataStorage protocol data
@@ -162,6 +176,19 @@ impl DecodedData {
                     data.data.len()
                 )
             }
+            DecodedData::PPk { data } => {
+                let odin_suffix = if let Some(ref odin) = data.odin_identifier {
+                    format!(" - ODIN: {}", odin.full_identifier)
+                } else {
+                    String::new()
+                };
+                format!(
+                    "PPk {:?} ({}){}",
+                    data.variant,
+                    data.content_type,
+                    odin_suffix
+                )
+            }
             DecodedData::DataStorage(data) => {
                 format!(
                     "DataStorage {} ({} bytes)",
@@ -185,6 +212,7 @@ impl DecodedData {
             DecodedData::Counterparty { data } => &data.txid,
             DecodedData::Omni { data } => &data.txid,
             DecodedData::Chancecoin { data } => &data.txid,
+            DecodedData::PPk { data } => &data.txid,
             DecodedData::DataStorage(data) => &data.txid,
         }
     }
@@ -202,6 +230,7 @@ impl DecodedData {
             DecodedData::Counterparty { data } => Some(&data.file_path),
             DecodedData::Omni { data } => Some(&data.file_path),
             DecodedData::Chancecoin { data } => Some(&data.file_path),
+            DecodedData::PPk { data } => Some(&data.file_path),
             DecodedData::DataStorage(_) => None, // DataStorage saves to multiple files
         }
     }
@@ -219,7 +248,24 @@ impl DecodedData {
             DecodedData::Omni { data } => data.deobfuscated_payload.len(),
             DecodedData::Counterparty { data } => data.raw_data.len(),
             DecodedData::Chancecoin { data } => data.data.len(),
+            DecodedData::PPk { data } => {
+                data.rt_json.as_ref().map(|j| j.to_string().len()).unwrap_or(0)
+                    + data.odin_identifier.as_ref().map(|o| o.full_identifier.len()).unwrap_or(0)
+            }
             DecodedData::DataStorage(data) => data.decoded_data.len(),
+        }
+    }
+
+    /// Check if this is a PPk protocol decode
+    pub fn is_ppk(&self) -> bool {
+        matches!(self, DecodedData::PPk { .. })
+    }
+
+    /// Get PPk data if this is a PPk decode
+    pub fn ppk_data(&self) -> Option<&PPkData> {
+        match self {
+            DecodedData::PPk { data } => Some(data),
+            _ => None,
         }
     }
 }
@@ -466,7 +512,13 @@ impl ProtocolDecoder {
             }
         }
 
-        // Priority 5: DataStorage (generic data embedding patterns)
+        // Priority 5: PPk (marker pubkey-based protocol detection)
+        if let Some(decoded_protocol) = try_ppk(&tx_data, &self.rpc_client).await {
+            info!("✅ Detected PPk protocol in {}", txid);
+            return self.decode_ppk(decoded_protocol).await;
+        }
+
+        // Priority 6: DataStorage (generic data embedding patterns)
         if let Some(decoded_protocol) =
             datastorage::try_datastorage(&tx_data, self.output_manager.output_dir())
         {
@@ -474,13 +526,13 @@ impl ProtocolDecoder {
             return self.decode_datastorage(decoded_protocol).await;
         }
 
-        // Priority 6: LikelyDataStorage (valid EC points but suspicious patterns)
+        // Priority 7: LikelyDataStorage (valid EC points but suspicious patterns)
         if let Some(decoded_protocol) = try_likely_data_storage(&tx_data) {
             info!("✅ Detected Likely Data Storage pattern in {}", txid);
             return self.decode_likely_data_storage(decoded_protocol).await;
         }
 
-        // Priority 7: LikelyLegitimateMultisig (pubkey validation - all valid EC points)
+        // Priority 8: LikelyLegitimateMultisig (pubkey validation - all valid EC points)
         if let Some(decoded_protocol) = try_likely_legitimate_p2ms(&tx_data) {
             info!("✅ Detected Likely Legitimate Multisig in {}", txid);
             return self.decode_likely_legitimate_p2ms(decoded_protocol).await;
@@ -1159,6 +1211,70 @@ impl ProtocolDecoder {
 
         info!(
             "Successfully decoded Chancecoin: {}",
+            decoded_data.summary()
+        );
+
+        Ok(Some(decoded_data))
+    }
+
+    /// Decode PPk protocol data
+    async fn decode_ppk(
+        &self,
+        protocol: DecodedProtocol,
+    ) -> DecoderResult<Option<DecodedData>> {
+        let (txid, variant, rt_json, raw_opreturn_bytes, parsed_data, content_type, odin_identifier) = match protocol {
+            DecodedProtocol::PPk {
+                txid,
+                variant,
+                rt_json,
+                raw_opreturn_bytes,
+                parsed_data,
+                content_type,
+                odin_identifier,
+                debug_info: _,
+            } => (txid, variant, rt_json, raw_opreturn_bytes, parsed_data, content_type, odin_identifier),
+            _ => {
+                return Err(DecoderError::InvalidTransaction(
+                    "Expected PPk protocol".to_string(),
+                ))
+            }
+        };
+
+        info!("Decoding PPk data for transaction: {}", txid);
+        info!("Variant: {:?}", variant);
+        info!("Content type: {}", content_type);
+        if let Some(ref odin) = odin_identifier {
+            info!("ODIN: {}", odin.full_identifier);
+        }
+
+        // Create output file for PPk data
+        let output_path = self.output_manager.create_ppk_output(
+            &txid,
+            &variant,
+            rt_json.as_ref(),
+            raw_opreturn_bytes.as_ref(),
+            parsed_data.as_ref(),
+            &content_type,
+            odin_identifier.as_ref(),
+        )?;
+
+        info!("Wrote PPk data to: {:?}", output_path);
+
+        let ppk_data = PPkData {
+            txid: txid.clone(),
+            file_path: output_path,
+            variant,
+            rt_json,
+            odin_identifier,
+            content_type,
+        };
+
+        let decoded_data = DecodedData::PPk {
+            data: ppk_data,
+        };
+
+        info!(
+            "Successfully decoded PPk: {}",
             decoded_data.summary()
         );
 

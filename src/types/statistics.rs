@@ -364,14 +364,18 @@ impl Stage3Results {
 /// Stage 3 (Protocol Classification) metrics for unified progress reporting
 impl crate::processor::StageMetrics for Stage3Results {
     fn format_custom_metrics(&self) -> String {
-        // Note: DS (DataStorage) includes WikiLeaks Cablegate
+        // Abbreviations: S=BitcoinStamps, CP=Counterparty, A=AsciiIdentifierProtocols,
+        // O=OmniLayer, CC=Chancecoin, PPk=PPk, OP_RET=OpReturnSignalled,
+        // DS=DataStorage (includes WikiLeaks Cablegate), LD=LikelyDataStorage,
+        // Leg=LikelyLegitimateMultisig, Unk=Unknown
         format!(
-            "S:{} CP:{} A:{} O:{} CC:{} OP_RET:{} DS:{} LD:{} Leg:{} Unk:{}",
+            "S:{} CP:{} A:{} O:{} CC:{} PPk:{} OP_RET:{} DS:{} LD:{} Leg:{} Unk:{}",
             self.stamps_classified,
             self.counterparty_classified,
             self.ascii_identifier_protocols_classified,
             self.omni_classified,
             self.chancecoin_classified,
+            self.ppk_classified,
             self.opreturn_signalled_classified,
             self.datastorage_classified,
             self.likely_data_storage_classified,
@@ -394,6 +398,7 @@ impl StatisticsCollector for Stage3Results {
         self.ascii_identifier_protocols_classified = 0;
         self.omni_classified = 0;
         self.chancecoin_classified = 0;
+        self.ppk_classified = 0;
         self.opreturn_signalled_classified = 0;
         self.datastorage_classified = 0;
         self.likely_data_storage_classified = 0;
@@ -435,7 +440,7 @@ impl StatisticsCollector for Stage3Results {
             cpv_pct,
             omni_pct,
             chancecoin_pct,
-            _ppk_pct,
+            ppk_pct,
             opreturn_signalled_pct,
             data_pct,
             likely_data_pct,
@@ -449,7 +454,7 @@ impl StatisticsCollector for Stage3Results {
 
         if self.baseline_transactions > 0 {
             format!(
-                "Stage 3: {} transactions classified this run (baseline: {}, total: {}), {:.1}% classified (S:{:.1}%, CP:{:.1}%, ASCII:{:.1}%, O:{:.1}%, CC:{:.1}%, ORS:{:.1}%, D:{:.1}%, LDS:{:.1}%, L:{:.1}%, U:{:.1}%), {:.1} tx/sec",
+                "Stage 3: {} transactions classified this run (baseline: {}, total: {}), {:.1}% classified (S:{:.1}%, CP:{:.1}%, ASCII:{:.1}%, O:{:.1}%, CC:{:.1}%, PPk:{:.1}%, ORS:{:.1}%, D:{:.1}%, LDS:{:.1}%, L:{:.1}%, U:{:.1}%), {:.1} tx/sec",
                 newly_processed,
                 self.baseline_transactions,
                 self.transactions_processed,
@@ -459,6 +464,7 @@ impl StatisticsCollector for Stage3Results {
                 cpv_pct,
                 omni_pct,
                 chancecoin_pct,
+                ppk_pct,
                 opreturn_signalled_pct,
                 data_pct,
                 likely_data_pct,
@@ -468,7 +474,7 @@ impl StatisticsCollector for Stage3Results {
             )
         } else {
             format!(
-                "Stage 3: {} transactions, {:.1}% classified (S:{:.1}%, CP:{:.1}%, ASCII:{:.1}%, O:{:.1}%, CC:{:.1}%, ORS:{:.1}%, D:{:.1}%, LDS:{:.1}%, L:{:.1}%, U:{:.1}%), {:.1} tx/sec",
+                "Stage 3: {} transactions, {:.1}% classified (S:{:.1}%, CP:{:.1}%, ASCII:{:.1}%, O:{:.1}%, CC:{:.1}%, PPk:{:.1}%, ORS:{:.1}%, D:{:.1}%, LDS:{:.1}%, L:{:.1}%, U:{:.1}%), {:.1} tx/sec",
                 self.transactions_processed,
                 self.classification_rate(),
                 stamps_pct,
@@ -476,6 +482,7 @@ impl StatisticsCollector for Stage3Results {
                 cpv_pct,
                 omni_pct,
                 chancecoin_pct,
+                ppk_pct,
                 opreturn_signalled_pct,
                 data_pct,
                 likely_data_pct,

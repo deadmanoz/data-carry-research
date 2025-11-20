@@ -56,6 +56,16 @@ pub enum DecodedProtocol {
         message: crate::types::chancecoin::ChancecoinMessage,
         debug_info: Option<crate::decoder::debug_display::TransactionDebugInfo>,
     },
+    PPk {
+        txid: String,
+        variant: crate::types::ProtocolVariant,
+        rt_json: Option<serde_json::Value>,
+        raw_opreturn_bytes: Option<Vec<u8>>,
+        parsed_data: Option<Vec<u8>>,
+        content_type: String,
+        odin_identifier: Option<crate::types::ppk::OdinIdentifier>,
+        debug_info: Option<crate::decoder::debug_display::TransactionDebugInfo>,
+    },
     LikelyLegitimateMultisig {
         txid: String,
         validation_summary: String,
@@ -274,6 +284,42 @@ impl TransactionData {
         }
 
         None
+    }
+
+    /// Extract OP_RETURN outputs from transaction
+    ///
+    /// Returns all outputs with OP_RETURN scripts (script_type: "nulldata")
+    pub fn op_return_outputs(&self) -> Vec<TransactionOutput> {
+        let mut outputs = Vec::new();
+
+        for (vout, output) in self.transaction.output.iter().enumerate() {
+            let script_hex = hex::encode(output.script_pubkey.to_bytes());
+            let script_bytes = output.script_pubkey.to_bytes();
+
+            // OP_RETURN scripts start with 0x6a
+            if !script_bytes.is_empty() && script_bytes[0] == 0x6a {
+                // Try to parse OP_RETURN data using shared parser
+                if let Some(op_return_data) =
+                    crate::types::script_metadata::parse_opreturn_script(&script_hex)
+                {
+                    outputs.push(TransactionOutput {
+                        txid: self.txid.clone(),
+                        vout: vout as u32,
+                        height: 0,
+                        amount: output.value.to_sat(),
+                        script_hex: script_hex.clone(),
+                        script_type: "nulldata".to_string(), // Bitcoin Core uses "nulldata" for OP_RETURN
+                        is_coinbase: false,
+                        script_size: script_bytes.len(),
+                        metadata: serde_json::to_value(op_return_data)
+                            .unwrap_or_else(|_| serde_json::json!({})),
+                        address: None, // OP_RETURN has no address
+                    });
+                }
+            }
+        }
+
+        outputs
     }
 
     /// Check if transaction has Exodus address output (for Omni)

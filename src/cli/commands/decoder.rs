@@ -414,6 +414,18 @@ async fn run_decode_txid(
                             data.data.len()
                         );
                     }
+                    DecodedData::PPk { data } => {
+                        let odin_str = data.odin_identifier.as_ref()
+                            .map(|o| format!(" ODIN:{}", o.full_identifier))
+                            .unwrap_or_default();
+                        println!(
+                            "TXID:{} TYPE:PPk VARIANT:{:?} CONTENT_TYPE:{}{}",
+                            txid,
+                            data.variant,
+                            data.content_type,
+                            odin_str
+                        );
+                    }
                     DecodedData::DataStorage(data) => {
                         println!(
                             "TXID:{} TYPE:DATASTORAGE PATTERN:{} SIZE:{}",
@@ -468,6 +480,21 @@ async fn run_decode_txid(
                         info!("✅ Successfully decoded Chancecoin data!");
                         info!("📄 Message Type: {:?}", data.message_type);
                         info!("📄 Size: {} bytes", data.data.len());
+                        info!("📄 File: {}", data.file_path.display());
+                    }
+                    DecodedData::PPk { data } => {
+                        info!("✅ Successfully decoded PPk protocol data!");
+                        info!("📄 Variant: {:?}", data.variant);
+                        info!("📄 Content Type: {}", data.content_type);
+                        if let Some(ref odin) = data.odin_identifier {
+                            info!("📄 ODIN: {}", odin.full_identifier);
+                            info!("   • Block: {} (time: {})", odin.block_height, odin.block_time);
+                            info!("   • TX index: {}", odin.tx_index);
+                            info!("   • DSS: {}", odin.dss);
+                        }
+                        if let Some(ref rt_json) = data.rt_json {
+                            info!("📄 RT JSON fields: {}", rt_json.as_object().map(|o| o.len()).unwrap_or(0));
+                        }
                         info!("📄 File: {}", data.file_path.display());
                     }
                     DecodedData::DataStorage(data) => {
@@ -573,6 +600,7 @@ async fn run_fetch_command(fetch_type: &FetchCommands) -> AppResult<()> {
                             DecodedData::Counterparty { .. } => "counterparty",
                             DecodedData::Omni { .. } => "omni",
                             DecodedData::Chancecoin { .. } => "chancecoin",
+                            DecodedData::PPk { .. } => "ppk",
                             DecodedData::DataStorage(_) => "datastorage",
                         };
                         info!("Auto-detected protocol: {}", detected_protocol);

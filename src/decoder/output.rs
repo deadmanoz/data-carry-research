@@ -306,6 +306,84 @@ impl OutputManager {
         Ok(filepath)
     }
 
+    /// Create PPk protocol output file
+    /// Creates: <base_dir>/ppk/<txid>.json
+    pub fn create_ppk_output(
+        &self,
+        txid: &str,
+        variant: &crate::types::ProtocolVariant,
+        rt_json: Option<&serde_json::Value>,
+        raw_opreturn_bytes: Option<&Vec<u8>>,
+        parsed_data: Option<&Vec<u8>>,
+        content_type: &str,
+        odin_identifier: Option<&crate::types::ppk::OdinIdentifier>,
+    ) -> OutputResult<PathBuf> {
+        use serde_json::json;
+
+        let ppk_dir = self.base_dir.join("ppk");
+        self.ensure_directory_exists(&ppk_dir)?;
+
+        // Build structured JSON output
+        let mut output_json = json!({
+            "txid": txid,
+            "protocol": "PPk",
+            "variant": format!("{:?}", variant),
+            "content_type": content_type,
+            "decode_timestamp": chrono::Utc::now().to_rfc3339(),
+        });
+
+        // Add ODIN identifier if present
+        if let Some(odin) = odin_identifier {
+            output_json["odin"] = json!({
+                "full_identifier": odin.full_identifier,
+                "block_height": odin.block_height,
+                "tx_index": odin.tx_index,
+                "dss": odin.dss,
+                "block_time": odin.block_time,
+            });
+        }
+
+        // Add RT JSON if present (for Profile variant)
+        if let Some(rt) = rt_json {
+            output_json["rt_json"] = rt.clone();
+        }
+
+        // Add raw OP_RETURN bytes if present (full archival data)
+        if let Some(raw_bytes) = raw_opreturn_bytes {
+            output_json["raw_opreturn"] = json!({
+                "hex": hex::encode(raw_bytes),
+                "length": raw_bytes.len(),
+            });
+        }
+
+        // Add parsed data if present (JSON string, registration number, or message text)
+        if let Some(parsed) = parsed_data {
+            // Try to decode as UTF-8 string
+            if let Ok(text) = String::from_utf8(parsed.clone()) {
+                output_json["parsed_data"] = json!({
+                    "text": text,
+                    "hex": hex::encode(parsed),
+                    "length": parsed.len(),
+                });
+            } else {
+                // Binary data only
+                output_json["parsed_data"] = json!({
+                    "hex": hex::encode(parsed),
+                    "length": parsed.len(),
+                });
+            }
+        }
+
+        let filename = format!("{}.json", txid);
+        let filepath = ppk_dir.join(filename);
+
+        let json_string = serde_json::to_string_pretty(&output_json)
+            .map_err(|e| OutputError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        fs::write(&filepath, json_string)?;
+
+        Ok(filepath)
+    }
+
     /// Ensure a directory exists, creating it if necessary
     fn ensure_directory_exists(&self, dir: &Path) -> OutputResult<()> {
         if !dir.exists() {
