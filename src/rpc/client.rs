@@ -22,6 +22,14 @@ pub enum RpcRequest {
     TestConnection {
         tx: oneshot::Sender<RpcResult<()>>,
     },
+    GetBlock {
+        block_hash: String,
+        tx: oneshot::Sender<RpcResult<serde_json::Value>>,
+    },
+    GetTransactionVerbose {
+        txid: String,
+        tx: oneshot::Sender<RpcResult<serde_json::Value>>,
+    },
 }
 
 /// Bitcoin RPC client with robust retry logic and async worker pattern
@@ -189,6 +197,106 @@ impl BitcoinRpcClient {
         }
     }
 
+    /// Get block information with verbosity=1 (includes tx list)
+    pub async fn get_block(&self, block_hash: &str) -> RpcResult<serde_json::Value> {
+        let (tx, rx) = oneshot::channel();
+
+        self.request_tx
+            .send(RpcRequest::GetBlock {
+                block_hash: block_hash.to_string(),
+                tx,
+            })
+            .await
+            .map_err(|_| RpcError::ConnectionFailed("Failed to send RPC request".to_string()))?;
+
+        rx.await
+            .map_err(|_| RpcError::ConnectionFailed("RPC worker channel closed".to_string()))?
+    }
+
+    /// Get transaction with verbose JSON output (includes blockhash, confirmations, etc.)
+    pub async fn get_transaction_verbose(&self, txid: &str) -> RpcResult<serde_json::Value> {
+        let (tx, rx) = oneshot::channel();
+
+        self.request_tx
+            .send(RpcRequest::GetTransactionVerbose {
+                txid: txid.to_string(),
+                tx,
+            })
+            .await
+            .map_err(|_| RpcError::ConnectionFailed("Failed to send RPC request".to_string()))?;
+
+        rx.await
+            .map_err(|_| RpcError::ConnectionFailed("RPC worker channel closed".to_string()))?
+    }
+
+    /// Get transaction's block position (height, index, time)
+    ///
+    /// Returns: (block_height, tx_index, block_time, block_hash)
+    /// Returns error if transaction is not confirmed (no blockhash)
+    pub async fn get_transaction_block_position(
+        &self,
+        txid: &str,
+    ) -> RpcResult<(u64, usize, u64, String)> {
+        // Single RPC call - get transaction with verbose=1
+        let tx_verbose = self.get_transaction_verbose(txid).await?;
+
+        // Extract block hash
+        let block_hash = tx_verbose
+            .get("blockhash")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                RpcError::InvalidResponse(format!(
+                    "Transaction {} not confirmed (no blockhash)",
+                    txid
+                ))
+            })?
+            .to_string();
+
+        // Fetch block info
+        let block_info = self.get_block(&block_hash).await?;
+
+        // Extract block height
+        let block_height = block_info
+            .get("height")
+            .and_then(|v| v.as_u64())
+            .ok_or_else(|| {
+                RpcError::InvalidResponse(format!("Block {} missing height field", block_hash))
+            })?;
+
+        // Extract block time
+        let block_time = block_info
+            .get("time")
+            .and_then(|v| v.as_u64())
+            .ok_or_else(|| {
+                RpcError::InvalidResponse(format!("Block {} missing time field", block_hash))
+            })?;
+
+        // Find transaction index in block's tx array
+        let tx_array = block_info
+            .get("tx")
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| {
+                RpcError::InvalidResponse(format!("Block {} missing tx array", block_hash))
+            })?;
+
+        let tx_index = tx_array
+            .iter()
+            .position(|tx| tx.as_str() == Some(txid))
+            .ok_or_else(|| {
+                RpcError::InvalidResponse(format!(
+                    "Transaction {} not found in block {}",
+                    txid, block_hash
+                ))
+            })?;
+
+        debug!(
+            "Transaction {} found at block {}:{} (height {}, time {})",
+            txid, block_hash, tx_index, block_height, block_time
+        );
+
+        Ok((block_height, tx_index, block_time, block_hash))
+    }
+
     /// Create synchronous client for worker use
     fn create_sync_client(config: &BitcoinRpcConfig) -> RpcResult<Arc<Client>> {
         let auth = Auth::UserPass(config.username.clone(), config.password.clone());
@@ -252,6 +360,14 @@ impl RpcWorker {
             }
             RpcRequest::TestConnection { tx } => {
                 let result = self.test_connection_impl().await;
+                let _ = tx.send(result);
+            }
+            RpcRequest::GetBlock { block_hash, tx } => {
+                let result = self.get_block_impl(&block_hash).await;
+                let _ = tx.send(result);
+            }
+            RpcRequest::GetTransactionVerbose { txid, tx } => {
+                let result = self.get_transaction_verbose_impl(&txid).await;
                 let _ = tx.send(result);
             }
         }
@@ -423,6 +539,100 @@ impl RpcWorker {
             Err(_) => Err(RpcError::Timeout {
                 timeout_seconds: self.config.timeout_seconds,
                 operation: "connection_test".to_string(),
+            }),
+        }
+    }
+
+    /// Get block information with verbosity=1 (includes tx list as txid strings)
+    async fn get_block_impl(&self, block_hash: &str) -> RpcResult<serde_json::Value> {
+        let client = Arc::clone(&self.client);
+        let block_hash_owned = block_hash.to_string();
+
+        match execute_with_timeout(
+            self.config.timeout_seconds,
+            move || -> RpcResult<serde_json::Value> {
+                // Use raw JSON-RPC call with verbosity=1 to get txid strings (not transaction objects)
+                // getblock <blockhash> 1 returns JSON with "tx": ["txid1", "txid2", ...]
+                let result: serde_json::Value = client
+                    .call(
+                        "getblock",
+                        &[
+                            serde_json::json!(block_hash_owned),
+                            serde_json::json!(1), // verbosity=1 for txid strings
+                        ],
+                    )
+                    .map_err(|e| RpcError::CallFailed {
+                        method: "getblock".to_string(),
+                        message: e.to_string(),
+                    })?;
+
+                debug!("Retrieved block {} with txid list", block_hash_owned);
+
+                Ok(result)
+            },
+        )
+        .await
+        {
+            Ok(result) => result.map_err(|e| RpcError::CallFailed {
+                method: "spawn_blocking".to_string(),
+                message: format!("Get block task failed: {}", e),
+            })?,
+            Err(_) => Err(RpcError::Timeout {
+                timeout_seconds: self.config.timeout_seconds,
+                operation: format!("get_block({})", block_hash),
+            }),
+        }
+    }
+
+    /// Get transaction with verbose JSON output (includes blockhash, confirmations, etc.)
+    async fn get_transaction_verbose_impl(&self, txid: &str) -> RpcResult<serde_json::Value> {
+        let client = Arc::clone(&self.client);
+        let txid_owned = txid.to_string();
+
+        match execute_with_timeout(
+            self.config.timeout_seconds,
+            move || -> RpcResult<serde_json::Value> {
+                // Use the client's call method to make a raw JSON-RPC call with verbose=true
+                // getrawtransaction <txid> true returns JSON with blockhash, confirmations, etc.
+                let result: serde_json::Value = client
+                    .call(
+                        "getrawtransaction",
+                        &[
+                            serde_json::json!(txid_owned),
+                            serde_json::json!(true), // verbose=true for JSON output
+                        ],
+                    )
+                    .map_err(|e| {
+                        let error_message = e.to_string();
+                        // Check for "not found" errors
+                        if error_message.contains("No such mempool or blockchain transaction")
+                            || error_message.contains("Invalid or non-wallet transaction id")
+                        {
+                            RpcError::TransactionNotFound {
+                                txid: txid_owned.clone(),
+                            }
+                        } else {
+                            RpcError::CallFailed {
+                                method: "getrawtransaction".to_string(),
+                                message: error_message,
+                            }
+                        }
+                    })?;
+
+                debug!("Retrieved verbose transaction {}", txid_owned);
+
+                Ok(result)
+            },
+        )
+        .await
+        {
+            Ok(result) => result.map_err(|e| RpcError::CallFailed {
+                method: "spawn_blocking".to_string(),
+                message: format!("Get transaction verbose task failed: {}", e),
+            })?,
+            Err(_) => Err(RpcError::Timeout {
+                timeout_seconds: self.config.timeout_seconds,
+                operation: format!("get_transaction_verbose({})", txid),
             }),
         }
     }
