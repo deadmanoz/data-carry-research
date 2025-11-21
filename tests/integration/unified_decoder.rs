@@ -25,7 +25,6 @@ use tokio;
 
 /// Test configuration - requires running Bitcoin Core
 // RPC configuration now imported from common::rpc_helpers
-
 /// Bitcoin Stamps test TXIDs - Images
 const BITCOIN_STAMPS_IMAGE_TXID: &str =
     "54fdeda90c4573f8a93fa45251a3c6214bcc79aa8549728dfb08ffe3e7dd3d81";
@@ -118,7 +117,6 @@ const OMNI_CLOSE_CROWDSALE_TXID: &str =
 
 /// Helper to create RPC config
 // RPC config creation now uses common::rpc_helpers::create_test_rpc_config()
-
 /// Helper to create decoder with temp directory
 async fn create_test_decoder() -> anyhow::Result<(ProtocolDecoder, TempDir)> {
     let temp_dir = TempDir::new()?;
@@ -131,7 +129,7 @@ async fn create_test_decoder() -> anyhow::Result<(ProtocolDecoder, TempDir)> {
 
 /// Helper to create decoder with project directory (for manual verification)
 async fn create_test_decoder_with_project_dir() -> anyhow::Result<ProtocolDecoder> {
-    let output_dir = std::path::PathBuf::from("output_data");
+    let output_dir = std::path::PathBuf::from("output_data/decoded");
     let rpc_config = create_test_rpc_config();
 
     let decoder = ProtocolDecoder::new(rpc_config, output_dir).await?;
@@ -613,10 +611,7 @@ async fn test_decode_bitcoin_stamps_multi_output_95dca4() -> anyhow::Result<()> 
                 decoded_html.size_bytes > 0,
                 "HTML data should have non-zero size"
             );
-            assert!(
-                decoded_html.file_path.exists(),
-                "HTML file should exist"
-            );
+            assert!(decoded_html.file_path.exists(), "HTML file should exist");
 
             // Check that HTML file is in the correct directory
             let expected_dir = temp_dir.path().join("bitcoin_stamps").join("html");
@@ -627,7 +622,10 @@ async fn test_decode_bitcoin_stamps_multi_output_95dca4() -> anyhow::Result<()> 
 
             // Validate HTML file extension
             assert!(
-                decoded_html.file_path.extension().map_or(false, |e| e == "html"),
+                decoded_html
+                    .file_path
+                    .extension()
+                    .is_some_and(|e| e == "html"),
                 "File should have .html extension"
             );
 

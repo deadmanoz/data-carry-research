@@ -250,7 +250,7 @@ async fn test_stage3_classification_stats_calculations() {
                     ProtocolType::BitcoinStamps => vec![BurnPatternType::Stamps22Pattern],
                     ProtocolType::OmniLayer => vec![], // OmniLayer uses protocol identifiers, not burn patterns
                     ProtocolType::Chancecoin => vec![], // Chancecoin uses signature, not burn patterns
-                    ProtocolType::PPk => vec![], // PPk uses marker pubkey, not burn patterns
+                    ProtocolType::PPk => vec![],        // PPk uses marker pubkey, not burn patterns
                     ProtocolType::OpReturnSignalled => vec![],
                     ProtocolType::DataStorage => vec![],
                     ProtocolType::LikelyDataStorage => vec![], // LikelyDataStorage uses pattern detection, not burn patterns

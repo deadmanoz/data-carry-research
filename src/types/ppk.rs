@@ -77,7 +77,7 @@ pub fn detect_ppk_variant(
         .or_else(|| detect_rt_p2ms_embedded(op_return_outputs, p2ms_outputs))
         .or_else(|| detect_registration(op_return_outputs))
         .or_else(|| detect_message(op_return_outputs))
-        .or_else(|| {
+        .or({
             // Fallback: PPk marker found but no specific variant
             Some(PPkDetectionResult {
                 variant: ProtocolVariant::PPkUnknown,
@@ -309,7 +309,9 @@ fn detect_message(op_return_outputs: &[TransactionOutput]) -> Option<PPkDetectio
     for output in op_return_outputs.iter() {
         if let Some(opreturn_bytes) = extract_opreturn_bytes(&output.script_hex) {
             // Message pattern: contains "PPk" or "ppk" substring
-            let has_ppk = opreturn_bytes.windows(3).any(|w| w == b"PPk" || w == b"ppk");
+            let has_ppk = opreturn_bytes
+                .windows(3)
+                .any(|w| w == b"PPk" || w == b"ppk");
 
             // OR ≥80% printable ASCII
             let printable_count = opreturn_bytes
@@ -588,4 +590,3 @@ mod tests {
         assert_eq!(extracted.unwrap(), test_data);
     }
 }
-

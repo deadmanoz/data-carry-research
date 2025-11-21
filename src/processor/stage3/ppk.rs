@@ -112,12 +112,8 @@ impl PPkClassifier {
         .with_content_type(content_type)
         .with_metadata(metadata);
 
-        let tx_classification = ClassificationResult::new(
-            tx.txid.clone(),
-            ProtocolType::PPk,
-            Some(variant),
-            details,
-        );
+        let tx_classification =
+            ClassificationResult::new(tx.txid.clone(), ProtocolType::PPk, Some(variant), details);
 
         Some((tx_classification, output_classifications))
     }

@@ -179,7 +179,9 @@ impl ProtocolStatsAnalyser {
     ///
     /// Returns statistics for all Bitcoin Stamps variants including the new
     /// HTML, Compressed, and Data variants.
-    pub fn get_stamps_variant_breakdown(db: &Database) -> AppResult<Vec<super::types::VariantStats>> {
+    pub fn get_stamps_variant_breakdown(
+        db: &Database,
+    ) -> AppResult<Vec<super::types::VariantStats>> {
         let conn = db.connection();
 
         let mut stmt = conn.prepare(

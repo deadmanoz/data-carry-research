@@ -331,7 +331,6 @@ pub fn detect_image_format(data: &[u8]) -> Option<ImageFormat> {
     None
 }
 
-
 /// Detect compression format (ZLIB or GZIP only)
 ///
 /// Checks for:
@@ -700,7 +699,11 @@ pub mod validation {
     /// 9. Fallback to binary data or Unknown
     pub fn detect_stamps_variant_with_content(
         decrypted_data: &[u8],
-    ) -> (Option<StampsVariant>, Option<&'static str>, Option<ImageFormat>) {
+    ) -> (
+        Option<StampsVariant>,
+        Option<&'static str>,
+        Option<ImageFormat>,
+    ) {
         // Handle empty payloads
         if decrypted_data.is_empty() {
             return (Some(StampsVariant::Unknown), None, None);
@@ -744,7 +747,6 @@ pub mod validation {
         // Detect content type using shared helper
         detect_content_type_from_payload(payload)
     }
-
 
     /// Extract base64 data from Bitcoin Stamps decrypted data after stamp signature
     ///
@@ -850,7 +852,11 @@ pub mod validation {
     /// Used by Stage 3 classifier and Stage 4 decoder to ensure identical detection logic.
     pub(crate) fn detect_content_type_from_payload(
         payload: &[u8],
-    ) -> (Option<StampsVariant>, Option<&'static str>, Option<ImageFormat>) {
+    ) -> (
+        Option<StampsVariant>,
+        Option<&'static str>,
+        Option<ImageFormat>,
+    ) {
         // Empty payload check
         if payload.is_empty() {
             let result = (Some(StampsVariant::Unknown), None, None);
@@ -902,7 +908,8 @@ pub mod validation {
                     if let Some(protocol) = obj.get("p").and_then(|v| v.as_str()) {
                         match protocol.to_lowercase().as_str() {
                             "src-20" => {
-                                let result = (Some(StampsVariant::SRC20), Some("application/json"), None);
+                                let result =
+                                    (Some(StampsVariant::SRC20), Some("application/json"), None);
                                 debug_assert!(
                                     result.1.is_some() && result.2.is_none(),
                                     "SRC20 must have content_type, no image_format"
@@ -910,7 +917,8 @@ pub mod validation {
                                 return result;
                             }
                             "src-721" | "src-721r" => {
-                                let result = (Some(StampsVariant::SRC721), Some("application/json"), None);
+                                let result =
+                                    (Some(StampsVariant::SRC721), Some("application/json"), None);
                                 debug_assert!(
                                     result.1.is_some() && result.2.is_none(),
                                     "SRC721 must have content_type, no image_format"
@@ -918,7 +926,8 @@ pub mod validation {
                                 return result;
                             }
                             "src-101" => {
-                                let result = (Some(StampsVariant::SRC101), Some("application/json"), None);
+                                let result =
+                                    (Some(StampsVariant::SRC101), Some("application/json"), None);
                                 debug_assert!(
                                     result.1.is_some() && result.2.is_none(),
                                     "SRC101 must have content_type, no image_format"

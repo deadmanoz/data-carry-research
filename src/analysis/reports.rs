@@ -842,9 +842,7 @@ impl ReportFormatter {
     }
 
     /// Export value distributions as Plotly-compatible JSON
-    fn export_plotly_value_distributions(
-        report: &ValueDistributionReport,
-    ) -> AppResult<String> {
+    fn export_plotly_value_distributions(report: &ValueDistributionReport) -> AppResult<String> {
         use serde_json::json;
 
         // Create bucket labels (X-axis)
@@ -904,7 +902,8 @@ impl ReportFormatter {
         protocol_dists.sort_by(|a, b| b.total_outputs.cmp(&a.total_outputs));
 
         for protocol_dist in &protocol_dists {
-            let protocol_counts: Vec<usize> = protocol_dist.buckets.iter().map(|b| b.count).collect();
+            let protocol_counts: Vec<usize> =
+                protocol_dist.buckets.iter().map(|b| b.count).collect();
 
             traces.push(json!({
                 "x": bucket_labels,
@@ -948,8 +947,9 @@ impl ReportFormatter {
             "layout": layout
         });
 
-        serde_json::to_string_pretty(&plotly_data)
-            .map_err(|e| crate::errors::AppError::Config(format!("Plotly JSON export failed: {}", e)))
+        serde_json::to_string_pretty(&plotly_data).map_err(|e| {
+            crate::errors::AppError::Config(format!("Plotly JSON export failed: {}", e))
+        })
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -1235,7 +1235,10 @@ impl ReportFormatter {
                 output.push_str(&format!(
                     "  Overhead Factor:      {}\n",
                     if report.total_data_capacity > 0 {
-                        format!("{:.2}x", report.total_script_bytes as f64 / report.total_data_capacity as f64)
+                        format!(
+                            "{:.2}x",
+                            report.total_script_bytes as f64 / report.total_data_capacity as f64
+                        )
                     } else {
                         "N/A".to_string()
                     }

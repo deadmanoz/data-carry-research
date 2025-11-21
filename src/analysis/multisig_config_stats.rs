@@ -293,7 +293,7 @@ impl MultisigConfigAnalyser {
                 // Note: This is a conservative underestimate. Actual capacity could be higher
                 // if uncompressed keys are used, but without the exact script size mapping
                 // we cannot determine the precise key composition.
-                let config = format!("{}-of-{}?", m, n);  // "?" suffix indicates estimated
+                let config = format!("{}-of-{}?", m, n); // "?" suffix indicates estimated
                 let capacity = if m == 1 && n > 1 {
                     // Conservative estimate: assume all compressed keys
                     (n - 1) * 32

@@ -26,9 +26,7 @@ use self::protocol_detection::{
     fetch_transaction, try_bitcoin_stamps, try_counterparty, try_likely_data_storage,
     try_likely_legitimate_p2ms, try_omni, DecodedProtocol,
 };
-use crate::types::stamps::validation::{
-    detect_content_type_from_payload, find_stamp_signature,
-};
+use crate::types::stamps::validation::{detect_content_type_from_payload, find_stamp_signature};
 use crate::types::stamps::{classify_json_data, StampsVariant};
 use base64::Engine;
 
@@ -184,9 +182,7 @@ impl DecodedData {
                 };
                 format!(
                     "PPk {:?} ({}){}",
-                    data.variant,
-                    data.content_type,
-                    odin_suffix
+                    data.variant, data.content_type, odin_suffix
                 )
             }
             DecodedData::DataStorage(data) => {
@@ -249,8 +245,15 @@ impl DecodedData {
             DecodedData::Counterparty { data } => data.raw_data.len(),
             DecodedData::Chancecoin { data } => data.data.len(),
             DecodedData::PPk { data } => {
-                data.rt_json.as_ref().map(|j| j.to_string().len()).unwrap_or(0)
-                    + data.odin_identifier.as_ref().map(|o| o.full_identifier.len()).unwrap_or(0)
+                data.rt_json
+                    .as_ref()
+                    .map(|j| j.to_string().len())
+                    .unwrap_or(0)
+                    + data
+                        .odin_identifier
+                        .as_ref()
+                        .map(|o| o.full_identifier.len())
+                        .unwrap_or(0)
             }
             DecodedData::DataStorage(data) => data.decoded_data.len(),
         }
@@ -688,8 +691,7 @@ impl ProtocolDecoder {
 
         // Shared payload handler keeps Stage 3 and Stage 4 aligned
         let handle_payload = |payload: Vec<u8>| -> DecoderResult<Option<DecodedData>> {
-            let (variant, content_type, image_format) =
-                detect_content_type_from_payload(&payload);
+            let (variant, content_type, image_format) = detect_content_type_from_payload(&payload);
 
             match (variant, content_type, image_format, payload) {
                 (Some(StampsVariant::Compressed), Some(ct), _, bytes) => {
@@ -1218,11 +1220,16 @@ impl ProtocolDecoder {
     }
 
     /// Decode PPk protocol data
-    async fn decode_ppk(
-        &self,
-        protocol: DecodedProtocol,
-    ) -> DecoderResult<Option<DecodedData>> {
-        let (txid, variant, rt_json, raw_opreturn_bytes, parsed_data, content_type, odin_identifier) = match protocol {
+    async fn decode_ppk(&self, protocol: DecodedProtocol) -> DecoderResult<Option<DecodedData>> {
+        let (
+            txid,
+            variant,
+            rt_json,
+            raw_opreturn_bytes,
+            parsed_data,
+            content_type,
+            odin_identifier,
+        ) = match protocol {
             DecodedProtocol::PPk {
                 txid,
                 variant,
@@ -1232,7 +1239,15 @@ impl ProtocolDecoder {
                 content_type,
                 odin_identifier,
                 debug_info: _,
-            } => (txid, variant, rt_json, raw_opreturn_bytes, parsed_data, content_type, odin_identifier),
+            } => (
+                txid,
+                variant,
+                rt_json,
+                raw_opreturn_bytes,
+                parsed_data,
+                content_type,
+                odin_identifier,
+            ),
             _ => {
                 return Err(DecoderError::InvalidTransaction(
                     "Expected PPk protocol".to_string(),
@@ -1269,14 +1284,9 @@ impl ProtocolDecoder {
             content_type,
         };
 
-        let decoded_data = DecodedData::PPk {
-            data: ppk_data,
-        };
+        let decoded_data = DecodedData::PPk { data: ppk_data };
 
-        info!(
-            "Successfully decoded PPk: {}",
-            decoded_data.summary()
-        );
+        info!("Successfully decoded PPk: {}", decoded_data.summary());
 
         Ok(Some(decoded_data))
     }

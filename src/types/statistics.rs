@@ -323,7 +323,9 @@ impl Stage3Results {
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn classification_breakdown(&self) -> (f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64) {
+    pub fn classification_breakdown(
+        &self,
+    ) -> (f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64) {
         let total = self.total_classified() as f64;
         if total > 0.0 {
             (

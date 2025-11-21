@@ -135,8 +135,8 @@ mod test_data {
             }
 
             // Check if this matches Counterparty P2MS pattern
-            let is_counterparty = (info.required_sigs == 1 && info.total_pubkeys == 3)
-                || (info.required_sigs == 1 && info.total_pubkeys == 2);
+            let is_counterparty =
+                info.required_sigs == 1 && (info.total_pubkeys == 2 || info.total_pubkeys == 3);
             analysis.push_str(&format!(
                 "║   Counterparty Pattern Match: {}\n",
                 if is_counterparty { "✅ YES" } else { "❌ NO" }

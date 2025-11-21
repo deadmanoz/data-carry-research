@@ -295,14 +295,14 @@ impl std::str::FromStr for ProtocolType {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ProtocolVariant {
     // Bitcoin Stamps variants
-    StampsClassic,     // Image data
-    StampsSRC20,       // SRC-20 token
-    StampsSRC721,      // SRC-721 NFT
-    StampsSRC101,      // SRC-101 domain
-    StampsHTML,        // HTML documents and JavaScript applications
-    StampsCompressed,  // Compressed data (ZLIB, GZIP)
-    StampsData,        // Generic data (XML, non-SRC JSON, binary)
-    StampsUnknown,     // Unrecognizable content or burn-pattern-only
+    StampsClassic,    // Image data
+    StampsSRC20,      // SRC-20 token
+    StampsSRC721,     // SRC-721 NFT
+    StampsSRC101,     // SRC-101 domain
+    StampsHTML,       // HTML documents and JavaScript applications
+    StampsCompressed, // Compressed data (ZLIB, GZIP)
+    StampsData,       // Generic data (XML, non-SRC JSON, binary)
+    StampsUnknown,    // Unrecognizable content or burn-pattern-only
 
     // Counterparty variants
     CounterpartySend,         // Asset transfer
@@ -335,15 +335,15 @@ pub enum ProtocolVariant {
     ChancecoinUnknown, // Unknown Chancecoin message type
 
     // PPk protocol variants (infrastructure with RT and other applications)
-    PPkProfile,      // JSON profile data via RT transport (2,010 txs total - combines OP_RETURN and P2MS-embedded)
+    PPkProfile, // JSON profile data via RT transport (2,010 txs total - combines OP_RETURN and P2MS-embedded)
     PPkRegistration, // Number string registrations (~1,000 txs)
-    PPkMessage,      // PPk promotional messages (~500 txs)
-    PPkUnknown,      // Other PPk applications (~1,196 txs)
+    PPkMessage, // PPk promotional messages (~500 txs)
+    PPkUnknown, // Other PPk applications (~1,196 txs)
 
     // OP_RETURN-signalled protocol variants
     OpReturnProtocol47930, // 0xbb3a marker (2-of-2 P2MS, ~9000 sats, blocks 554753+)
     OpReturnCLIPPERZ,      // CLIPPERZ notarization (2-of-2 P2MS, 238 txs, blocks 403627-443835)
-    OpReturnGenericASCII,  // Generic ASCII OP_RETURN protocols (one-off protocols: PRVCY, unsuccessful, @DEVCHA, etc.)
+    OpReturnGenericASCII, // Generic ASCII OP_RETURN protocols (one-off protocols: PRVCY, unsuccessful, @DEVCHA, etc.)
 
     // LikelyDataStorage variants
     InvalidECPoint, // Invalid EC points (not on secp256k1 curve - obvious data embedding)

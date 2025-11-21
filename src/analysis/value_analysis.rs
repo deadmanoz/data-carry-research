@@ -200,8 +200,8 @@ impl ValueAnalysisEngine {
             (100_000_000, 500_000_000),   // 100M-500M satoshis (1-5 BTC)
             (500_000_000, 1_000_000_000), // 500M-1B satoshis (5-10 BTC)
             (1_000_000_000, i64::MAX as u64), // 1B+ satoshis (10+ BTC)
-                                               // LIMIT: i64::MAX (9.22M BTC) for SQLite INTEGER compatibility
-                                               // This is well above Bitcoin's 21M BTC supply, so no practical limitation
+                                          // LIMIT: i64::MAX (9.22M BTC) for SQLite INTEGER compatibility
+                                          // This is well above Bitcoin's 21M BTC supply, so no practical limitation
         ];
 
         // First, get global distribution (all P2MS outputs)
@@ -357,7 +357,12 @@ impl ValueAnalysisEngine {
 
         if count == 0 {
             return Ok(ValuePercentiles {
-                p25: 0, p50: 0, p75: 0, p90: 0, p95: 0, p99: 0,
+                p25: 0,
+                p50: 0,
+                p75: 0,
+                p90: 0,
+                p95: 0,
+                p99: 0,
             });
         }
 
@@ -409,7 +414,12 @@ impl ValueAnalysisEngine {
         let len = values.len();
         if len == 0 {
             return Ok(ValuePercentiles {
-                p25: 0, p50: 0, p75: 0, p90: 0, p95: 0, p99: 0,
+                p25: 0,
+                p50: 0,
+                p75: 0,
+                p90: 0,
+                p95: 0,
+                p99: 0,
             });
         }
 
@@ -595,7 +605,7 @@ mod tests {
             .unwrap();
 
         // Add outputs with known values for percentile testing
-        let test_values = vec![100, 200, 300, 400, 500, 600, 700, 800, 900, 1000];
+        let test_values = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000];
         for (i, value) in test_values.iter().enumerate() {
             conn.execute(
                 "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type, script_size, is_coinbase, is_spent)

@@ -22,7 +22,9 @@
 //! All tests use authentic Bitcoin mainnet transaction data from JSON fixtures,
 //! ensuring validation against real-world PPk protocol usage.
 
-use data_carry_research::types::{EnrichedTransaction, ProtocolType, ProtocolVariant, TransactionOutput};
+use data_carry_research::types::{
+    EnrichedTransaction, ProtocolType, ProtocolVariant, TransactionOutput,
+};
 use serial_test::serial;
 
 // Import standardised test utilities
@@ -30,7 +32,7 @@ use crate::common::db_seeding::seed_enriched_transaction_simple;
 use crate::common::fixtures;
 use crate::common::protocol_test_base::{
     load_all_outputs_from_json, run_stage3_processor, setup_protocol_test, verify_classification,
-    verify_stage3_completion, verify_content_type,
+    verify_content_type, verify_stage3_completion,
 };
 
 /// PPk protocol test data helpers
@@ -62,7 +64,10 @@ mod test_data {
         let mut tx = fixtures::create_test_enriched_transaction(txid);
         tx.height = height;
         tx.outputs = outputs.clone();
-        tx.p2ms_outputs_count = outputs.iter().filter(|o| o.script_type == "multisig").count();
+        tx.p2ms_outputs_count = outputs
+            .iter()
+            .filter(|o| o.script_type == "multisig")
+            .count();
 
         Some(tx)
     }
@@ -276,9 +281,7 @@ async fn test_ppk_no_marker_negative() {
     seed_enriched_transaction_simple(&mut test_db, &tx, Vec::new()).unwrap();
 
     // Run Stage 3 processor
-    let stats = run_stage3_processor(test_db.path(), config)
-        .await
-        .unwrap();
+    let stats = run_stage3_processor(test_db.path(), config).await.unwrap();
 
     // Verify NO PPk classification occurred
     assert_eq!(

@@ -169,12 +169,15 @@ fn test_overall_efficiency_calculation() -> AppResult<()> {
 
     // Add test data with known values
     seed_blocks(&db, &[100])?;
-    seed_transaction_outputs(&db, &[
-        // 1-of-3 CCC: 105 bytes script, 64 bytes data
-        create_test_multisig("tx1", 0, 100, 1000, 105, 1, 3),
-        // Another 1-of-3 CCC
-        create_test_multisig("tx2", 0, 100, 2000, 105, 1, 3),
-    ])?;
+    seed_transaction_outputs(
+        &db,
+        &[
+            // 1-of-3 CCC: 105 bytes script, 64 bytes data
+            create_test_multisig("tx1", 0, 100, 1000, 105, 1, 3),
+            // Another 1-of-3 CCC
+            create_test_multisig("tx2", 0, 100, 2000, 105, 1, 3),
+        ],
+    )?;
 
     let report = MultisigConfigAnalyser::analyse_multisig_configurations(&db)?;
 
@@ -194,17 +197,20 @@ fn test_type_summary_grouping() -> AppResult<()> {
     let db = create_test_db()?;
 
     seed_blocks(&db, &[100])?;
-    seed_transaction_outputs(&db, &[
-        // Three 1-of-3 outputs
-        create_test_multisig("tx1", 0, 100, 1000, 105, 1, 3),
-        create_test_multisig("tx2", 0, 100, 2000, 105, 1, 3),
-        create_test_multisig("tx3", 0, 100, 3000, 105, 1, 3),
-        // Two 1-of-2 outputs
-        create_test_multisig("tx4", 0, 100, 4000, 71, 1, 2),
-        create_test_multisig("tx5", 0, 100, 5000, 71, 1, 2),
-        // One 2-of-3 output
-        create_test_multisig("tx6", 0, 100, 6000, 105, 2, 3),
-    ])?;
+    seed_transaction_outputs(
+        &db,
+        &[
+            // Three 1-of-3 outputs
+            create_test_multisig("tx1", 0, 100, 1000, 105, 1, 3),
+            create_test_multisig("tx2", 0, 100, 2000, 105, 1, 3),
+            create_test_multisig("tx3", 0, 100, 3000, 105, 1, 3),
+            // Two 1-of-2 outputs
+            create_test_multisig("tx4", 0, 100, 4000, 71, 1, 2),
+            create_test_multisig("tx5", 0, 100, 5000, 71, 1, 2),
+            // One 2-of-3 output
+            create_test_multisig("tx6", 0, 100, 6000, 105, 2, 3),
+        ],
+    )?;
 
     let report = MultisigConfigAnalyser::analyse_multisig_configurations(&db)?;
 
@@ -222,10 +228,13 @@ fn test_zero_data_capacity_efficiency() -> AppResult<()> {
     let db = create_test_db()?;
 
     seed_blocks(&db, &[100])?;
-    seed_transaction_outputs(&db, &[
-        // 2-of-2 CC: 71 bytes script, 0 bytes data
-        create_test_multisig("tx1", 0, 100, 1000, 71, 2, 2),
-    ])?;
+    seed_transaction_outputs(
+        &db,
+        &[
+            // 2-of-2 CC: 71 bytes script, 0 bytes data
+            create_test_multisig("tx1", 0, 100, 1000, 71, 2, 2),
+        ],
+    )?;
 
     let report = MultisigConfigAnalyser::analyse_multisig_configurations(&db)?;
 
@@ -243,20 +252,38 @@ fn assert_config(m: u32, n: u32, script_size: u32, expected_config: &str, expect
     // Call the production function directly (exposed publicly for testing)
     let (config, capacity) = MultisigConfigAnalyser::determine_configuration(m, n, script_size);
 
-    assert_eq!(config, expected_config,
-        "Configuration mismatch for {}-of-{} with script size {}", m, n, script_size);
-    assert_eq!(capacity, expected_capacity,
-        "Capacity mismatch for {}-of-{} with script size {}", m, n, script_size);
+    assert_eq!(
+        config, expected_config,
+        "Configuration mismatch for {}-of-{} with script size {}",
+        m, n, script_size
+    );
+    assert_eq!(
+        capacity, expected_capacity,
+        "Capacity mismatch for {}-of-{} with script size {}",
+        m, n, script_size
+    );
 }
 
-fn assert_config_pattern(m: u32, n: u32, script_size: u32, expected_pattern: &str, expected_capacity: u32) {
+fn assert_config_pattern(
+    m: u32,
+    n: u32,
+    script_size: u32,
+    expected_pattern: &str,
+    expected_capacity: u32,
+) {
     // Call the production function directly
     let (config, capacity) = MultisigConfigAnalyser::determine_configuration(m, n, script_size);
 
-    assert_eq!(config, expected_pattern,
-        "Pattern mismatch for {}-of-{} with script size {}", m, n, script_size);
-    assert_eq!(capacity, expected_capacity,
-        "Capacity mismatch for {}-of-{} with script size {}", m, n, script_size);
+    assert_eq!(
+        config, expected_pattern,
+        "Pattern mismatch for {}-of-{} with script size {}",
+        m, n, script_size
+    );
+    assert_eq!(
+        capacity, expected_capacity,
+        "Capacity mismatch for {}-of-{} with script size {}",
+        m, n, script_size
+    );
 }
 
 // Test data structure that matches database schema

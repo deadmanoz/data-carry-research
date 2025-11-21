@@ -650,8 +650,8 @@ mod variant_classification {
         let gzip_data = &[
             0x1F, 0x8B, 0x08, 0x00, // Magic + deflate
             0x00, 0x00, 0x00, 0x00, // Timestamp
-            0x00, 0x03,             // Extra flags + OS
-            0x03, 0x00,             // Minimal deflate block
+            0x00, 0x03, // Extra flags + OS
+            0x03, 0x00, // Minimal deflate block
         ];
         let with_signature = add_stamp_signature(gzip_data);
         let (variant, content_type, _) = detect_stamps_variant_with_content(&with_signature);
@@ -691,7 +691,8 @@ mod variant_classification {
     fn test_svg_is_classic() {
         let svg = b"<svg xmlns=\"http://www.w3.org/2000/svg\"><circle cx=\"50\" cy=\"50\" r=\"40\"/></svg>";
         let with_signature = add_stamp_signature(svg);
-        let (variant, content_type, image_format) = detect_stamps_variant_with_content(&with_signature);
+        let (variant, content_type, image_format) =
+            detect_stamps_variant_with_content(&with_signature);
         assert_eq!(variant, Some(StampsVariant::Classic));
         assert_eq!(content_type, Some("image/svg+xml"));
         assert_eq!(image_format, Some(ImageFormat::Svg));

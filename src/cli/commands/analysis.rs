@@ -66,6 +66,7 @@ pub enum AnalysisCommands {
         format: String,
 
         /// Output file path (if not specified, outputs to stdout)
+        /// Recommended: ./output_data/analysis/value_distributions.json
         #[arg(long, short = 'o')]
         output: Option<PathBuf>,
     },
@@ -277,8 +278,11 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
                 ReportFormatter::format_value_distributions(&analysis, &parse_format(format))?;
 
             if let Some(output_path) = output {
-                std::fs::write(&output_path, formatted_output)?;
-                println!("Value distribution analysis written to: {}", output_path.display());
+                std::fs::write(output_path, formatted_output)?;
+                println!(
+                    "Value distribution analysis written to: {}",
+                    output_path.display()
+                );
             } else {
                 print!("{}", formatted_output);
             }
@@ -431,10 +435,8 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
             let db_path = get_db_path(database_path)?;
             let engine = AnalysisEngine::new(&db_path)?;
             let analysis = engine.analyse_multisig_configurations()?;
-            let output = ReportFormatter::format_multisig_config_report(
-                &analysis,
-                &parse_format(format),
-            )?;
+            let output =
+                ReportFormatter::format_multisig_config_report(&analysis, &parse_format(format))?;
             print!("{}", output);
             Ok(())
         }

@@ -55,10 +55,7 @@ pub async fn try_ppk(
     let detection_result = detect_ppk_variant(&op_return_outputs, &p2ms_outputs)?;
 
     info!("✅ PPk variant detected: {:?}", detection_result.variant);
-    info!(
-        "   • Content type: {}",
-        detection_result.content_type
-    );
+    info!("   • Content type: {}", detection_result.content_type);
 
     // Construct ODIN identifier for ALL PPk variants
     // Each variant uses a specific DSS format for resource location
@@ -67,7 +64,10 @@ pub async fn try_ppk(
 
     if let Some(ref odin) = odin_identifier {
         info!("   • ODIN: {}", odin.full_identifier);
-        info!("   • Block: {} (time: {})", odin.block_height, odin.block_time);
+        info!(
+            "   • Block: {} (time: {})",
+            odin.block_height, odin.block_time
+        );
         info!("   • TX index: {}", odin.tx_index);
         info!("   • DSS: {}", odin.dss);
     }
@@ -131,11 +131,7 @@ async fn construct_odin_identifier(
             if let Some(ref parsed_data) = detection_result.parsed_data {
                 // Parse quoted number (e.g., "315"} → 315)
                 let text = String::from_utf8_lossy(parsed_data);
-                let number = text
-                    .trim()
-                    .trim_matches('"')
-                    .trim_end_matches('}')
-                    .trim();
+                let number = text.trim().trim_matches('"').trim_end_matches('}').trim();
                 format!("reg_{}.txt", sanitize_filename(number))
             } else {
                 "registration.txt".to_string()
@@ -180,8 +176,7 @@ async fn construct_odin_identifier(
 fn sanitize_dss(input: &str) -> String {
     let sanitized = input
         .replace("..", "") // Remove directory traversal
-        .replace('/', "_") // Replace path separators
-        .replace('\\', "_")
+        .replace(['/', '\\'], "_")
         .chars()
         .filter(|c| !c.is_control() && *c != '\0') // Remove control chars and nulls
         .take(200) // Max 200 chars

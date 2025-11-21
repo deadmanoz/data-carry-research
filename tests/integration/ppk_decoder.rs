@@ -87,7 +87,9 @@ async fn test_ppk_profile_opreturn_decoding() -> anyhow::Result<()> {
 
         // Verify DSS format (should be inferred from JSON)
         assert!(
-            odin.dss.ends_with(".json") || odin.dss.contains("profile") || odin.dss.contains("data"),
+            odin.dss.ends_with(".json")
+                || odin.dss.contains("profile")
+                || odin.dss.contains("data"),
             "DSS should be JSON-related: {}",
             odin.dss
         );
@@ -163,10 +165,7 @@ async fn test_ppk_profile_p2ms_decoding() -> anyhow::Result<()> {
             "Profile should have parsed RT JSON"
         );
 
-        println!(
-            "   • RT JSON: {}",
-            ppk_data.rt_json.as_ref().unwrap()
-        );
+        println!("   • RT JSON: {}", ppk_data.rt_json.as_ref().unwrap());
     } else {
         panic!("PPk data missing from decoded result");
     }
@@ -322,8 +321,7 @@ async fn test_non_ppk_transaction() -> anyhow::Result<()> {
     };
 
     // Use a known Bitcoin Stamps transaction (different marker)
-    const NON_PPK_TXID: &str =
-        "54fdeda90c4573f8a93fa45251a3c6214bcc79aa8549728dfb08ffe3e7dd3d81";
+    const NON_PPK_TXID: &str = "54fdeda90c4573f8a93fa45251a3c6214bcc79aa8549728dfb08ffe3e7dd3d81";
 
     let result = decoder.decode_txid(NON_PPK_TXID).await?;
     let decoded_opt = result;
