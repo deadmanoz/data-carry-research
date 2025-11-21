@@ -88,7 +88,7 @@ just plot-temporal-log test_output/stage1_small.db
     --bin monthly \
     --log-scale \
     --format svg \
-    --output plots/custom.svg \
+    --output output_data/plots/custom.svg \
     --title "Custom Title"
 ```
 
@@ -112,7 +112,7 @@ just viz-help
 
 ## Output
 
-All plots saved to `plots/` directory (gitignored).
+All plots saved to `output_data/plots/` directory (gitignored).
 
 Plot types generated:
 - Temporal distribution (raw, daily, monthly, yearly bins)

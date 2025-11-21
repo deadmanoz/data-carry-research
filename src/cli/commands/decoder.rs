@@ -1,4 +1,4 @@
-use crate::config::{AppConfig, BitcoinRpcConfig};
+use crate::config::{output_paths, AppConfig, BitcoinRpcConfig};
 use crate::decoder::{DecodedData, ProtocolDecoder};
 use crate::errors::{AppError, AppResult};
 use crate::rpc::BitcoinRpcClient;
@@ -28,8 +28,8 @@ pub enum FetchCommands {
         #[arg(long)]
         output: Option<String>,
 
-        /// Custom output root directory (default: ./output_data for investigation)
-        #[arg(long, default_value = "./output_data")]
+        /// Custom output root directory (default: ./output_data/fetched for fetched transactions)
+        #[arg(long, default_value = output_paths::FETCHED_BASE)]
         output_dir: PathBuf,
 
         /// Also fetch all input transactions
@@ -71,8 +71,8 @@ pub enum FetchCommands {
         #[arg(long, default_value = "4")]
         parallel: usize,
 
-        /// Custom output root directory (default: ./output_data for investigation)
-        #[arg(long, default_value = "./output_data")]
+        /// Custom output root directory (default: ./output_data/fetched for fetched transactions)
+        #[arg(long, default_value = output_paths::FETCHED_BASE)]
         output_dir: PathBuf,
 
         /// Bitcoin RPC URL (overrides config.toml)
@@ -144,7 +144,7 @@ pub struct DecodeTxidCommand {
     pub txid: String,
 
     /// Output directory for decoded data
-    #[arg(long, default_value = "./output_data")]
+    #[arg(long, default_value = output_paths::DECODED_BASE)]
     pub output_dir: PathBuf,
 
     /// Bitcoin RPC URL (overrides config.toml)
@@ -371,22 +371,18 @@ async fn run_decode_txid(
                             );
                         }
                         crate::decoder::BitcoinStampsData::Html(decoded_html) => {
-                            println!(
-                                "TXID:{} TYPE:HTML SIZE:{}",
-                                txid, decoded_html.size_bytes
-                            );
+                            println!("TXID:{} TYPE:HTML SIZE:{}", txid, decoded_html.size_bytes);
                         }
                         crate::decoder::BitcoinStampsData::Compressed(decoded_compressed) => {
                             println!(
                                 "TXID:{} TYPE:COMPRESSED ALGORITHM:{} SIZE:{}",
-                                txid, decoded_compressed.compression_type, decoded_compressed.size_bytes
+                                txid,
+                                decoded_compressed.compression_type,
+                                decoded_compressed.size_bytes
                             );
                         }
                         crate::decoder::BitcoinStampsData::Data(decoded_data) => {
-                            println!(
-                                "TXID:{} TYPE:DATA SIZE:{}",
-                                txid, decoded_data.size_bytes
-                            );
+                            println!("TXID:{} TYPE:DATA SIZE:{}", txid, decoded_data.size_bytes);
                         }
                     },
                     DecodedData::Counterparty { data } => {
@@ -415,15 +411,14 @@ async fn run_decode_txid(
                         );
                     }
                     DecodedData::PPk { data } => {
-                        let odin_str = data.odin_identifier.as_ref()
+                        let odin_str = data
+                            .odin_identifier
+                            .as_ref()
                             .map(|o| format!(" ODIN:{}", o.full_identifier))
                             .unwrap_or_default();
                         println!(
                             "TXID:{} TYPE:PPk VARIANT:{:?} CONTENT_TYPE:{}{}",
-                            txid,
-                            data.variant,
-                            data.content_type,
-                            odin_str
+                            txid, data.variant, data.content_type, odin_str
                         );
                     }
                     DecodedData::DataStorage(data) => {
@@ -488,12 +483,18 @@ async fn run_decode_txid(
                         info!("📄 Content Type: {}", data.content_type);
                         if let Some(ref odin) = data.odin_identifier {
                             info!("📄 ODIN: {}", odin.full_identifier);
-                            info!("   • Block: {} (time: {})", odin.block_height, odin.block_time);
+                            info!(
+                                "   • Block: {} (time: {})",
+                                odin.block_height, odin.block_time
+                            );
                             info!("   • TX index: {}", odin.tx_index);
                             info!("   • DSS: {}", odin.dss);
                         }
                         if let Some(ref rt_json) = data.rt_json {
-                            info!("📄 RT JSON fields: {}", rt_json.as_object().map(|o| o.len()).unwrap_or(0));
+                            info!(
+                                "📄 RT JSON fields: {}",
+                                rt_json.as_object().map(|o| o.len()).unwrap_or(0)
+                            );
                         }
                         info!("📄 File: {}", data.file_path.display());
                     }
@@ -506,7 +507,7 @@ async fn run_decode_txid(
                                 info!("📄 Total pubkeys: {}", total_pubkeys);
                             }
                         }
-                        info!("📄 Saved to: output_data/datastorage/");
+                        // Note: DataStorage saves to multiple files in pattern-specific subdirectories
                     }
                 }
             }

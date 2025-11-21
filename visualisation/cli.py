@@ -5,6 +5,7 @@ from pathlib import Path
 
 import click
 
+from visualisation.config import PLOTS_DIR
 from visualisation.db import get_temporal_distribution, get_database_stats, get_protocol_distribution, get_spendability_distribution
 from visualisation.plotting import plot_temporal_distribution, plot_protocol_distribution, plot_spendability_percentage
 from visualisation.export import export_protocol_distribution_plotly, export_spendability_plotly
@@ -29,8 +30,8 @@ def cli():
 )
 @click.option(
     '--output', '-o',
-    default='plots/temporal_distribution.png',
-    help='Output file path (default: plots/temporal_distribution.png)'
+    default=str(PLOTS_DIR / 'temporal_distribution.png'),
+    help='Output file path (default: output_data/plots/temporal_distribution.png)'
 )
 @click.option(
     '--bin',
@@ -102,7 +103,7 @@ def temporal(
         # Save as SVG with custom title
         python -m visualisation.cli temporal -d test_output/stage1_small.db \\
             --format svg --title "Bitcoin P2MS Evolution" \\
-            --output plots/p2ms_evolution.svg
+            --output output_data/plots/p2ms_evolution.svg
     """
     try:
         # Show stats if requested
@@ -190,8 +191,8 @@ def stats(database: str):
 )
 @click.option(
     '--output', '-o',
-    default='plots/protocol_distribution.png',
-    help='Output file path (default: plots/protocol_distribution.png)'
+    default=str(PLOTS_DIR / 'protocol_distribution.png'),
+    help='Output file path (default: output_data/plots/protocol_distribution.png)'
 )
 @click.option(
     '--bin',
@@ -252,7 +253,7 @@ def protocols(
         # Save as SVG with custom title
         python -m visualisation.cli protocols -d p2ms_analysis_production.db \\
             --format svg --title "Bitcoin P2MS Protocols" \\
-            --output plots/protocols.svg
+            --output output_data/plots/protocols.svg
     """
     try:
         # Extract data
@@ -291,8 +292,8 @@ def protocols(
 @cli.command()
 @click.option('-d', '--database', required=True, type=click.Path(exists=True),
               help='Path to SQLite database')
-@click.option('-o', '--output', default='plots/spendability_percentage.png',
-              help='Output file path (default: plots/spendability_percentage.png)')
+@click.option('-o', '--output', default=str(PLOTS_DIR / 'spendability_percentage.png'),
+              help='Output file path (default: output_data/plots/spendability_percentage.png)')
 @click.option('--bin', 'bin_by', type=click.Choice(['monthly', 'yearly']),
               help='Aggregate data by time period (default: monthly)')
 @click.option('-f', '--format', 'format', type=click.Choice(['png', 'svg', 'pdf']),
@@ -321,7 +322,7 @@ def spendability(database, output, bin_by, format, dpi, title):
         # Save as SVG with custom title
         python -m visualisation.cli spendability -d p2ms_analysis_production.db \\
             --format svg --title "P2MS Spendability Analysis" \\
-            --output plots/spendability.svg
+            --output output_data/plots/spendability.svg
     """
     try:
         click.echo(f"Loading spendability data from {database}...")
@@ -357,8 +358,8 @@ def spendability(database, output, bin_by, format, dpi, title):
 @cli.command()
 @click.option('-d', '--database', required=True, type=click.Path(exists=True),
               help='Path to SQLite database')
-@click.option('-o', '--output', default='plots/protocol_distribution.json',
-              help='Output JSON file path (default: plots/protocol_distribution.json)')
+@click.option('-o', '--output', default=str(PLOTS_DIR / 'protocol_distribution.json'),
+              help='Output JSON file path (default: output_data/plots/protocol_distribution.json)')
 @click.option('--bin', 'bin_by', type=click.Choice(['monthly', 'yearly']),
               default='monthly', help='Aggregate data by time period (default: monthly)')
 @click.option('-t', '--title', default='P2MS Protocol Distribution Over Time',
@@ -380,7 +381,7 @@ def export_protocols(database, output, bin_by, title, log):
         # Yearly aggregation with log scale
         python -m visualisation.cli export-protocols -d p2ms_analysis_production.db \\
             --bin yearly --log \\
-            --output plots/protocols_yearly_log.json
+            --output output_data/plots/protocols_yearly_log.json
 
         \b
         # Custom title
@@ -421,8 +422,8 @@ def export_protocols(database, output, bin_by, title, log):
 @cli.command()
 @click.option('-d', '--database', required=True, type=click.Path(exists=True),
               help='Path to SQLite database')
-@click.option('-o', '--output', default='plots/spendability.json',
-              help='Output JSON file path (default: plots/spendability.json)')
+@click.option('-o', '--output', default=str(PLOTS_DIR / 'spendability.json'),
+              help='Output JSON file path (default: output_data/plots/spendability.json)')
 @click.option('--bin', 'bin_by', type=click.Choice(['monthly', 'yearly']),
               default='monthly', help='Aggregate data by time period (default: monthly)')
 @click.option('-t', '--title', default='P2MS Output Spendability Over Time',
@@ -443,7 +444,7 @@ def export_spendability(database, output, bin_by, title):
         # Yearly aggregation
         python -m visualisation.cli export-spendability -d p2ms_analysis_production.db \\
             --bin yearly \\
-            --output plots/spendability_yearly.json
+            --output output_data/plots/spendability_yearly.json
 
         \b
         # For website

@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use super::image_formats::ImageFormat;
+use crate::config::output_paths;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -60,7 +61,10 @@ impl OutputManager {
         image_data: &[u8],
         format: ImageFormat,
     ) -> OutputResult<PathBuf> {
-        let image_dir = self.base_dir.join("bitcoin_stamps").join("images");
+        let image_dir = self
+            .base_dir
+            .join(output_paths::PROTOCOL_BITCOIN_STAMPS)
+            .join("images");
         self.ensure_directory_exists(&image_dir)?;
 
         let filename = format!("{}.{}", txid, format.extension());
@@ -78,7 +82,10 @@ impl OutputManager {
         json_data: &[u8],
         _json_type: JsonType,
     ) -> OutputResult<PathBuf> {
-        let json_dir = self.base_dir.join("bitcoin_stamps").join("json");
+        let json_dir = self
+            .base_dir
+            .join(output_paths::PROTOCOL_BITCOIN_STAMPS)
+            .join("json");
         self.ensure_directory_exists(&json_dir)?;
 
         let filename = format!("{}.json", txid);
@@ -91,7 +98,10 @@ impl OutputManager {
     /// Write HTML document to the bitcoin_stamps/html subdirectory
     /// Creates: <base_dir>/bitcoin_stamps/html/<txid>.html
     pub fn write_html(&self, txid: &str, data: &[u8]) -> OutputResult<PathBuf> {
-        let html_dir = self.base_dir.join("bitcoin_stamps").join("html");
+        let html_dir = self
+            .base_dir
+            .join(output_paths::PROTOCOL_BITCOIN_STAMPS)
+            .join("html");
         self.ensure_directory_exists(&html_dir)?;
 
         let filename = format!("{}.html", txid);
@@ -109,7 +119,10 @@ impl OutputManager {
         data: &[u8],
         content_type: &str,
     ) -> OutputResult<PathBuf> {
-        let compressed_dir = self.base_dir.join("bitcoin_stamps").join("compressed");
+        let compressed_dir = self
+            .base_dir
+            .join(output_paths::PROTOCOL_BITCOIN_STAMPS)
+            .join("compressed");
         self.ensure_directory_exists(&compressed_dir)?;
 
         let ext = match content_type {
@@ -132,7 +145,10 @@ impl OutputManager {
         data: &[u8],
         content_type: Option<&str>,
     ) -> OutputResult<PathBuf> {
-        let data_dir = self.base_dir.join("bitcoin_stamps").join("data");
+        let data_dir = self
+            .base_dir
+            .join(output_paths::PROTOCOL_BITCOIN_STAMPS)
+            .join("data");
         self.ensure_directory_exists(&data_dir)?;
 
         let ext = match content_type {
@@ -155,7 +171,7 @@ impl OutputManager {
         txid: &str,
         counterparty_data: &[u8],
     ) -> OutputResult<PathBuf> {
-        let counterparty_dir = self.base_dir.join("counterparty");
+        let counterparty_dir = self.base_dir.join(output_paths::PROTOCOL_COUNTERPARTY);
         self.ensure_directory_exists(&counterparty_dir)?;
 
         let filename = format!("{}.json", txid);
@@ -177,7 +193,7 @@ impl OutputManager {
         use serde_json::json;
 
         // Use counterparty subdirectory in base_dir
-        let counterparty_dir = self.base_dir.join("counterparty");
+        let counterparty_dir = self.base_dir.join(output_paths::PROTOCOL_COUNTERPARTY);
         self.ensure_directory_exists(&counterparty_dir)?;
 
         // Create comprehensive JSON structure
@@ -204,7 +220,10 @@ impl OutputManager {
 
     /// Check if an image file already exists
     pub fn image_file_exists(&self, txid: &str, format: ImageFormat) -> bool {
-        let image_dir = self.base_dir.join("bitcoin_stamps").join("images");
+        let image_dir = self
+            .base_dir
+            .join(output_paths::PROTOCOL_BITCOIN_STAMPS)
+            .join("images");
         let filename = format!("{}.{}", txid, format.extension());
         let filepath = image_dir.join(filename);
         filepath.exists()
@@ -212,7 +231,10 @@ impl OutputManager {
 
     /// Check if a JSON file already exists
     pub fn json_file_exists(&self, txid: &str) -> bool {
-        let json_dir = self.base_dir.join("bitcoin_stamps").join("json");
+        let json_dir = self
+            .base_dir
+            .join(output_paths::PROTOCOL_BITCOIN_STAMPS)
+            .join("json");
         let filename = format!("{}.json", txid);
         let filepath = json_dir.join(filename);
         filepath.exists()
@@ -232,7 +254,7 @@ impl OutputManager {
         use serde_json::json;
 
         // Create omni subdirectory in base_dir
-        let omni_dir = self.base_dir.join("omni");
+        let omni_dir = self.base_dir.join(output_paths::PROTOCOL_OMNI);
         self.ensure_directory_exists(&omni_dir)?;
 
         // Create comprehensive JSON structure
@@ -277,7 +299,7 @@ impl OutputManager {
     ) -> OutputResult<PathBuf> {
         use serde_json::json;
 
-        let chancecoin_dir = self.base_dir.join("chancecoin");
+        let chancecoin_dir = self.base_dir.join(output_paths::PROTOCOL_CHANCECOIN);
         self.ensure_directory_exists(&chancecoin_dir)?;
 
         // Create structured JSON output
@@ -308,6 +330,7 @@ impl OutputManager {
 
     /// Create PPk protocol output file
     /// Creates: <base_dir>/ppk/<txid>.json
+    #[allow(clippy::too_many_arguments)]
     pub fn create_ppk_output(
         &self,
         txid: &str,
@@ -320,7 +343,7 @@ impl OutputManager {
     ) -> OutputResult<PathBuf> {
         use serde_json::json;
 
-        let ppk_dir = self.base_dir.join("ppk");
+        let ppk_dir = self.base_dir.join(output_paths::PROTOCOL_PPK);
         self.ensure_directory_exists(&ppk_dir)?;
 
         // Build structured JSON output

@@ -19,7 +19,7 @@ set -euo pipefail
 #   ./scripts/viz.sh --help                                     # Show help
 #   ./scripts/viz.sh stats                                      # Stats with default DB
 #   ./scripts/viz.sh temporal ./custom.db --bin monthly         # Custom DB
-#   ./scripts/viz.sh protocols --bin yearly --output plots/protocols_yearly.png
+#   ./scripts/viz.sh protocols --bin yearly --output output_data/plots/protocols_yearly.png
 
 if [[ $# -eq 0 ]]; then
     echo "Usage: $0 <COMMAND> [DB_PATH] [OPTIONS...]"

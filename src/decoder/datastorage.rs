@@ -8,6 +8,7 @@
 //! - Binary files with magic numbers
 //! - Proof-of-burn and structured burn patterns
 
+use crate::config::output_paths;
 use crate::decoder::protocol_detection::{DecodedProtocol, TransactionData};
 use crate::types::TransactionOutput;
 use bzip2::read::BzDecoder;
@@ -1175,7 +1176,10 @@ impl DataStorageDecoder {
             _ => "other",
         };
 
-        let output_dir = self.output_dir.join("datastorage").join(subdir);
+        let output_dir = self
+            .output_dir
+            .join(output_paths::PROTOCOL_DATASTORAGE)
+            .join(subdir);
         std::fs::create_dir_all(&output_dir)?;
 
         let filename = format!("{}.{}", decoded.txid, decoded.pattern.file_extension());
@@ -1240,8 +1244,8 @@ mod tests {
     /// Test bzip2 decompression with valid compressed data
     #[test]
     fn test_bzip2_decompression_valid() {
-        use std::path::PathBuf;
-        let decoder = DataStorageDecoder::new(PathBuf::from("output_data"));
+        use crate::config::output_paths;
+        let decoder = DataStorageDecoder::new(output_paths::decoded_base());
 
         // Create valid bzip2 compressed data: "Hello World"
         // This is actual bzip2-compressed data created with: echo -n "Hello World" | bzip2 | xxd -p
@@ -1259,8 +1263,8 @@ mod tests {
     /// Test bzip2 decompression with invalid/corrupt data
     #[test]
     fn test_bzip2_decompression_invalid() {
-        use std::path::PathBuf;
-        let decoder = DataStorageDecoder::new(PathBuf::from("output_data"));
+        use crate::config::output_paths;
+        let decoder = DataStorageDecoder::new(output_paths::decoded_base());
 
         // Invalid bzip2 data (just random bytes)
         let invalid_data = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05];
@@ -1272,8 +1276,8 @@ mod tests {
     /// Test bzip2 decompression with empty input
     #[test]
     fn test_bzip2_decompression_empty() {
-        use std::path::PathBuf;
-        let decoder = DataStorageDecoder::new(PathBuf::from("output_data"));
+        use crate::config::output_paths;
+        let decoder = DataStorageDecoder::new(output_paths::decoded_base());
 
         let empty_data = vec![];
         let result = decoder.decompress_bzip2(&empty_data);
@@ -1283,8 +1287,8 @@ mod tests {
     /// Test bzip2 decompression with truncated data
     #[test]
     fn test_bzip2_decompression_truncated() {
-        use std::path::PathBuf;
-        let decoder = DataStorageDecoder::new(PathBuf::from("output_data"));
+        use crate::config::output_paths;
+        let decoder = DataStorageDecoder::new(output_paths::decoded_base());
 
         // Truncated bzip2 header (incomplete)
         let truncated = vec![0x42, 0x5a, 0x68]; // "BZh" magic but incomplete
@@ -1296,8 +1300,8 @@ mod tests {
     /// Test bzip2 pattern detection
     #[test]
     fn test_bzip2_pattern_detection() {
-        use std::path::PathBuf;
-        let decoder = DataStorageDecoder::new(PathBuf::from("output_data"));
+        use crate::config::output_paths;
+        let decoder = DataStorageDecoder::new(output_paths::decoded_base());
 
         // Valid bzip2 magic number
         let bzip2_data = vec![0x42, 0x5a, 0x68, 0x39]; // "BZh9"
@@ -1308,8 +1312,8 @@ mod tests {
     /// Test that bzip2 magic number is correctly identified
     #[test]
     fn test_bzip2_magic_number() {
-        use std::path::PathBuf;
-        let decoder = DataStorageDecoder::new(PathBuf::from("output_data"));
+        use crate::config::output_paths;
+        let decoder = DataStorageDecoder::new(output_paths::decoded_base());
 
         // Bzip2 starts with "BZ" (0x42 0x5a)
         let valid_bzip2 = vec![0x42, 0x5a, 0x68, 0x39, 0x31, 0x41, 0x59];

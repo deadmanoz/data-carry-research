@@ -163,7 +163,7 @@ stage3-test cmd *args="":
 decode-txid txid *args="":
     #!/usr/bin/env bash
     TXID="{{txid}}"
-    OUTPUT_DIR="./output_data"
+    OUTPUT_DIR="./output_data/decoded"
     VERBOSE_FLAG=""
 
     # Parse remaining arguments
@@ -250,12 +250,12 @@ setup-config:
 create-test-data:
     ./test_data/create_test_datasets.sh
 
-# Fetch single transaction for investigation (saves to output_data/)
+# Fetch single transaction for investigation (saves to output_data/fetched/)
 fetch-tx txid protocol="unknown" output="":
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Fetching transaction for investigation"
-    echo "   Output: output_data/{{protocol}}/"
+    echo "   Output: output_data/fetched/{{protocol}}/"
     if [ -n "{{output}}" ]; then
         cargo run --release -- fetch tx {{txid}} --protocol {{protocol}} --output {{output}}
     else
@@ -336,7 +336,7 @@ inspect-tx txid db_path=default_db_path:
 # Examples:
 #   just viz --help
 #   just viz stats
-#   just viz temporal ./custom.db --bin monthly --output plots/temporal.png
+#   just viz temporal ./custom.db --bin monthly --output output_data/plots/temporal.png
 viz cmd db_path=default_db_path *args="":
     #!/usr/bin/env bash
     # If cmd starts with -, it's a flag (like --help), don't pass db_path

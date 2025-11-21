@@ -151,6 +151,90 @@ impl AppConfig {
     }
 }
 
+/// Output path constants for organised data storage
+///
+/// This module provides centralised path constants for all generated outputs:
+/// - `decoded/`: Blockchain protocol data extraction (Stage 4)
+/// - `fetched/`: Raw transaction JSON from Bitcoin Core RPC
+/// - `plots/`: Visualisation outputs (Stage 6)
+/// - `analysis/`: Statistical analysis exports (Stage 6)
+pub mod output_paths {
+    use std::path::PathBuf;
+
+    /// Base directory for all decoded protocol data (Stage 4)
+    pub const DECODED_BASE: &str = "./output_data/decoded";
+
+    /// Base directory for fetched raw transactions from Bitcoin Core RPC
+    pub const FETCHED_BASE: &str = "./output_data/fetched";
+
+    /// Base directory for visualisation outputs (plots, charts)
+    pub const PLOTS_BASE: &str = "./output_data/plots";
+
+    /// Base directory for statistical analysis exports
+    pub const ANALYSIS_BASE: &str = "./output_data/analysis";
+
+    // Protocol subdirectory names (within decoded/)
+    /// Bitcoin Stamps protocol subdirectory name
+    pub const PROTOCOL_BITCOIN_STAMPS: &str = "bitcoin_stamps";
+
+    /// Counterparty protocol subdirectory name
+    pub const PROTOCOL_COUNTERPARTY: &str = "counterparty";
+
+    /// Omni Layer protocol subdirectory name
+    pub const PROTOCOL_OMNI: &str = "omni";
+
+    /// Chancecoin protocol subdirectory name
+    pub const PROTOCOL_CHANCECOIN: &str = "chancecoin";
+
+    /// PPk protocol subdirectory name
+    pub const PROTOCOL_PPK: &str = "ppk";
+
+    /// DataStorage protocol subdirectory name
+    pub const PROTOCOL_DATASTORAGE: &str = "datastorage";
+
+    /// Get the full path for a decoded protocol's output directory
+    ///
+    /// # Arguments
+    /// * `protocol` - Protocol name (e.g., "bitcoin_stamps", "counterparty", "omni")
+    ///
+    /// # Returns
+    /// PathBuf pointing to `./output_data/decoded/<protocol>/`
+    pub fn decoded_protocol_dir(protocol: &str) -> PathBuf {
+        PathBuf::from(DECODED_BASE).join(protocol)
+    }
+
+    /// Get the full path for a fetched transaction protocol directory
+    ///
+    /// # Arguments
+    /// * `protocol` - Protocol name (e.g., "stamps", "counterparty")
+    ///
+    /// # Returns
+    /// PathBuf pointing to `./output_data/fetched/<protocol>/`
+    pub fn fetched_protocol_dir(protocol: &str) -> PathBuf {
+        PathBuf::from(FETCHED_BASE).join(protocol)
+    }
+
+    /// Get the base decoded directory as PathBuf
+    pub fn decoded_base() -> PathBuf {
+        PathBuf::from(DECODED_BASE)
+    }
+
+    /// Get the base fetched directory as PathBuf
+    pub fn fetched_base() -> PathBuf {
+        PathBuf::from(FETCHED_BASE)
+    }
+
+    /// Get the base plots directory as PathBuf
+    pub fn plots_base() -> PathBuf {
+        PathBuf::from(PLOTS_BASE)
+    }
+
+    /// Get the base analysis directory as PathBuf
+    pub fn analysis_base() -> PathBuf {
+        PathBuf::from(ANALYSIS_BASE)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
