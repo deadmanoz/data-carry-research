@@ -17,8 +17,5 @@ config.toml
 # Output directories (protocol-specific decoded data)
 /output_data/
 
-# Visualisation outputs (generated)
-/plots/
-
 # Large test file
 /tests/test_data/utxo_1m.csv
