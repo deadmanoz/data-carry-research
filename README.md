@@ -19,7 +19,7 @@ Enjoy the comprehensive tests to keep the AI on the rails and the excessive emoj
 ## Overview
 
 This tool processes Bitcoin UTXO set dumps to extract and classify P2MS outputs used by various data-embedding protocols.
-These protocols leverage Bitcoin's P2MS scripts to store arbitrary data including images, tokens, and other digital assets directly on the Bitcoin blockchain.
+These protocols leverage Bitcoin's P2MS scripts to store arbitrary data including text, images, documents, name registrations, tokens and other digital assets directly on the Bitcoin blockchain.
 
 ### Supported Protocols
 
@@ -29,14 +29,14 @@ These protocols leverage Bitcoin's P2MS scripts to store arbitrary data includin
 - **Omni Layer**: Early protocol that originally powered Tether (USDT) and other tokens
 - **Chancecoin**: Historical gambling protocol with signature-based detection
 - **ASCII Identifier Protocols**: Protocols detected via ASCII identifiers in P2MS outputs (e.g., `TB0001`, `TEST01`, `METROXMN`)
-- **PPk**: Blockchain infrastructure protocol (ODIN) with marker pubkey and RT/Registration/Message variants
+- **PPk**: Blockchain infrastructure protocol (ODIN) with marker pubkey and Registration/Message variants
 - **OP_RETURN Signalled**: Protocols detected via identifiers in OP_RETURN outputs (e.g., "Protocol47930", `CLIPPERZ`)
 - **Generic Data Storage**: General data storage, including text and files
 
 **Other Classification Categories:**
-- **Likely data storage**: Valid EC points with suspicious patterns (repeated pubkeys, high output count 5+)
+- **Likely data storage**: Valid EC points with suspicious patterns (high output count, dust output amounts), or invalid EC points present
 - **Likely legitimate multisig**: Likely legitimate multisig transactions as all pubkeys are valid EC points and we didn't get a hit on any of the data-carrying protocols.
-- **Unknown**: Some pubkeys are invalid EC points and did not match any other classification
+- **Unknown**: Did not match any other classification, requires further analysis
 
 ### Protocol Detection Methodology
 
@@ -77,7 +77,7 @@ These protocols leverage Bitcoin's P2MS scripts to store arbitrary data includin
 
 ### Unified Protocol Decoder
 
-**Automatically detect and decode data from Bitcoin P2MS transactions** across all supported protocols with a single command.
+**Automatically detect and decode data from Bitcoin P2MS transactions** across most of the supported protocols with a single command.
 The decoder identifies protocol signatures, handles multiple encoding formats (ARC4, SHA256, bzip2), and extracts embedded data including images (PNG, GIF, JPG, WebP, SVG) and JSON metadata.
 
 **Key capabilities:**
@@ -85,7 +85,7 @@ The decoder identifies protocol signatures, handles multiple encoding formats (A
 - Image format recognition and extraction
 - Organised output by protocol type
 - Full RPC integration for complete transaction analysis
-- **Note: currently limited to transactions involving at least one P2MS output**
+- **Note: as this codebase is initially focused on P2MS, it is currently limited to transactions involving at least one P2MS output**
 
 ## Quick Start
 
@@ -154,14 +154,28 @@ Decoded protocol data is organised in `output_data/` with protocol-specific subd
 
 ```plaintext
 output_data/
-├── bitcoin_stamps/
-│   ├── images/            # Decoded images (PNG, GIF, JPG, WebP, SVG)
-│   └── json/              # SRC-20, SRC-101, SRC-721, SRC-721r data
-├── counterparty/          # Counterparty protocol data
-├── omni/                  # Omni Layer protocol data
-├── chancecoin/            # Chancecoin protocol data
-├── datastorage/           # DataStorage protocol data
-└── unknown/               # Unclassified/fallback transactions
+├── decoded/               # Decode TXID path
+│   ├── bitcoin_stamps/
+│   │   ├── images/        # Decoded images (PNG, GIF, JPG, WebP, SVG)
+│   │   ├── json/          # SRC-20, SRC-101, SRC-721, SRC-721r data
+│   │   ├── html/          # HTML documents
+│   │   ├── compressed/    # GZIP/ZLIB compressed data
+│   │   └── data/          # Generic stamp data (XML, text, binary)
+│   ├── counterparty/      # Counterparty protocol data (JSON)
+│   ├── omni/              # Omni Layer protocol data (JSON)
+│   ├── chancecoin/        # Chancecoin protocol data (JSON)
+│   ├── ppk/               # PPk protocol data (JSON)
+│   ├── datastorage/       # DataStorage protocol data
+│   └── unknown/           # Unclassified/fallback transactions
+├── fetched/               # Raw transaction JSON from Bitcoin Core RPC
+│   └── <protocol>/
+│       ├── <txid>.json
+│       └── inputs/        # Input transaction cache
+├── plots/                 # Visualisation outputs
+│   ├── *.png, *.svg       # Plot files
+│   └── *.json             # Plotly exports
+└── analysis/              # Statistical analysis exports
+    └── *.json             # JSON reports
 ```
 
 See `just` for a complete list of available commands.
