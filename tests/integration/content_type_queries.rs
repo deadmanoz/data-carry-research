@@ -101,7 +101,7 @@ fn test_content_type_schema_and_queries() {
     let result1 = ClassificationResult {
         txid: "txid1".to_string(),
         protocol: ProtocolType::Counterparty,
-        variant: Some(ProtocolVariant::CounterpartySend),
+        variant: Some(ProtocolVariant::CounterpartyTransfer),
         classification_details: details1,
         classification_timestamp: timestamp,
     };

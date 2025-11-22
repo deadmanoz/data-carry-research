@@ -142,11 +142,32 @@ Content detection follows encoding-over-content priority (compression → images
 #### Variants
 **Source**: [src/types/stage3.rs](src/types/stage3.rs)
 
-- `CounterpartySend` - Asset transfer
-- `CounterpartyIssuance` - Asset creation
-- `CounterpartyBroadcast` - Oracle data
-- `CounterpartyEnhancedSend` - Enhanced send format
-- `CounterpartyDEX` - DEX operation
+The codebase maps 21 Counterparty message types to 7 semantically coherent variant categories:
+
+- **`CounterpartyTransfer`** - Asset transfers between parties
+  - Message types: Send (0), EnhancedSend (2), Mpma (3), Sweep (4), Dividend (50)
+
+- **`CounterpartyIssuance`** - Asset creation and minting
+  - Message types: Issuance (20/21/22), FairMinter (90), FairMint (91)
+
+- **`CounterpartyDestruction`** - Asset destruction and burns
+  - Message types: Destroy (110), Burn (60)
+
+- **`CounterpartyDEX`** - Decentralised exchange operations
+  - Message types: Order (10), BtcPay (11), Dispenser (12), Cancel (70)
+
+- **`CounterpartyOracle`** - Oracle data publication
+  - Message types: Broadcast (30)
+
+- **`CounterpartyGaming`** - Betting and gaming operations
+  - Message types: Bet (40), Rps (80), RpsResolve (81)
+
+- **`CounterpartyUtility`** - UTXO technical operations
+  - Message types: Utxo (100), Attach (101), Detach (102)
+
+**Semantic Coherence**: Each variant groups message types with a single, clear purpose. For example, FairMint creates new tokens (issuance), while Dividend redistributes existing assets (transfer).
+
+**Note**: The full 21-value `CounterpartyMessageType` enum is preserved in the database `additional_metadata_json` column for detailed analysis.
 
 ---
 

@@ -102,7 +102,7 @@ async fn test_stage3_classification_insertion_and_retrieval() {
     let classification_result = ClassificationResult {
         txid: "test_txid_1".to_string(),
         protocol: ProtocolType::Counterparty,
-        variant: Some(ProtocolVariant::CounterpartySend),
+        variant: Some(ProtocolVariant::CounterpartyTransfer),
         classification_details: ClassificationDetails {
             burn_patterns_detected: vec![], // Counterparty uses protocol identifiers, not burn patterns
             height_check_passed: true,
@@ -156,7 +156,7 @@ async fn test_stage3_batch_classification_insertion() {
                 ProtocolType::BitcoinStamps
             },
             variant: if i % 2 == 0 {
-                Some(ProtocolVariant::CounterpartySend)
+                Some(ProtocolVariant::CounterpartyTransfer)
             } else {
                 Some(ProtocolVariant::StampsClassic)
             },
@@ -229,7 +229,7 @@ async fn test_stage3_classification_stats_calculations() {
             txid: txid.to_string(),
             protocol: protocol_type.clone(),
             variant: match protocol_type {
-                ProtocolType::Counterparty => Some(ProtocolVariant::CounterpartySend),
+                ProtocolType::Counterparty => Some(ProtocolVariant::CounterpartyTransfer),
                 ProtocolType::AsciiIdentifierProtocols => {
                     Some(ProtocolVariant::AsciiIdentifierTB0001)
                 }
@@ -326,7 +326,7 @@ async fn test_stage3_unclassified_transaction_counting() {
     let classification_result = ClassificationResult {
         txid: "classified_1".to_string(),
         protocol: ProtocolType::Counterparty,
-        variant: Some(ProtocolVariant::CounterpartySend),
+        variant: Some(ProtocolVariant::CounterpartyTransfer),
         classification_details: ClassificationDetails {
             burn_patterns_detected: vec![], // Counterparty uses protocol identifiers, not burn patterns
             height_check_passed: true,

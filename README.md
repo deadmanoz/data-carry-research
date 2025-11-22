@@ -25,7 +25,7 @@ These protocols leverage Bitcoin's P2MS scripts to store arbitrary data includin
 
 **Data-Carrying Protocols:**
 - **Bitcoin Stamps**: Images and SRC-20/721 tokens with ARC4 obfuscation
-- **Counterparty**: One of the earliest Bitcoin meta-protocols for asset issuance and trading
+- **Counterparty**: One of the earliest Bitcoin meta-protocols for asset issuance and trading (classified into 7 semantic categories: Transfer, Issuance, Destruction, DEX, Oracle, Gaming, Utility)
 - **Omni Layer**: Early protocol that originally powered Tether (USDT) and other tokens
 - **Chancecoin**: Historical gambling protocol with signature-based detection
 - **ASCII Identifier Protocols**: Protocols detected via ASCII identifiers in P2MS outputs (e.g., `TB0001`, `TEST01`, `METROXMN`)

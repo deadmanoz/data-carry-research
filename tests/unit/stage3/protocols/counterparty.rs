@@ -512,7 +512,7 @@ mod modern_format {
             "tests/test_data/counterparty/counterparty_modern_broadcast_tx.json",
             "21c2cd5b369c2e7a350bf92ad43c31e5abb0aa85ccba11368b08f9f4abb8e0af",
             "counterparty_modern_broadcast",
-            Some(ProtocolVariant::CounterpartyBroadcast),
+            Some(ProtocolVariant::CounterpartyOracle),
             Some("application/octet-stream"), // Binary protocol message
         )
         .await;
@@ -537,7 +537,7 @@ mod legacy_format {
             "tests/test_data/counterparty/counterparty_legacy_1of2_send_tx.json",
             "da3ed1efda82824cb24ea081ef2a8f532a7dd9cd1ebc5efa873498c3958c864e",
             "counterparty_legacy_send",
-            Some(ProtocolVariant::CounterpartySend),
+            Some(ProtocolVariant::CounterpartyTransfer),
             Some("application/octet-stream"), // Binary protocol message
         )
         .await;
@@ -582,7 +582,7 @@ mod message_types {
             "tests/test_data/counterparty/counterparty_type0_send_tx.json",
             "585f50f12288cd9044705483672fbbddb71dff8198b390b40ab3de30db0a88dd",
             "counterparty_type0_send",
-            Some(ProtocolVariant::CounterpartySend),
+            Some(ProtocolVariant::CounterpartyTransfer),
             Some("application/octet-stream"), // Binary protocol message
         )
         .await;
@@ -622,7 +622,7 @@ mod message_types {
             "tests/test_data/counterparty/counterparty_type30_broadcast_tx.json",
             "627ae48d6b4cffb2ea734be1016dedef4cee3f8ffefaea5602dd58c696de6b74",
             "counterparty_type30_broadcast",
-            Some(ProtocolVariant::CounterpartyBroadcast),
+            Some(ProtocolVariant::CounterpartyOracle),
             Some("application/octet-stream"), // Binary protocol message
         )
         .await;
@@ -723,7 +723,7 @@ mod edge_cases {
             "tests/test_data/counterparty/9b4afd1d54dc88b50dbda166e837fb4ce110f4185b432c6155a403ca0fb2eb75.json",
             "9b4afd1d54dc88b50dbda166e837fb4ce110f4185b432c6155a403ca0fb2eb75",
             "counterparty_mixed_pubkey_format",
-            Some(ProtocolVariant::CounterpartyBroadcast),
+            Some(ProtocolVariant::CounterpartyOracle),
             Some("application/octet-stream"), // Binary protocol message
         )
         .await;

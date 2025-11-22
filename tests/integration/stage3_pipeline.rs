@@ -189,7 +189,7 @@ async fn test_stage3_batch_classification_insertion() {
     classifications.push(ClassificationResult {
         txid: "counterparty_tx".to_string(),
         protocol: ProtocolType::Counterparty,
-        variant: Some(ProtocolVariant::CounterpartySend),
+        variant: Some(ProtocolVariant::CounterpartyTransfer),
         classification_details: cp_details,
         classification_timestamp: SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -373,8 +373,8 @@ fn test_protocol_and_variant_enums() {
         "BitcoinStamps"
     );
     assert_eq!(
-        format!("{:?}", ProtocolVariant::CounterpartySend),
-        "CounterpartySend"
+        format!("{:?}", ProtocolVariant::CounterpartyTransfer),
+        "CounterpartyTransfer"
     );
 }
 

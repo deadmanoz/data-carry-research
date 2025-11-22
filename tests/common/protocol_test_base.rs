@@ -105,13 +105,26 @@ pub fn verify_classification(
             Some(var_str) => {
                 let actual_variant = match var_str.as_str() {
                     // Counterparty variants (Display strings)
-                    "Send" if matches!(expected_var, ProtocolVariant::CounterpartySend) => {
-                        ProtocolVariant::CounterpartySend
+                    // Guard all variants with actual_protocol check to prevent collisions
+                    "Transfer" if actual_protocol == ProtocolType::Counterparty => {
+                        ProtocolVariant::CounterpartyTransfer
                     }
-                    "Issuance" => ProtocolVariant::CounterpartyIssuance,
-                    "Broadcast" => ProtocolVariant::CounterpartyBroadcast,
-                    "Enhanced Send" => ProtocolVariant::CounterpartyEnhancedSend,
-                    "DEX" if matches!(expected_var, ProtocolVariant::CounterpartyDEX) => {
+                    "Issuance" if actual_protocol == ProtocolType::Counterparty => {
+                        ProtocolVariant::CounterpartyIssuance
+                    }
+                    "Destruction" if actual_protocol == ProtocolType::Counterparty => {
+                        ProtocolVariant::CounterpartyDestruction
+                    }
+                    "Oracle" if actual_protocol == ProtocolType::Counterparty => {
+                        ProtocolVariant::CounterpartyOracle
+                    }
+                    "Gaming" if actual_protocol == ProtocolType::Counterparty => {
+                        ProtocolVariant::CounterpartyGaming
+                    }
+                    "Utility" if actual_protocol == ProtocolType::Counterparty => {
+                        ProtocolVariant::CounterpartyUtility
+                    }
+                    "DEX" if actual_protocol == ProtocolType::Counterparty => {
                         ProtocolVariant::CounterpartyDEX
                     }
                     // AsciiIdentifierProtocols variants (Display strings)

@@ -53,7 +53,7 @@ fn create_populated_test_db() -> (Database, String) {
             "counterparty_tx_1",
             290000,
             ProtocolType::Counterparty,
-            Some(ProtocolVariant::CounterpartySend),
+            Some(ProtocolVariant::CounterpartyTransfer),
             vec![],
             true,
             "ContainsRealPubkey",

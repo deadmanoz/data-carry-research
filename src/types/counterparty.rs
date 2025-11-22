@@ -62,42 +62,40 @@ impl CounterpartyMessageType {
 
     pub fn get_variant(&self) -> ProtocolVariant {
         match self {
-            // Asset Transfer Operations
-            Self::Send => ProtocolVariant::CounterpartySend,
-            Self::EnhancedSend => ProtocolVariant::CounterpartyEnhancedSend,
-            Self::Mpma => ProtocolVariant::CounterpartySend, // Multi-peer multi-asset
-            Self::Sweep => ProtocolVariant::CounterpartySend,
+            // Asset Transfers - Moving value between parties
+            Self::Send => ProtocolVariant::CounterpartyTransfer,
+            Self::EnhancedSend => ProtocolVariant::CounterpartyTransfer,
+            Self::Mpma => ProtocolVariant::CounterpartyTransfer,
+            Self::Sweep => ProtocolVariant::CounterpartyTransfer,
+            Self::Dividend => ProtocolVariant::CounterpartyTransfer,
 
-            // Asset Management
+            // Asset Creation - Creating new assets
             Self::Issuance => ProtocolVariant::CounterpartyIssuance,
-            Self::Destroy => ProtocolVariant::CounterpartyIssuance, // Asset destruction
+            Self::FairMinter => ProtocolVariant::CounterpartyIssuance,
+            Self::FairMint => ProtocolVariant::CounterpartyIssuance,
 
-            // DEX Operations
+            // Asset Destruction - Burning/destroying assets
+            Self::Destroy => ProtocolVariant::CounterpartyDestruction,
+            Self::Burn => ProtocolVariant::CounterpartyDestruction,
+
+            // Decentralised Exchange
             Self::Order => ProtocolVariant::CounterpartyDEX,
             Self::BtcPay => ProtocolVariant::CounterpartyDEX,
             Self::Dispenser => ProtocolVariant::CounterpartyDEX,
+            Self::Cancel => ProtocolVariant::CounterpartyDEX,
 
             // Oracle/Broadcasting
-            Self::Broadcast => ProtocolVariant::CounterpartyBroadcast,
-            Self::Bet => ProtocolVariant::CounterpartyBroadcast, // Betting uses broadcasts
+            Self::Broadcast => ProtocolVariant::CounterpartyOracle,
 
-            // Gaming
-            Self::Rps => ProtocolVariant::CounterpartySend, // Rock paper scissors
-            Self::RpsResolve => ProtocolVariant::CounterpartySend,
+            // Gaming/Betting
+            Self::Bet => ProtocolVariant::CounterpartyGaming,
+            Self::Rps => ProtocolVariant::CounterpartyGaming,
+            Self::RpsResolve => ProtocolVariant::CounterpartyGaming,
 
-            // Fair Mining
-            Self::FairMinter => ProtocolVariant::CounterpartyIssuance,
-            Self::FairMint => ProtocolVariant::CounterpartySend,
-
-            // UTXO Operations
-            Self::Utxo => ProtocolVariant::CounterpartySend,
-            Self::Attach => ProtocolVariant::CounterpartySend,
-            Self::Detach => ProtocolVariant::CounterpartySend,
-
-            // Other Operations
-            Self::Dividend => ProtocolVariant::CounterpartySend,
-            Self::Burn => ProtocolVariant::CounterpartySend, // XCP burns
-            Self::Cancel => ProtocolVariant::CounterpartyDEX, // Order/bet cancellation
+            // UTXO Technical Operations
+            Self::Utxo => ProtocolVariant::CounterpartyUtility,
+            Self::Attach => ProtocolVariant::CounterpartyUtility,
+            Self::Detach => ProtocolVariant::CounterpartyUtility,
         }
     }
 }

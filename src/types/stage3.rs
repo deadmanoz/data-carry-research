@@ -304,12 +304,14 @@ pub enum ProtocolVariant {
     StampsData,       // Generic data (XML, non-SRC JSON, binary)
     StampsUnknown,    // Unrecognizable content or burn-pattern-only
 
-    // Counterparty variants
-    CounterpartySend,         // Asset transfer
-    CounterpartyIssuance,     // Asset creation
-    CounterpartyBroadcast,    // Oracle data
-    CounterpartyEnhancedSend, // Enhanced send format
-    CounterpartyDEX,          // DEX operation
+    // Counterparty variants (7 semantically coherent categories)
+    CounterpartyTransfer,     // Asset transfers: Send (0), EnhancedSend (2), Mpma (3), Sweep (4), Dividend (50)
+    CounterpartyIssuance,     // Asset creation: Issuance (20/21/22), FairMinter (90), FairMint (91)
+    CounterpartyDestruction,  // Asset destruction: Destroy (110), Burn (60)
+    CounterpartyDEX,          // DEX operations: Order (10), BtcPay (11), Dispenser (12), Cancel (70)
+    CounterpartyOracle,       // Oracle broadcasts: Broadcast (30)
+    CounterpartyGaming,       // Betting and gaming: Bet (40), Rps (80), RpsResolve (81)
+    CounterpartyUtility,      // UTXO operations: Utxo (100), Attach (101), Detach (102)
 
     // ASCII Identifier Protocols (protocols with ASCII identifiers in P2MS data)
     AsciiIdentifierTB0001,     // TB0001 protocol (May 2015, ~150 txs)
@@ -376,11 +378,13 @@ impl std::fmt::Display for ProtocolVariant {
             ProtocolVariant::StampsCompressed => "Compressed",
             ProtocolVariant::StampsData => "Data",
             ProtocolVariant::StampsUnknown => "Unknown",
-            ProtocolVariant::CounterpartySend => "Send",
+            ProtocolVariant::CounterpartyTransfer => "Transfer",
             ProtocolVariant::CounterpartyIssuance => "Issuance",
-            ProtocolVariant::CounterpartyBroadcast => "Broadcast",
-            ProtocolVariant::CounterpartyEnhancedSend => "Enhanced Send",
+            ProtocolVariant::CounterpartyDestruction => "Destruction",
             ProtocolVariant::CounterpartyDEX => "DEX",
+            ProtocolVariant::CounterpartyOracle => "Oracle",
+            ProtocolVariant::CounterpartyGaming => "Gaming",
+            ProtocolVariant::CounterpartyUtility => "Utility",
             ProtocolVariant::AsciiIdentifierTB0001 => "TB0001",
             ProtocolVariant::AsciiIdentifierTEST01 => "TEST01",
             ProtocolVariant::AsciiIdentifierMetronotes => "Metronotes",
@@ -700,7 +704,7 @@ mod tests {
     #[test]
     fn test_protocol_variant_display() {
         assert_eq!(ProtocolVariant::StampsClassic.to_string(), "Classic");
-        assert_eq!(ProtocolVariant::CounterpartySend.to_string(), "Send");
+        assert_eq!(ProtocolVariant::CounterpartyTransfer.to_string(), "Transfer");
         assert_eq!(ProtocolVariant::OmniSimpleSend.to_string(), "Simple Send");
         assert_eq!(
             ProtocolVariant::DataStorageProofOfBurn.to_string(),
