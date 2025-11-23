@@ -32,7 +32,11 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🔗 INTEGRATION TESTS (Non-RPC)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-cargo test integration::stage3_pipeline:: integration::content_type_queries:: integration::spendability_queries:: 2>&1 | tee /tmp/integration_test_output.txt
+{
+    cargo test integration::stage3_pipeline
+    cargo test integration::content_type_queries
+    cargo test integration::spendability_queries
+} 2>&1 | tee /tmp/integration_test_output.txt
 
 # ============================================================================
 # Step 3: Check Bitcoin Core RPC Availability
@@ -55,15 +59,15 @@ if [ $RPC_EXIT_CODE -eq 0 ]; then
 
     echo ""
     echo "📡 Unified Decoder Tests (68 tests)..."
-    cargo test integration::unified_decoder:: 2>&1 | tee /tmp/decoder_test_output.txt
+    cargo test integration::unified_decoder 2>&1 | tee /tmp/decoder_test_output.txt
 
     echo ""
     echo "🔧 Stage 2 Pipeline Integration Tests..."
-    cargo test integration::stage2_pipeline:: 2>&1 | tee /tmp/stage2_pipeline_output.txt
+    cargo test integration::stage2_pipeline 2>&1 | tee /tmp/stage2_pipeline_output.txt
 
     echo ""
     echo "🔧 ARC4 Tool Integration Tests..."
-    cargo test integration::arc4_tool:: 2>&1 | tee /tmp/arc4_test_output.txt
+    cargo test integration::arc4_tool 2>&1 | tee /tmp/arc4_test_output.txt
 else
     echo ""
     echo "⚠️  Skipping RPC-dependent tests (Bitcoin Core not available)"

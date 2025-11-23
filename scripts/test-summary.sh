@@ -22,13 +22,19 @@ parse_test_output() {
     if [ -f "$file" ]; then
         # Extract test results (format: "test result: ok. X passed; Y failed; ...")
         if grep -q "test result:" "$file"; then
-            passed=$(grep "test result:" "$file" | tail -1 | sed -n 's/.*\([0-9]\+\) passed.*/\1/p')
-            failed=$(grep "test result:" "$file" | tail -1 | sed -n 's/.*\([0-9]\+\) failed.*/\1/p')
+            # Use -E for extended regex (BSD sed compatible)
+            passed=$(grep "test result:" "$file" | tail -1 | sed -E 's/.*[^0-9]([0-9]+) passed;.*/\1/')
+            failed=$(grep "test result:" "$file" | tail -1 | sed -E 's/.*[^0-9]([0-9]+) failed;.*/\1/')
+
+            # Default to 0 if extraction failed
+            passed=${passed:-0}
+            failed=${failed:-0}
+
             total=$((passed + failed))
 
             # Extract duration from "Finished ... in X.XXs"
             if grep -q "Finished.*in" "$file"; then
-                duration=$(grep "Finished.*in" "$file" | tail -1 | sed -n 's/.*in \([0-9.]\+s\).*/\1/p')
+                duration=$(grep "Finished.*in" "$file" | tail -1 | sed -E 's/.*in ([0-9.]+s).*/\1/')
             fi
         fi
     fi
@@ -205,6 +211,10 @@ echo ""
 # Overall Result
 total_failed=$((unit_failed + integration_failed))
 if [ "$rpc_available" = true ]; then
+    # Default to 0 if RPC tests didn't populate these variables
+    decoder_failed=${decoder_failed:-0}
+    stage2_failed=${stage2_failed:-0}
+    arc4_failed=${arc4_failed:-0}
     total_failed=$((total_failed + decoder_failed + stage2_failed + arc4_failed))
 fi
 
@@ -222,10 +232,13 @@ fi
 # Calculate total duration
 total_duration=0
 for dur in "$unit_duration" "$integration_duration"; do
-    if [ "$dur" != "N/A" ]; then
+    if [ "$dur" != "N/A" ] && [ -n "$dur" ]; then
         # Extract numeric part
         num=$(echo "$dur" | sed 's/s//')
-        total_duration=$(echo "$total_duration + $num" | bc)
+        # Only add if num is not empty and is a valid number
+        if [ -n "$num" ] && [[ "$num" =~ ^[0-9.]+$ ]]; then
+            total_duration=$(echo "$total_duration + $num" | bc)
+        fi
     fi
 done
 
