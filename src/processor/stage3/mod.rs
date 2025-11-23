@@ -438,7 +438,7 @@ impl ProtocolClassificationEngine {
         // 7. WikiLeaks Cablegate (specific historical artifact, checked before generic DataStorage)
         // 8. OpReturnSignalled (OP_RETURN-based protocols: Protocol47930, CLIPPERZ, GenericASCII)
         // 9. DataStorage (generic data embedding patterns in P2MS outputs)
-        // 10. LikelyDataStorage (valid EC points but suspicious patterns - marker addresses, repeated pubkeys)
+        // 10. LikelyDataStorage (suspicious patterns - invalid EC points, high output count, dust amounts)
         // 11. LikelyLegitimateMultisig (pubkey validation - all valid EC points)
         // 12. Unknown (fallback)
         //

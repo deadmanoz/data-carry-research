@@ -10,6 +10,7 @@
 //! checked after all specific protocol detectors have run.
 
 use crate::database::Database;
+use crate::detection::likely_data_storage::{detect, LikelyDataStorageVariant};
 use crate::types::{
     ClassificationDetails, ClassificationResult, EnrichedTransaction, OutputClassificationDetails,
     ProtocolType, ProtocolVariant, TransactionOutput,
@@ -36,10 +37,12 @@ impl LikelyDataStorageClassifier {
     }
 
     /// Check if a transaction shows likely data storage patterns
+    ///
+    /// Uses shared detection module to ensure consistency with Stage 4 (decoder).
     pub fn classify(
         &self,
         tx: &EnrichedTransaction,
-        db: &Database,
+        _db: &Database,
     ) -> Option<(
         ClassificationResult,
         Vec<crate::types::OutputClassificationData>,
@@ -49,85 +52,38 @@ impl LikelyDataStorageClassifier {
             tx.txid
         );
 
-        // Filter to P2MS outputs ONLY (collect owned values for helper functions)
+        // Filter to P2MS outputs ONLY (collect owned values for shared detect function)
         let p2ms_outputs: Vec<_> = filter_p2ms_for_classification(&tx.outputs)
             .into_iter()
             .cloned()
             .collect();
 
-        // Need at least one P2MS output to classify
-        if p2ms_outputs.is_empty() {
-            return None;
-        }
-
-        // Check 1: Invalid EC points (strong data embedding indicator)
-        // Even a SINGLE invalid EC point suggests data storage, as legitimate wallets
-        // would never generate keys that aren't on the secp256k1 curve.
-        // Uses full EC validation (not just prefix checking).
-        if let Some(invalid_info) = self.check_invalid_ec_points(&p2ms_outputs) {
+        // Single call to unified detection logic (shared with Stage 4)
+        if let Some(result) = detect(&p2ms_outputs) {
             debug!(
-                "Transaction {} has invalid EC points: {}",
-                tx.txid, invalid_info
+                "Transaction {} classified as LikelyDataStorage ({}): {}",
+                tx.txid,
+                match result.variant {
+                    LikelyDataStorageVariant::InvalidECPoint => "InvalidECPoint",
+                    LikelyDataStorageVariant::HighOutputCount => "HighOutputCount",
+                    LikelyDataStorageVariant::DustAmount => "DustAmount",
+                },
+                result.details
             );
 
-            // Build per-output classifications with spendability analysis
-            let output_classifications = self.build_output_classifications(
-                &p2ms_outputs,
-                ProtocolVariant::InvalidECPoint,
-                &invalid_info,
-            );
+            // Map shared variant to Stage 3 ProtocolVariant (exact match)
+            let protocol_variant = match result.variant {
+                LikelyDataStorageVariant::InvalidECPoint => ProtocolVariant::InvalidECPoint,
+                LikelyDataStorageVariant::HighOutputCount => ProtocolVariant::HighOutputCount,
+                LikelyDataStorageVariant::DustAmount => ProtocolVariant::DustAmount,
+            };
+
+            // Build Stage 3-specific output classifications (spendability analysis)
+            let output_classifications =
+                self.build_output_classifications(&p2ms_outputs, protocol_variant.clone(), &result.details);
 
             let tx_classification =
-                self.create_classification(&tx.txid, ProtocolVariant::InvalidECPoint, invalid_info);
-
-            return Some((tx_classification, output_classifications));
-        }
-
-        // Check 2: High output count (5+ P2MS outputs)
-        // But only if ALL pubkeys are valid EC points (otherwise would be Unknown)
-        if p2ms_outputs.len() >= 5 {
-            // Check that all outputs have valid EC points (no obvious data embedding)
-            let all_valid_ec = self.check_all_valid_ec_points(&p2ms_outputs, db);
-            if all_valid_ec {
-                let method = format!("{} P2MS outputs with valid EC points", p2ms_outputs.len());
-
-                debug!(
-                    "Transaction {} has {} P2MS outputs with valid EC points",
-                    tx.txid,
-                    p2ms_outputs.len()
-                );
-
-                // Build per-output classifications with spendability analysis
-                let output_classifications = self.build_output_classifications(
-                    &p2ms_outputs,
-                    ProtocolVariant::HighOutputCount,
-                    &method,
-                );
-
-                let tx_classification =
-                    self.create_classification(&tx.txid, ProtocolVariant::HighOutputCount, method);
-
-                return Some((tx_classification, output_classifications));
-            }
-        }
-
-        // Check 3: Dust-level amounts (<= 1000 sats) with valid EC points
-        // This catches data-carrying protocols that use minimal amounts to reduce costs
-        if let Some(dust_info) = self.check_dust_amounts(&p2ms_outputs, db) {
-            debug!(
-                "Transaction {} has dust-level P2MS outputs: {}",
-                tx.txid, dust_info
-            );
-
-            // Build per-output classifications with spendability analysis
-            let output_classifications = self.build_output_classifications(
-                &p2ms_outputs,
-                ProtocolVariant::DustAmount,
-                &dust_info,
-            );
-
-            let tx_classification =
-                self.create_classification(&tx.txid, ProtocolVariant::DustAmount, dust_info);
+                self.create_classification(&tx.txid, protocol_variant, result.details);
 
             return Some((tx_classification, output_classifications));
         }
@@ -164,112 +120,6 @@ impl LikelyDataStorageClassifier {
             ));
         }
         output_classifications
-    }
-
-    /// Check if any pubkeys are invalid EC points (data embedding indicator)
-    ///
-    /// Returns Some(description) if ANY pubkey fails EC point validation.
-    /// Uses full secp256k1 curve validation via shared aggregation helper.
-    ///
-    /// Even a single invalid EC point strongly suggests data storage, as legitimate
-    /// multisig wallets would never generate keys that aren't on the curve.
-    ///
-    /// This catches:
-    /// - Invalid prefixes (0xb6, 0x01, 0xe1 instead of 0x02/0x03/0x04)
-    /// - Valid prefixes but coordinates not on secp256k1 curve
-    /// - Malformed keys of wrong length
-    fn check_invalid_ec_points(&self, outputs: &[TransactionOutput]) -> Option<String> {
-        use crate::analysis::aggregate_validation_for_outputs;
-
-        let validation = aggregate_validation_for_outputs(outputs)?;
-
-        // Trigger if ANY key is invalid (≥1 invalid EC point)
-        if !validation.all_valid_ec_points {
-            let total_invalid = validation.invalid_key_indices.len();
-            let total_keys = validation.total_keys;
-
-            // Collect error examples (first 3)
-            let error_examples: Vec<String> = validation
-                .validation_errors
-                .iter()
-                .take(3)
-                .cloned()
-                .collect();
-
-            let examples = if !error_examples.is_empty() {
-                format!(": {}", error_examples.join("; "))
-            } else {
-                String::new()
-            };
-
-            Some(format!(
-                "{}/{} pubkeys are invalid EC points{}",
-                total_invalid, total_keys, examples
-            ))
-        } else {
-            None
-        }
-    }
-
-    /// Check if all pubkeys are valid EC points
-    ///
-    /// Uses full secp256k1 curve validation via shared aggregation helper.
-    /// Returns true only if every single pubkey passes EC point validation.
-    fn check_all_valid_ec_points(&self, outputs: &[TransactionOutput], _db: &Database) -> bool {
-        use crate::analysis::aggregate_validation_for_outputs;
-
-        if let Some(validation) = aggregate_validation_for_outputs(outputs) {
-            // Return true only if ALL pubkeys are valid EC points
-            validation.all_valid_ec_points
-        } else {
-            // If we can't validate (no extractable pubkeys), assume invalid
-            false
-        }
-    }
-
-    /// Check for dust-level amounts in P2MS outputs
-    ///
-    /// Data-carrying protocols typically use minimal amounts (dust) to reduce costs
-    /// while still being accepted by the network. Legitimate multisig transactions
-    /// typically have meaningful amounts of BTC.
-    ///
-    /// Threshold: <= 1000 satoshis per P2MS output
-    /// This catches protocols like the October 2024+ mystery protocol (800 sats)
-    ///
-    /// NOTE: Expects pre-filtered multisig-only outputs (filtering done in classify())
-    fn check_dust_amounts(&self, outputs: &[TransactionOutput], db: &Database) -> Option<String> {
-        const DUST_THRESHOLD: u64 = 1000; // satoshis
-
-        // Check if ALL multisig outputs have dust-level amounts
-        let all_dust = outputs.iter().all(|output| output.amount <= DUST_THRESHOLD);
-
-        if !all_dust {
-            return None; // Some multisig outputs have significant amounts, likely legitimate
-        }
-
-        // Also verify that pubkeys are valid EC points (not obvious data)
-        // This prevents double-classification with Unknown protocol
-        if !self.check_all_valid_ec_points(outputs, db) {
-            return None;
-        }
-
-        // Calculate statistics for the classification method
-        let amounts: Vec<u64> = outputs.iter().map(|o| o.amount).collect();
-        let min_amount = amounts.iter().min().unwrap_or(&0);
-        let max_amount = amounts.iter().max().unwrap_or(&0);
-        let avg_amount = if !amounts.is_empty() {
-            amounts.iter().sum::<u64>() / amounts.len() as u64
-        } else {
-            0
-        };
-
-        Some(format!(
-            "All {} P2MS outputs have dust-level amounts (min: {}, max: {}, avg: {} sats)",
-            outputs.len(),
-            min_amount,
-            max_amount,
-            avg_amount
-        ))
     }
 
     /// Create a classification result

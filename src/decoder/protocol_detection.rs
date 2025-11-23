@@ -74,7 +74,7 @@ pub enum DecodedProtocol {
     },
     LikelyDataStorage {
         txid: String,
-        pattern_type: String, // "RepeatedPubkey", "HighOutputCount"
+        pattern_type: String, // "InvalidECPoint", "HighOutputCount", "DustAmount"
         details: String,
         debug_info: Option<crate::decoder::debug_display::TransactionDebugInfo>,
     },
@@ -823,92 +823,43 @@ pub fn has_counterparty_signature(data: &[u8]) -> Option<usize> {
         .find(|&i| data[i..].starts_with(COUNTERPARTY_PREFIX))
 }
 
-/// Try to classify as likely data storage based on suspicious patterns
+/// Try to classify as LikelyDataStorage using shared detection logic
 ///
-/// Returns Some(DecodedProtocol::LikelyDataStorage) if suspicious patterns are found:
-/// - Repeated pubkeys across outputs
-/// - High output count (5+) with valid EC points
+/// Uses unified detection module to ensure consistency with Stage 3 (classification).
+///
+/// **Detects three patterns**:
+/// 1. InvalidECPoint - ≥1 pubkey fails secp256k1 validation
+/// 2. HighOutputCount - ≥5 P2MS outputs with ALL valid EC points
+/// 3. DustAmount - ALL outputs ≤1000 sats with ALL valid EC points
+///
+/// Returns `Some(DecodedProtocol::LikelyDataStorage)` if a pattern is detected.
 pub fn try_likely_data_storage(tx_data: &TransactionData) -> Option<DecodedProtocol> {
-    use std::collections::HashMap;
+    use crate::detection::likely_data_storage::{detect, LikelyDataStorageVariant};
     use tracing::debug;
 
-    // Only check P2MS outputs for data storage patterns
+    // Get P2MS outputs (returns Vec<TransactionOutput> - same type as Stage 3)
     let p2ms_outputs = tx_data.p2ms_outputs();
-    if p2ms_outputs.is_empty() {
-        return None;
-    }
 
-    // Check 1: Repeated pubkeys across outputs
-    let mut pubkey_counts: HashMap<String, usize> = HashMap::new();
-
-    for output in &p2ms_outputs {
-        if let Some(info) = output.multisig_info() {
-            for pubkey in &info.pubkeys {
-                *pubkey_counts.entry(pubkey.clone()).or_insert(0) += 1;
-            }
-        }
-    }
-
-    // Find repeated pubkeys (appearing in 2+ outputs)
-    let repeated: Vec<(String, usize)> = pubkey_counts
-        .into_iter()
-        .filter(|(_, count)| *count >= 2)
-        .collect();
-
-    if !repeated.is_empty() {
-        let details = repeated
-            .iter()
-            .map(|(pubkey, count)| {
-                let truncated = if pubkey.len() > 16 {
-                    format!("{}...", &pubkey[..16])
-                } else {
-                    pubkey.clone()
-                };
-                format!("{} ({}x)", truncated, count)
-            })
-            .collect::<Vec<_>>()
-            .join(", ");
+    // Single call to unified detection logic (shared with Stage 3)
+    if let Some(result) = detect(&p2ms_outputs) {
+        // Map shared variant to pattern_type string (exact match with Stage 3)
+        let pattern_type = match result.variant {
+            LikelyDataStorageVariant::InvalidECPoint => "InvalidECPoint",
+            LikelyDataStorageVariant::HighOutputCount => "HighOutputCount",
+            LikelyDataStorageVariant::DustAmount => "DustAmount",
+        };
 
         debug!(
-            "Found repeated pubkeys in txid {}: {}",
-            tx_data.txid, details
+            "Transaction {} classified as LikelyDataStorage ({}): {}",
+            tx_data.txid, pattern_type, result.details
         );
+
         return Some(DecodedProtocol::LikelyDataStorage {
             txid: tx_data.txid.clone(),
-            pattern_type: "RepeatedPubkey".to_string(),
-            details: format!("Repeated pubkeys: {}", details),
+            pattern_type: pattern_type.to_string(),
+            details: result.details,
             debug_info: None,
         });
-    }
-
-    // Check 2: High output count (5+ P2MS outputs) with valid EC points
-    if p2ms_outputs.len() >= 5 {
-        // Quick validation - check that pubkeys look like valid compressed/uncompressed keys
-        let all_valid_format = p2ms_outputs.iter().all(|output| {
-            if let Some(info) = output.multisig_info() {
-                info.pubkeys.iter().all(|pubkey| {
-                    // Check length and prefix for compressed/uncompressed keys
-                    (pubkey.len() == 66 && (pubkey.starts_with("02") || pubkey.starts_with("03")))
-                        || (pubkey.len() == 130 && pubkey.starts_with("04"))
-                })
-            } else {
-                false
-            }
-        });
-
-        if all_valid_format {
-            debug!(
-                "Found high output count ({}) with valid EC point format in txid {}",
-                p2ms_outputs.len(),
-                tx_data.txid
-            );
-            return Some(DecodedProtocol::LikelyDataStorage {
-                txid: tx_data.txid.clone(),
-                pattern_type: "HighOutputCount".to_string(),
-                details: format!("{} P2MS outputs with valid EC points", p2ms_outputs.len()),
-                debug_info: None,
-            });
-        }
     }
 
     None
