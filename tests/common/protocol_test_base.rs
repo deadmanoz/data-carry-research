@@ -174,7 +174,6 @@ pub fn verify_classification(
                     "CLIPPERZ" => ProtocolVariant::OpReturnCLIPPERZ,
                     "GenericASCII" => ProtocolVariant::OpReturnGenericASCII,
                     // LikelyDataStorage variants (Display strings)
-                    "Repeated Pubkey" => ProtocolVariant::RepeatedPubkey,
                     "High Output Count" => ProtocolVariant::HighOutputCount,
                     // LikelyLegitimateMultisig variants (Display strings)
                     "Legitimate Multisig" if !var_str.contains("Duplicate") => {

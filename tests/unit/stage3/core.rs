@@ -239,7 +239,7 @@ async fn test_stage3_classification_stats_calculations() {
                 ProtocolType::PPk => Some(ProtocolVariant::PPkProfile),
                 ProtocolType::OpReturnSignalled => Some(ProtocolVariant::OpReturnProtocol47930),
                 ProtocolType::DataStorage => None,
-                ProtocolType::LikelyDataStorage => Some(ProtocolVariant::RepeatedPubkey),
+                ProtocolType::LikelyDataStorage => Some(ProtocolVariant::InvalidECPoint),
                 ProtocolType::LikelyLegitimateMultisig => Some(ProtocolVariant::LegitimateMultisig),
                 ProtocolType::Unknown => None,
             },
@@ -271,7 +271,7 @@ async fn test_stage3_classification_stats_calculations() {
                     ProtocolType::OpReturnSignalled => "OP_RETURN 0xbb3a signature".to_string(),
                     ProtocolType::DataStorage => "Data storage pattern".to_string(),
                     ProtocolType::LikelyDataStorage => {
-                        "Marker address/repeated pubkey/high output count".to_string()
+                        "Invalid EC points/high output count/dust amounts".to_string()
                     }
                     ProtocolType::LikelyLegitimateMultisig => "EC point validation".to_string(),
                     ProtocolType::Unknown => "No definitive signature found".to_string(),
