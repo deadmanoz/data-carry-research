@@ -7,6 +7,7 @@ pub mod config;
 pub mod crypto;
 pub mod database;
 pub mod decoder;
+pub mod detection;
 pub mod errors;
 pub mod processor;
 pub mod rpc;
