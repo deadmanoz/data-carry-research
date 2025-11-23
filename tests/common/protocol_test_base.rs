@@ -138,11 +138,15 @@ pub fn verify_classification(
                     "Send To Owners" => ProtocolVariant::OmniSendToOwners,
                     "Property Creation" => ProtocolVariant::OmniPropertyCreation,
                     "DEX Offer" => ProtocolVariant::OmniDEXOffer,
+                    "Failed Deobfuscation" => ProtocolVariant::OmniFailedDeobfuscation,
                     // Bitcoin Stamps variants (Display strings)
                     "Classic" => ProtocolVariant::StampsClassic,
                     "SRC-20" => ProtocolVariant::StampsSRC20,
                     "SRC-721" => ProtocolVariant::StampsSRC721,
                     "SRC-101" => ProtocolVariant::StampsSRC101,
+                    "HTML" => ProtocolVariant::StampsHTML,
+                    "Compressed" => ProtocolVariant::StampsCompressed,
+                    "Data" => ProtocolVariant::StampsData,
                     "Unknown"
                         if matches!(
                             expected_var,
@@ -174,20 +178,26 @@ pub fn verify_classification(
                     "CLIPPERZ" => ProtocolVariant::OpReturnCLIPPERZ,
                     "GenericASCII" => ProtocolVariant::OpReturnGenericASCII,
                     // LikelyDataStorage variants (Display strings)
+                    "Invalid EC Point" => ProtocolVariant::InvalidECPoint,
                     "High Output Count" => ProtocolVariant::HighOutputCount,
+                    "Dust Amount" => ProtocolVariant::DustAmount,
                     // LikelyLegitimateMultisig variants (Display strings)
-                    "Legitimate Multisig" if !var_str.contains("Duplicate") => {
+                    "Legitimate Multisig" if !var_str.contains("Duplicate") && !var_str.contains("Null") => {
                         ProtocolVariant::LegitimateMultisig
                     }
                     "Legitimate Multisig (Duplicate Keys)" => {
                         ProtocolVariant::LegitimateMultisigDupeKeys
                     }
+                    "Legitimate Multisig (Null-Padded)" => {
+                        ProtocolVariant::LegitimateMultisigWithNullKey
+                    }
                     // DataStorage variants (Display strings)
                     "Proof of Burn" => ProtocolVariant::DataStorageProofOfBurn,
                     "File Metadata" => ProtocolVariant::DataStorageFileMetadata,
                     "Embedded Data" => ProtocolVariant::DataStorageEmbeddedData,
-                    "WikiLeaks Cablegate Archive" => ProtocolVariant::DataStorageWikiLeaksCablegate,
-                    "Generic Data Storage" => ProtocolVariant::DataStorageGeneric,
+                    "WikiLeaks Cablegate" => ProtocolVariant::DataStorageWikiLeaksCablegate,
+                    "Null Data" => ProtocolVariant::DataStorageNullData,
+                    "Generic" => ProtocolVariant::DataStorageGeneric,
                     _ => return Err(anyhow::anyhow!("Unknown protocol variant: {}", var_str)),
                 };
                 assert_eq!(
