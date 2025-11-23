@@ -247,7 +247,7 @@ pub enum ProtocolType {
     PPk, // PPk blockchain infrastructure protocol (identified by marker pubkey, with RT, Registration, Message variants)
     OpReturnSignalled, // Protocols identified by OP_RETURN markers (Protocol47930, CLIPPERZ)
     DataStorage,
-    LikelyDataStorage, // Valid EC points but suspicious patterns (marker addresses, repeated pubkeys, high output count)
+    LikelyDataStorage, // Suspicious patterns (invalid EC points, high output count, dust amounts)
     LikelyLegitimateMultisig, // All pubkeys are valid EC points - likely legitimate multisig
     Unknown,
 }
@@ -349,7 +349,6 @@ pub enum ProtocolVariant {
 
     // LikelyDataStorage variants
     InvalidECPoint, // Invalid EC points (not on secp256k1 curve - obvious data embedding)
-    RepeatedPubkey, // Same pubkey across multiple outputs
     HighOutputCount, // 5+ P2MS outputs with valid EC points
     DustAmount,     // P2MS outputs with dust-level amounts (<= 1000 sats)
 
@@ -410,7 +409,6 @@ impl std::fmt::Display for ProtocolVariant {
             ProtocolVariant::OpReturnCLIPPERZ => "CLIPPERZ",
             ProtocolVariant::OpReturnGenericASCII => "GenericASCII",
             ProtocolVariant::InvalidECPoint => "Invalid EC Point",
-            ProtocolVariant::RepeatedPubkey => "Repeated Pubkey",
             ProtocolVariant::HighOutputCount => "High Output Count",
             ProtocolVariant::DustAmount => "Dust Amount",
             ProtocolVariant::LegitimateMultisig => "Legitimate Multisig",

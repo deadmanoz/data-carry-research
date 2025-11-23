@@ -429,6 +429,12 @@ async fn run_decode_txid(
                             data.decoded_data.len()
                         );
                     }
+                    DecodedData::LikelyDataStorage(data) => {
+                        println!(
+                            "TXID:{} TYPE:LIKELYDATASTORAGE PATTERN:{}",
+                            txid, data.pattern_type
+                        );
+                    }
                 }
             } else {
                 match decoded_data {
@@ -508,6 +514,12 @@ async fn run_decode_txid(
                             }
                         }
                         // Note: DataStorage saves to multiple files in pattern-specific subdirectories
+                    }
+                    DecodedData::LikelyDataStorage(data) => {
+                        info!("✅ Successfully classified as Likely Data Storage!");
+                        info!("📄 Pattern Type: {}", data.pattern_type);
+                        info!("📄 Details: {}", data.details);
+                        info!("📄 Metadata file: {}", data.file_path.display());
                     }
                 }
             }
@@ -603,6 +615,7 @@ async fn run_fetch_command(fetch_type: &FetchCommands) -> AppResult<()> {
                             DecodedData::Chancecoin { .. } => "chancecoin",
                             DecodedData::PPk { .. } => "ppk",
                             DecodedData::DataStorage(_) => "datastorage",
+                            DecodedData::LikelyDataStorage(_) => "likely_data_storage",
                         };
                         info!("Auto-detected protocol: {}", detected_protocol);
                         detected_protocol

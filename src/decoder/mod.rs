@@ -79,6 +79,7 @@ pub enum DecodedData {
     Chancecoin { data: ChancecoinData },
     PPk { data: PPkData },
     DataStorage(DataStorageData),
+    LikelyDataStorage(LikelyDataStorageData),
 }
 
 /// Bitcoin Stamps protocol data types
@@ -140,6 +141,15 @@ pub struct DataStorageData {
     pub metadata: serde_json::Value,
 }
 
+/// LikelyDataStorage protocol data
+#[derive(Debug, Clone)]
+pub struct LikelyDataStorageData {
+    pub txid: String,
+    pub pattern_type: String, // "InvalidECPoint", "HighOutputCount", "DustAmount"
+    pub details: String,
+    pub file_path: PathBuf,
+}
+
 impl DecodedData {
     /// Get a human-readable summary of the decoded data
     pub fn summary(&self) -> String {
@@ -192,6 +202,9 @@ impl DecodedData {
                     data.decoded_data.len()
                 )
             }
+            DecodedData::LikelyDataStorage(data) => {
+                format!("LikelyDataStorage {} - {}", data.pattern_type, data.details)
+            }
         }
     }
 
@@ -210,6 +223,7 @@ impl DecodedData {
             DecodedData::Chancecoin { data } => &data.txid,
             DecodedData::PPk { data } => &data.txid,
             DecodedData::DataStorage(data) => &data.txid,
+            DecodedData::LikelyDataStorage(data) => &data.txid,
         }
     }
 
@@ -228,6 +242,7 @@ impl DecodedData {
             DecodedData::Chancecoin { data } => Some(&data.file_path),
             DecodedData::PPk { data } => Some(&data.file_path),
             DecodedData::DataStorage(_) => None, // DataStorage saves to multiple files
+            DecodedData::LikelyDataStorage(data) => Some(&data.file_path),
         }
     }
 
@@ -256,6 +271,7 @@ impl DecodedData {
                         .unwrap_or(0)
             }
             DecodedData::DataStorage(data) => data.decoded_data.len(),
+            DecodedData::LikelyDataStorage(_) => 0, // Metadata-only classification, no data bytes
         }
     }
 
@@ -414,7 +430,7 @@ impl ProtocolDecoder {
     ///    - Bitcoin Stamps (BEFORE Counterparty - can be embedded)
     ///    - Counterparty (after Stamps)
     ///    - DataStorage (generic patterns)
-    ///    - LikelyDataStorage (suspicious patterns - marker addresses, repeated pubkeys)
+    ///    - LikelyDataStorage (suspicious patterns - invalid EC points, high output count, dust amounts)
     ///    - LikelyLegitimateMultisig (pubkey validation)
     /// 3. Return None if no protocol detected
     ///
@@ -1351,9 +1367,47 @@ impl ProtocolDecoder {
             txid, pattern_type, details
         );
 
-        // For likely data storage, we don't decode/extract any specific data
-        // Just return None to indicate "transaction processed, no data to save"
-        Ok(None)
+        // Create metadata JSON (no data extraction - heuristic classification only)
+        let metadata = serde_json::json!({
+            "txid": txid,
+            "pattern_type": pattern_type,
+            "details": details,
+            "classification": "LikelyDataStorage",
+            "note": "Heuristic classification - no protocol data extracted"
+        });
+
+        // Save to output_data/decoded/likely_data_storage/<pattern_type>/<txid>.json
+        let output_path = self
+            .output_manager
+            .output_dir()
+            .join("likely_data_storage")
+            .join(&pattern_type)
+            .join(format!("{}.json", txid));
+
+        // Create directory structure
+        if let Some(parent) = output_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        // Write metadata JSON
+        let json_str = serde_json::to_string_pretty(&metadata)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        std::fs::write(&output_path, json_str)?;
+
+        info!(
+            "Saved LikelyDataStorage metadata to {}",
+            output_path.display()
+        );
+
+        // Return LikelyDataStorage variant (metadata saved as side effect)
+        Ok(Some(DecodedData::LikelyDataStorage(
+            LikelyDataStorageData {
+                txid,
+                pattern_type,
+                details,
+                file_path: output_path,
+            },
+        )))
     }
 
     async fn decode_likely_legitimate_p2ms(
