@@ -85,6 +85,7 @@ pub struct ProtocolBreakdown {
     pub ascii_identifier_protocols: ProtocolStats,
     pub omni_layer: ProtocolStats,
     pub chancecoin: ProtocolStats,
+    pub ppk: ProtocolStats,
     pub opreturn_signalled: ProtocolStats,
     pub data_storage: ProtocolStats,
     pub likely_data_storage: ProtocolStats,

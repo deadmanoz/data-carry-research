@@ -111,6 +111,7 @@ impl ProtocolStatsAnalyser {
             ascii_identifier_protocols: get_protocol_stats("AsciiIdentifierProtocols")?,
             omni_layer: get_protocol_stats("OmniLayer")?,
             chancecoin: get_protocol_stats("Chancecoin")?,
+            ppk: get_protocol_stats("PPk")?,
             opreturn_signalled: get_protocol_stats("OpReturnSignalled")?,
             data_storage: get_protocol_stats("DataStorage")?,
             likely_data_storage: get_protocol_stats("LikelyDataStorage")?,

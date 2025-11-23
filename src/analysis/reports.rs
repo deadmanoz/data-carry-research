@@ -248,7 +248,7 @@ impl ReportFormatter {
             "Counterparty" => "Counterparty".to_string(),
             "OmniLayer" => "Omni Layer".to_string(),
             "LikelyLegitimateMultisig" => "Likely Legitimate Multisig".to_string(),
-            "DataStorage" => "Generic Data Storage".to_string(),
+            "DataStorage" => "Data Storage".to_string(),
             "LikelyDataStorage" => "Likely Data Storage".to_string(),
             "Chancecoin" => "Chancecoin".to_string(),
             "AsciiIdentifierProtocols" => "ASCII Identifier Protocols".to_string(),
@@ -390,6 +390,16 @@ impl ReportFormatter {
                     "Chancecoin: {} ({:.1}%)\n",
                     report.protocol_breakdown.chancecoin.count,
                     report.protocol_breakdown.chancecoin.percentage
+                ));
+                output.push_str(&format!(
+                    "PPk: {} ({:.1}%)\n",
+                    report.protocol_breakdown.ppk.count,
+                    report.protocol_breakdown.ppk.percentage
+                ));
+                output.push_str(&format!(
+                    "OP_RETURN Signalled: {} ({:.1}%)\n",
+                    report.protocol_breakdown.opreturn_signalled.count,
+                    report.protocol_breakdown.opreturn_signalled.percentage
                 ));
                 output.push_str(&format!(
                     "Data Storage: {} ({:.1}%)\n",
