@@ -597,7 +597,8 @@ fn run_content_type_analysis(
             }
             "omni" | "omnilayer" => Ok(ProtocolType::OmniLayer),
             "chancecoin" => Ok(ProtocolType::Chancecoin),
-            "opreturnsignalled" | "opreturn" | "protocol47930" | "47930" | "bb3a" | "rt"
+            "ppk" => Ok(ProtocolType::PPk),
+            "opreturnsignalled" | "opreturn" | "protocol47930" | "47930" | "bb3a"
             | "clipperz" => Ok(ProtocolType::OpReturnSignalled),
             "datastorage" | "data" => Ok(ProtocolType::DataStorage),
             "likelydatastorage" | "lds" => Ok(ProtocolType::LikelyDataStorage),
