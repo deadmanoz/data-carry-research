@@ -393,8 +393,7 @@ impl ReportFormatter {
                 ));
                 output.push_str(&format!(
                     "PPk: {} ({:.1}%)\n",
-                    report.protocol_breakdown.ppk.count,
-                    report.protocol_breakdown.ppk.percentage
+                    report.protocol_breakdown.ppk.count, report.protocol_breakdown.ppk.percentage
                 ));
                 output.push_str(&format!(
                     "OP_RETURN Signalled: {} ({:.1}%)\n",
@@ -855,15 +854,60 @@ impl ReportFormatter {
     fn export_plotly_value_distributions(report: &ValueDistributionReport) -> AppResult<String> {
         use serde_json::json;
 
-        // Create bucket labels (X-axis)
+        // Helper to format value with K/M abbreviations or BTC for large values
+        let format_value_label = |sats: u64| -> String {
+            if sats >= 100_000_000 {
+                // >= 1 BTC: show as BTC
+                let btc = sats as f64 / 100_000_000.0;
+                if btc >= 10.0 {
+                    format!("{:.0} BTC", btc)
+                } else {
+                    format!("{:.1} BTC", btc)
+                }
+            } else if sats >= 1_000_000 {
+                // >= 1M: show as M
+                let m = sats as f64 / 1_000_000.0;
+                if m >= 10.0 {
+                    format!("{}M", (sats / 1_000_000))
+                } else {
+                    format!("{:.1}M", m)
+                }
+            } else if sats >= 1_000 {
+                // >= 1K: show as K
+                let k = sats as f64 / 1_000.0;
+                if k >= 10.0 {
+                    format!("{}K", (sats / 1_000))
+                } else {
+                    format!("{:.1}K", k)
+                }
+            } else {
+                // < 1K: show as-is
+                format!("{}", sats)
+            }
+        };
+
+        // Create bucket labels (X-axis) with abbreviated format
         let bucket_labels: Vec<String> = report
             .bucket_ranges
             .iter()
             .map(|(min, max)| {
                 if *max >= i64::MAX as u64 {
-                    format!("{}+ sats", min)
+                    // Top bucket: "1+ BTC" format
+                    format!("{}+", format_value_label(*min))
+                } else if *min >= 100_000_000 {
+                    // BTC range: "0.1-0.5 BTC"
+                    format!(
+                        "{}-{}",
+                        format_value_label(*min).replace(" BTC", ""),
+                        format_value_label(*max)
+                    )
                 } else {
-                    format!("{}-{}", min, max)
+                    // Satoshi ranges: "546-1K sats", "1K-2.7K sats"
+                    format!(
+                        "{}-{} sats",
+                        format_value_label(*min),
+                        format_value_label(*max)
+                    )
                 }
             })
             .collect();
