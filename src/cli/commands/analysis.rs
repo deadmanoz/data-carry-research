@@ -1,9 +1,6 @@
 use crate::config::AppConfig;
-use crate::database::stage3::operations::NO_MIME_TYPE_SENTINEL;
 use crate::errors::{AppError, AppResult};
-use crate::types::content_detection::ContentType;
 use clap::{Args, Subcommand};
-use serde::Serialize;
 use std::path::PathBuf;
 
 /// Analysis commands for database statistics and reports
@@ -277,13 +274,26 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
             let formatted_output =
                 ReportFormatter::format_value_distributions(&analysis, &parse_format(format))?;
 
+            // Default output path for JSON/Plotly formats
+            let default_output_path =
+                std::path::PathBuf::from("./output_data/plots/value_distributions.json");
+
             if let Some(output_path) = output {
-                std::fs::write(output_path, formatted_output)?;
+                std::fs::write(&output_path, formatted_output)?;
                 println!(
                     "Value distribution analysis written to: {}",
                     output_path.display()
                 );
+            } else if matches!(parse_format(format), OutputFormat::Json | OutputFormat::Plotly) {
+                // Auto-write JSON/Plotly output to default path
+                std::fs::create_dir_all(default_output_path.parent().unwrap())?;
+                std::fs::write(&default_output_path, formatted_output)?;
+                println!(
+                    "Value distribution analysis written to: {}",
+                    default_output_path.display()
+                );
             } else {
+                // Console format: print to stdout
                 print!("{}", formatted_output);
             }
             Ok(())
@@ -360,12 +370,120 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
             mime_type,
         } => {
             let db_path = get_db_path(database_path)?;
-            run_content_type_analysis(
-                &db_path,
-                &parse_format(format),
-                protocol.as_deref(),
-                mime_type.as_deref(),
-            )
+            use crate::database::Database;
+            use crate::analysis::ContentTypeAnalyser;
+            let db = Database::new_v2(&db_path)?;
+
+            // Handle filtering modes
+            if let Some(protocol_str) = protocol {
+                // Protocol-specific analysis
+                let analysis = ContentTypeAnalyser::analyse_protocol_content_types(&db, protocol_str)?;
+                match parse_format(format) {
+                    OutputFormat::Json | OutputFormat::Plotly => {
+                        println!("{}", serde_json::to_string_pretty(&analysis)?);
+                    }
+                    OutputFormat::Console => {
+                        println!("📊 Content Type Analysis - {}", protocol_str);
+                        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+                        println!();
+                        println!("Total outputs: {}", analysis.total_outputs);
+                        println!("With content type: {}", analysis.with_content_type);
+                        println!("Without content type: {}", analysis.without_content_type);
+                        println!("Coverage: {:.2}%", analysis.coverage_percentage);
+                        println!();
+                        if !analysis.content_types.is_empty() {
+                            println!("{:<40} {:>10} {:>11}", "MIME Type", "Count", "% of Total");
+                            println!("{:-<40} {:->10} {:->11}", "", "", "");
+                            for ct in &analysis.content_types {
+                                println!("{:<40} {:>10} {:>10.2}%", ct.mime_type, ct.count, ct.percentage);
+                            }
+                        }
+                    }
+                }
+            } else if let Some(mime_str) = mime_type {
+                // MIME type usage analysis
+                let analysis = ContentTypeAnalyser::analyse_mime_type_usage(&db, mime_str)?;
+                match parse_format(format) {
+                    OutputFormat::Json | OutputFormat::Plotly => {
+                        println!("{}", serde_json::to_string_pretty(&analysis)?);
+                    }
+                    OutputFormat::Console => {
+                        println!("📊 MIME Type Usage - {}", mime_str);
+                        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+                        println!();
+                        for protocol_stats in &analysis {
+                            println!("{}: {} outputs ({:.2}%)",
+                                protocol_stats.protocol,
+                                protocol_stats.with_content_type,
+                                protocol_stats.coverage_percentage);
+                        }
+                    }
+                }
+            } else {
+                // Full content type analysis
+                let analysis = ContentTypeAnalyser::analyse_content_types(&db)?;
+                match parse_format(format) {
+                    OutputFormat::Json | OutputFormat::Plotly => {
+                        println!("{}", serde_json::to_string_pretty(&analysis)?);
+                    }
+                    OutputFormat::Console => {
+                        println!("📊 Content Type Distribution (Unspent P2MS Outputs Only)");
+                        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+                        println!();
+                        println!("Total outputs: {}", analysis.total_outputs);
+                        println!("With content type: {} ({:.2}%)",
+                            analysis.outputs_with_content_type,
+                            analysis.content_type_percentage);
+                        println!("Without content type: {}", analysis.outputs_without_content_type);
+                        println!();
+
+                        // Valid None cases
+                        println!("Valid None Cases (Architecturally Correct):");
+                        println!("  LikelyDataStorage: {}", analysis.valid_none_stats.likely_data_storage);
+                        println!("  LikelyLegitimateMultisig: {}", analysis.valid_none_stats.likely_legitimate_multisig);
+                        println!("  StampsUnknown: {}", analysis.valid_none_stats.stamps_unknown);
+                        println!("  OmniFailedDeobfuscation: {}", analysis.valid_none_stats.omni_failed_deobfuscation);
+                        println!("  Total valid None: {}", analysis.valid_none_stats.total_valid_none);
+                        println!();
+
+                        // Invalid None cases
+                        if !analysis.invalid_none_stats.is_empty() {
+                            println!("Invalid None Cases (Missing Content Types):");
+                            for protocol_stats in &analysis.invalid_none_stats {
+                                println!("  {}: {} outputs missing content types",
+                                    protocol_stats.protocol,
+                                    protocol_stats.without_content_type);
+                            }
+                            println!();
+                        }
+
+                        // Category breakdown
+                        println!("Content Type Categories:");
+                        println!("{:<20} {:>10} {:>11}", "Category", "Count", "% of Total");
+                        println!("{:-<20} {:->10} {:->11}", "", "", "");
+                        for category in &analysis.category_breakdown {
+                            println!("{:<20} {:>10} {:>10.2}%",
+                                category.category,
+                                category.count,
+                                category.percentage);
+                        }
+                        println!();
+
+                        // Top content types
+                        println!("Top Content Types:");
+                        println!("{:<40} {:>10} {:>11}", "MIME Type", "Count", "% of Total");
+                        println!("{:-<40} {:->10} {:->11}", "", "", "");
+                        for (i, ct) in analysis.content_type_breakdown.iter().enumerate() {
+                            if i >= 15 { break; } // Show top 15
+                            println!("{:<40} {:>10} {:>10.2}%", ct.mime_type, ct.count, ct.percentage);
+                        }
+                        if analysis.content_type_breakdown.len() > 15 {
+                            println!("  ... and {} more", analysis.content_type_breakdown.len() - 15);
+                        }
+                    }
+                }
+            }
+            Ok(())
         }
 
         AnalysisCommands::ProtocolDataSizes {
@@ -443,343 +561,3 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
     }
 }
 
-use crate::analysis::OutputFormat;
-
-/// Analyse content type distribution
-fn run_content_type_analysis(
-    db_path: &str,
-    format: &OutputFormat,
-    protocol_filter: Option<&str>,
-    mime_type_filter: Option<&str>,
-) -> AppResult<()> {
-    use crate::database::traits::Stage3Operations;
-    use crate::database::Database;
-    use crate::types::ProtocolType;
-
-    let db = Database::new_v2(db_path)?;
-
-    let fetch_transactions_for_mime = |mime: &str| -> AppResult<(Vec<String>, bool)> {
-        let is_missing = mime == NO_MIME_TYPE_SENTINEL
-            || mime.eq_ignore_ascii_case("none")
-            || mime.eq_ignore_ascii_case("no-mime-type")
-            || mime.eq_ignore_ascii_case("missing")
-            || mime.eq_ignore_ascii_case("null");
-
-        if is_missing {
-            let mut stmt = db
-                .connection()
-                .prepare(
-                    r#"
-                        SELECT txid
-                        FROM transaction_classifications
-                        WHERE content_type IS NULL
-                        ORDER BY id
-                        "#,
-                )
-                .map_err(AppError::Database)?;
-
-            let rows = stmt
-                .query_map([], |row| row.get::<_, String>(0))
-                .map_err(AppError::Database)?;
-
-            let mut txids = Vec::new();
-            for row_result in rows {
-                txids.push(row_result.map_err(AppError::Database)?);
-            }
-
-            Ok((txids, true))
-        } else {
-            Ok((db.get_transactions_by_content_type(mime)?, false))
-        }
-    };
-
-    #[derive(Debug, Clone, Serialize)]
-    struct ContentTypeSummary {
-        mime_type: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        raw_mime_type: Option<String>,
-        category: String,
-        count: u64,
-        percentage: f64,
-        is_missing: bool,
-    }
-
-    #[derive(Debug, Clone, Serialize)]
-    struct CategorySummary {
-        category: String,
-        count: u64,
-        percentage: f64,
-    }
-
-    let build_summaries = |distribution: &std::collections::HashMap<String, u64>| -> (
-        Vec<ContentTypeSummary>,
-        Vec<CategorySummary>,
-        u64,
-    ) {
-        let total: u64 = distribution.values().sum();
-        let mut entries: Vec<ContentTypeSummary> = Vec::new();
-        let mut category_totals: std::collections::BTreeMap<String, u64> =
-            std::collections::BTreeMap::new();
-
-        for (mime_type, count) in distribution.iter() {
-            let is_missing = mime_type == NO_MIME_TYPE_SENTINEL;
-            let (display_mime, raw_mime) = if is_missing {
-                ("No MIME Type".to_string(), None)
-            } else {
-                (mime_type.clone(), Some(mime_type.clone()))
-            };
-
-            let category = if is_missing {
-                "No Category".to_string()
-            } else {
-                ContentType::from_mime_type(mime_type)
-                    .as_ref()
-                    .map(|ct| ct.category().to_string())
-                    .unwrap_or_else(|| "Other".to_string())
-            };
-
-            let percentage = if total == 0 {
-                0.0
-            } else {
-                (*count as f64 * 100.0) / total as f64
-            };
-
-            *category_totals.entry(category.clone()).or_insert(0) += *count;
-
-            entries.push(ContentTypeSummary {
-                mime_type: display_mime,
-                raw_mime_type: raw_mime,
-                category,
-                count: *count,
-                percentage,
-                is_missing,
-            });
-        }
-
-        entries.sort_by(|a, b| {
-            b.count
-                .cmp(&a.count)
-                .then_with(|| a.mime_type.cmp(&b.mime_type))
-        });
-
-        let mut categories: Vec<CategorySummary> = category_totals
-            .into_iter()
-            .map(|(category, count)| {
-                let percentage = if total == 0 {
-                    0.0
-                } else {
-                    (count as f64 * 100.0) / total as f64
-                };
-                CategorySummary {
-                    category,
-                    count,
-                    percentage,
-                }
-            })
-            .collect();
-
-        categories.sort_by(|a, b| {
-            b.count
-                .cmp(&a.count)
-                .then_with(|| a.category.cmp(&b.category))
-        });
-
-        (entries, categories, total)
-    };
-
-    // Helper function to parse protocol string
-    let parse_protocol_type = |s: &str| -> Result<ProtocolType, AppError> {
-        match s.to_lowercase().as_str() {
-            "bitcoinstamps" | "stamps" => Ok(ProtocolType::BitcoinStamps),
-            "counterparty" | "cp" => Ok(ProtocolType::Counterparty),
-            "asciiidentifierprotocols" | "ascii" | "aip" => {
-                Ok(ProtocolType::AsciiIdentifierProtocols)
-            }
-            "omni" | "omnilayer" => Ok(ProtocolType::OmniLayer),
-            "chancecoin" => Ok(ProtocolType::Chancecoin),
-            "ppk" => Ok(ProtocolType::PPk),
-            "opreturnsignalled" | "opreturn" | "protocol47930" | "47930" | "bb3a"
-            | "clipperz" => Ok(ProtocolType::OpReturnSignalled),
-            "datastorage" | "data" => Ok(ProtocolType::DataStorage),
-            "likelydatastorage" | "lds" => Ok(ProtocolType::LikelyDataStorage),
-            "likelylegitimate" | "legitimate" => Ok(ProtocolType::LikelyLegitimateMultisig),
-            "unknown" => Ok(ProtocolType::Unknown),
-            _ => Err(AppError::Config(format!("Unknown protocol type: {}", s))),
-        }
-    };
-
-    match format {
-        OutputFormat::Json | OutputFormat::Plotly => {
-            // JSON output
-            if let Some(mime_type) = mime_type_filter {
-                // Show transactions with specific MIME type
-                let (txids, is_missing) = fetch_transactions_for_mime(mime_type)?;
-                let count = txids.len();
-                let category = if is_missing {
-                    "No Category"
-                } else {
-                    ContentType::from_mime_type(mime_type)
-                        .as_ref()
-                        .map(|ct| ct.category())
-                        .unwrap_or("Other")
-                };
-
-                let output = serde_json::json!({
-                    "mime_type": if is_missing { "No MIME Type" } else { mime_type },
-                    "raw_mime_type": if is_missing { serde_json::Value::Null } else { serde_json::Value::String(mime_type.to_string()) },
-                    "category": category,
-                    "count": count,
-                    "is_missing": is_missing,
-                    "transactions": txids
-                });
-                println!("{}", serde_json::to_string_pretty(&output).unwrap());
-            } else if let Some(protocol_str) = protocol_filter {
-                // Show content types for specific protocol
-                let protocol = parse_protocol_type(protocol_str)?;
-                let distribution = db.get_content_type_distribution_by_protocol(protocol)?;
-                let (summaries, category_totals, total) = build_summaries(&distribution);
-
-                let output = serde_json::json!({
-                    "protocol": protocol_str,
-                    "total_classifications": total,
-                    "category_totals": category_totals,
-                    "content_types": summaries
-                });
-                println!("{}", serde_json::to_string_pretty(&output).unwrap());
-            } else {
-                // Show all content types
-                let distribution = db.get_content_type_distribution()?;
-                let (summaries, category_totals, total) = build_summaries(&distribution);
-
-                let output = serde_json::json!({
-                    "total_classifications": total,
-                    "category_totals": category_totals,
-                    "content_types": summaries
-                });
-                println!("{}", serde_json::to_string_pretty(&output).unwrap());
-            }
-        }
-        OutputFormat::Console => {
-            // Console output
-            if let Some(mime_type) = mime_type_filter {
-                // Show transactions with specific MIME type
-                let (txids, is_missing) = fetch_transactions_for_mime(mime_type)?;
-                let count = txids.len();
-                let display_mime = if is_missing {
-                    "No MIME Type"
-                } else {
-                    mime_type
-                };
-                let category = if is_missing {
-                    "No Category"
-                } else {
-                    ContentType::from_mime_type(mime_type)
-                        .as_ref()
-                        .map(|ct| ct.category())
-                        .unwrap_or("Other")
-                };
-
-                println!("📊 Content Type Analysis - {}", display_mime);
-                println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-                println!();
-                println!("Total transactions: {}", count);
-                println!("Category: {}", category);
-                println!();
-
-                if !txids.is_empty() {
-                    println!("Transactions:");
-                    for txid in txids.iter().take(100) {
-                        println!("  {}", txid);
-                    }
-                    if txids.len() > 100 {
-                        println!("  ... and {} more", txids.len() - 100);
-                    }
-                }
-            } else if let Some(protocol_str) = protocol_filter {
-                // Show content types for specific protocol
-                let protocol = parse_protocol_type(protocol_str)?;
-                let distribution =
-                    db.get_content_type_distribution_by_protocol(protocol.clone())?;
-                let (summaries, category_totals, total) = build_summaries(&distribution);
-
-                println!("📊 Content Type Analysis - {:?}", protocol);
-                println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-                println!();
-
-                if summaries.is_empty() {
-                    println!("No content types found for this protocol");
-                } else {
-                    println!("Category Totals:");
-                    println!("{:<20} {:>10} {:>11}", "Category", "Count", "Share");
-                    println!("{:-<20} {:->10} {:->11}", "", "", "");
-                    for category in &category_totals {
-                        println!(
-                            "{:<20} {:>10} {:>10.2}%",
-                            category.category, category.count, category.percentage
-                        );
-                    }
-
-                    println!();
-                    println!("Detailed Content Types:");
-                    println!(
-                        "{:<20} {:<40} {:>10} {:>11}",
-                        "Category", "MIME Type", "Count", "Share"
-                    );
-                    println!("{:-<20} {:-<40} {:->10} {:->11}", "", "", "", "");
-
-                    for entry in summaries {
-                        println!(
-                            "{:<20} {:<40} {:>10} {:>10.2}%",
-                            entry.category, entry.mime_type, entry.count, entry.percentage
-                        );
-                    }
-
-                    println!();
-                    println!("Total classified outputs: {}", total);
-                }
-            } else {
-                // Show all content types
-                let distribution = db.get_content_type_distribution()?;
-                let (summaries, category_totals, total) = build_summaries(&distribution);
-
-                println!("📊 Content Type Distribution");
-                println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-                println!();
-
-                if summaries.is_empty() {
-                    println!("No content types found");
-                } else {
-                    println!("Category Totals:");
-                    println!("{:<20} {:>10} {:>11}", "Category", "Count", "Share");
-                    println!("{:-<20} {:->10} {:->11}", "", "", "");
-                    for category in &category_totals {
-                        println!(
-                            "{:<20} {:>10} {:>10.2}%",
-                            category.category, category.count, category.percentage
-                        );
-                    }
-
-                    println!();
-                    println!("Detailed Content Types:");
-                    println!(
-                        "{:<20} {:<40} {:>10} {:>11}",
-                        "Category", "MIME Type", "Count", "Share"
-                    );
-                    println!("{:-<20} {:-<40} {:->10} {:->11}", "", "", "", "");
-
-                    for entry in summaries {
-                        println!(
-                            "{:<20} {:<40} {:>10} {:>10.2}%",
-                            entry.category, entry.mime_type, entry.count, entry.percentage
-                        );
-                    }
-
-                    println!();
-                    println!("Total classified outputs: {}", total);
-                }
-            }
-        }
-    }
-
-    Ok(())
-}
