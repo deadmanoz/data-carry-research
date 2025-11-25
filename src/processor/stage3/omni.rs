@@ -250,6 +250,11 @@ impl ProtocolSpecificClassifier for OmniClassifier {
         match self.extract_and_deobfuscate_p2ms_data(tx, database) {
             Some(omni_data) => {
                 // Successful deobfuscation - classify with message type variant
+
+                // Detect content type from payload (used for both tx and output classifications)
+                let content_type =
+                    ContentType::detect(&omni_data.payload).map(|ct| ct.mime_type().to_string());
+
                 // Build per-output classifications: mark outputs that contributed packets
                 // Each output gets its own spendability analysis for accurate key counts
                 use std::collections::HashSet;
@@ -267,7 +272,7 @@ impl ProtocolSpecificClassifier for OmniClassifier {
                             let spendability_result =
                                 SpendabilityAnalyser::analyse_omni_output(output);
 
-                            let details = crate::types::OutputClassificationDetails::new(
+                            let mut details = crate::types::OutputClassificationDetails::new(
                                 Vec::new(),
                                 true,
                                 true,
@@ -277,6 +282,13 @@ impl ProtocolSpecificClassifier for OmniClassifier {
                                 ),
                                 spendability_result,
                             );
+
+                            // Propagate transaction-level content type to THIS PROTOCOL's outputs only.
+                            // IMPORTANT: This assumes all Omni outputs in a transaction share the same content type.
+                            // Future protocols with mixed content per output would need per-output detection.
+                            if let Some(ref ct) = content_type {
+                                details = details.with_content_type(ct.clone());
+                            }
 
                             output_classifications.push(
                                 crate::types::OutputClassificationData::new(
@@ -296,10 +308,6 @@ impl ProtocolSpecificClassifier for OmniClassifier {
                     }
                 }
                 let variant = omni_data.message_type.get_variant();
-
-                // Detect content type from payload
-                let content_type =
-                    ContentType::detect(&omni_data.payload).map(|ct| ct.mime_type().to_string());
 
                 let tx_classification = ClassificationResult {
                     txid: tx.txid.clone(),

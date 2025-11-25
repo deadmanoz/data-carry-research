@@ -62,6 +62,10 @@ impl ProtocolSpecificClassifier for CounterpartyClassifier {
         if let Some(counterparty_data) = self.extract_p2ms_counterparty_data(tx, database) {
             let variant = counterparty_data.message_type.get_variant();
 
+            // Detect content type from payload (used for both tx and output classifications)
+            let content_type = ContentType::detect(&counterparty_data.payload)
+                .map(|ct| ct.mime_type().to_string());
+
             // Track which vouts contain protocol data (already classified)
             let mut classified_vouts = HashSet::<u32>::new();
             let mut output_classifications = Vec::new();
@@ -80,7 +84,7 @@ impl ProtocolSpecificClassifier for CounterpartyClassifier {
                             let spendability_result =
                                 SpendabilityAnalyser::analyse_counterparty_output(output);
 
-                            let details = crate::types::OutputClassificationDetails::new(
+                            let mut details = crate::types::OutputClassificationDetails::new(
                                 Vec::new(),
                                 true,
                                 true,
@@ -90,6 +94,15 @@ impl ProtocolSpecificClassifier for CounterpartyClassifier {
                                 ),
                                 spendability_result,
                             );
+
+                            // Propagate transaction-level content type to THIS PROTOCOL's outputs only.
+                            // IMPORTANT: This assumes all Counterparty outputs in a transaction share the same
+                            // content type (multi-part payloads from one logical message). This is verified for
+                            // Counterparty. Future protocols with mixed content per output or cross-protocol
+                            // transactions (Counterparty+Stamps) would need per-output detection.
+                            if let Some(ref ct) = content_type {
+                                details = details.with_content_type(ct.clone());
+                            }
 
                             output_classifications.push(
                                 crate::types::OutputClassificationData::new(
@@ -120,13 +133,18 @@ impl ProtocolSpecificClassifier for CounterpartyClassifier {
                         let spendability_result =
                             SpendabilityAnalyser::analyse_counterparty_output(output);
 
-                        let details = crate::types::OutputClassificationDetails::new(
+                        let mut details = crate::types::OutputClassificationDetails::new(
                             Vec::new(),
                             true,
                             true,
                             format!("Counterparty P2MS {:?}", counterparty_data.message_type),
                             spendability_result,
                         );
+
+                        // Propagate transaction-level content type to THIS PROTOCOL's outputs only.
+                        if let Some(ref ct) = content_type {
+                            details = details.with_content_type(ct.clone());
+                        }
 
                         output_classifications.push(crate::types::OutputClassificationData::new(
                             counterparty_data.vout_index,
@@ -146,6 +164,8 @@ impl ProtocolSpecificClassifier for CounterpartyClassifier {
 
             // Classify remaining P2MS outputs in this transaction
             // These are "dust" outputs without protocol data, but should still be marked as Counterparty
+            // NOTE: These outputs DO NOT get content_type because they carry NO protocol payload.
+            // Only outputs with actual protocol data (protocol_signature_found=true) should have content types.
             for output in p2ms_outputs
                 .iter()
                 .filter(|o| !classified_vouts.contains(&o.vout))
@@ -162,6 +182,7 @@ impl ProtocolSpecificClassifier for CounterpartyClassifier {
                     ),
                     spendability_result,
                 );
+                // No content_type propagation for dust outputs - they carry no data
 
                 output_classifications.push(crate::types::OutputClassificationData::new(
                     output.vout,
@@ -170,10 +191,6 @@ impl ProtocolSpecificClassifier for CounterpartyClassifier {
                     details,
                 ));
             }
-
-            // Detect content type from payload
-            let content_type = ContentType::detect(&counterparty_data.payload)
-                .map(|ct| ct.mime_type().to_string());
 
             let tx_classification = ClassificationResult {
                 txid: tx.txid.clone(),

@@ -162,6 +162,9 @@ impl ProtocolSpecificClassifier for LikelyLegitimateClassifier {
                     })
                     .to_string(),
                 ),
+                // Content type is None because LikelyLegitimateMultisig outputs are REAL MULTISIG,
+                // not data-carrying protocols. These are legitimate cryptocurrency addresses.
+                // This is intentional and architecturally correct.
                 content_type: None,
             },
             classification_timestamp: std::time::SystemTime::now()

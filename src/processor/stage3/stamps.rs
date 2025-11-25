@@ -232,6 +232,9 @@ impl ProtocolSpecificClassifier for BitcoinStampsClassifier {
                     crate::types::spendability::SpendabilityResult::all_burn_keys(1)
                 };
 
+                // StampsUnknown variant: ARC4 decryption failed or 'stamp:' signature not found.
+                // Content type remains None because we cannot extract/validate the payload.
+                // This is correct behaviour - failed decryption = no content to classify.
                 let details = crate::types::OutputClassificationDetails::new(
                     vec![p.pattern_type.clone()],
                     true,
@@ -239,6 +242,7 @@ impl ProtocolSpecificClassifier for BitcoinStampsClassifier {
                     "Bitcoin Stamps burn key only; ARC4 'stamp:' not validated".to_string(),
                     spendability_result,
                 );
+                // No .with_content_type() - intentionally None
 
                 output_classifications.push(crate::types::OutputClassificationData::new(
                     p.vout,

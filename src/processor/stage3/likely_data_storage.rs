@@ -79,8 +79,11 @@ impl LikelyDataStorageClassifier {
             };
 
             // Build Stage 3-specific output classifications (spendability analysis)
-            let output_classifications =
-                self.build_output_classifications(&p2ms_outputs, protocol_variant.clone(), &result.details);
+            let output_classifications = self.build_output_classifications(
+                &p2ms_outputs,
+                protocol_variant.clone(),
+                &result.details,
+            );
 
             let tx_classification =
                 self.create_classification(&tx.txid, protocol_variant, result.details);
@@ -139,7 +142,10 @@ impl LikelyDataStorageClassifier {
                 protocol_signature_found: false,
                 classification_method: method,
                 additional_metadata: None,
-                content_type: None, // No content extraction for LikelyDataStorage
+                // Content type is None because LikelyDataStorage performs PATTERN DETECTION only.
+                // Actual data extraction and content type detection occurs in Stage 4 (decoder).
+                // This is intentional and architecturally correct.
+                content_type: None,
             },
             classification_timestamp: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
