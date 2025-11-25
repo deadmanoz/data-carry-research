@@ -38,6 +38,7 @@
 
 pub mod burn_detector;
 pub mod burn_patterns;
+pub mod content_type_analysis;
 pub mod data_size_stats;
 pub mod fee_analyser;
 pub mod fee_analysis;
@@ -56,6 +57,7 @@ pub mod value_analysis;
 // Re-export main types and interfaces
 pub use burn_detector::BurnPatternDetector;
 pub use burn_patterns::BurnPatternAnalyser;
+pub use content_type_analysis::ContentTypeAnalyser;
 pub use data_size_stats::DataSizeAnalyser;
 pub use fee_analyser::FeeAnalyser;
 pub use fee_analysis::FeeAnalysisEngine;
@@ -73,11 +75,12 @@ pub use stamps_signature_stats::{StampsSignatureAnalyser, StampsSignatureAnalysi
 pub use stamps_transport_stats::{StampsTransportAnalyser, StampsTransportAnalysis};
 pub use types::{
     BurnPatternAnalysis, ClassificationStatsReport, ComprehensiveDataSizeReport,
-    ContentTypeSpendabilityReport, FeeAnalysisReport, FileExtensionReport, FullAnalysisReport,
-    GlobalValueDistribution, MultisigConfigReport, MultisigConfiguration, ProtocolDataSizeReport,
-    ProtocolValueDistribution, SignatureAnalysisReport, SpendabilityDataSizeReport,
-    SpendabilityStatsReport, ValueAnalysisReport, ValueBucket, ValueDistributionReport,
-    ValuePercentiles,
+    ContentTypeAnalysisReport, ContentTypeCategoryStats, ContentTypeProtocolStats,
+    ContentTypeSpendabilityReport, ContentTypeStats, FeeAnalysisReport, FileExtensionReport,
+    FullAnalysisReport, GlobalValueDistribution, MultisigConfigReport, MultisigConfiguration,
+    ProtocolDataSizeReport, ProtocolValueDistribution, SignatureAnalysisReport,
+    SpendabilityDataSizeReport, SpendabilityStatsReport, ValidNoneStats, ValueAnalysisReport,
+    ValueBucket, ValueDistributionReport, ValuePercentiles,
 };
 pub use value_analysis::ValueAnalysisEngine;
 
@@ -317,6 +320,27 @@ impl AnalysisEngine {
     /// * `AppResult<MultisigConfigReport>` - Comprehensive multisig configuration analysis
     pub fn analyse_multisig_configurations(&self) -> AppResult<MultisigConfigReport> {
         MultisigConfigAnalyser::analyse_multisig_configurations(&self.database)
+    }
+
+    /// Analyse content type (MIME type) distribution across protocols
+    ///
+    /// **Replaces:** Old transaction-level content type queries
+    ///
+    /// Provides comprehensive content type analysis including:
+    /// - Overall content type presence statistics
+    /// - Breakdown by specific MIME type
+    /// - Category grouping (image/*, text/*, application/*)
+    /// - Protocol-specific content type distributions
+    /// - Valid None cases (LikelyDataStorage, LikelyLegitimateMultisig, StampsUnknown)
+    /// - Invalid None cases (missing content types that should exist)
+    ///
+    /// **IMPORTANT**: Analyses at **output level** (not transaction level) for accurate statistics.
+    /// All queries filter by `is_spent = 0 AND script_type = 'multisig'` (unspent P2MS outputs only).
+    ///
+    /// # Returns
+    /// * `AppResult<ContentTypeAnalysisReport>` - Comprehensive content type analysis
+    pub fn analyse_content_types(&self) -> AppResult<ContentTypeAnalysisReport> {
+        ContentTypeAnalyser::analyse_content_types(&self.database)
     }
 
     /// Generate a comprehensive analysis report including all analysis types
