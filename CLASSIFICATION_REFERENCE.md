@@ -62,10 +62,15 @@ Classifications are tried in protocol precedence order, with the first match win
 #### Variants
 **Source**: [src/types/stage3.rs](src/types/stage3.rs)
 
-- `OmniSimpleSend` - Type 0: Simple Send
-- `OmniSendToOwners` - Type 3: Send To Owners
-- `OmniDEXOffer` - Type 20: DEx Offer
-- `OmniPropertyCreation` - Type 50/51: Property Creation
+Omni Layer uses 7 semantic variants + 1 special case to categorise operations:
+
+- `OmniTransfer` - Types 0,2,4,5: Peer-to-peer asset transfers (USDT, etc.)
+- `OmniDistribution` - Type 3: Broadcast distributions to all token holders (dividends/airdrops)
+- `OmniIssuance` - Types 50,51,52,54,55: Property creation, crowdsales, token minting
+- `OmniDestruction` - Type 56: Token burning/revocation
+- `OmniDEX` - Types 20,22,25-28: Decentralised exchange operations
+- `OmniAdministration` - Types 53,70,71,72,185,186: Administrative controls, restrictions, freezing
+- `OmniUtility` - Types 31,200: Notifications and arbitrary data storage
 - `OmniFailedDeobfuscation` - Exodus address present but deobfuscation failed
 
 ---

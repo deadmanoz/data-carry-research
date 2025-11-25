@@ -738,7 +738,7 @@ mod simple_send {
             "tests/test_data/omni/omni_usdt_grant_tokens_tx.json",
             "1caf0432ef165b19d5b5d726dc7fd1461390283c15bade2c9683fd712099e53b",
             "omni_usdt_grant_tokens",
-            Some(ProtocolVariant::OmniPropertyCreation), // Type 55 = Grant Property Tokens
+            Some(ProtocolVariant::OmniIssuance), // Type 55 = Grant Property Tokens
             Some("application/octet-stream"),            // Binary protocol message
         )
         .await;
@@ -757,7 +757,7 @@ mod simple_send {
             "tests/test_data/omni/omni_dex_sell_offer_cancel_tx.json",
             "f706f60ff3f8cfb4161e9135af82d432f5bc588cae77dfdfedde011ec8baf287",
             "omni_dex_sell_offer_cancel",
-            Some(ProtocolVariant::OmniDEXOffer),
+            Some(ProtocolVariant::OmniDEX),
             Some("application/octet-stream"), // Binary protocol message
         )
         .await;
@@ -801,7 +801,7 @@ mod send_to_owners {
             "tests/test_data/omni/omni_send_to_owners_0937f1.json",
             "0937f1627f7c8663bbc59c7e8f2c7e039c067c659fa5e5a0e0ee7f9f96bb27f1",
             "omni_send_to_owners",
-            Some(ProtocolVariant::OmniSendToOwners), // Type 3 = SendToOwners
+            Some(ProtocolVariant::OmniDistribution), // Type 3 = SendToOwners
             Some("application/octet-stream"),        // Binary protocol message
         )
         .await;
@@ -820,7 +820,7 @@ mod send_to_owners {
             "tests/test_data/omni/omni_close_crowdsale_tx.json",
             "b8864525a2eef4f76a58f33a4af50dc24461445e1a420e21bcc99a1901740e79",
             "omni_close_crowdsale",
-            Some(ProtocolVariant::OmniPropertyCreation),
+            Some(ProtocolVariant::OmniAdministration), // Type 53 = Close Crowdsale
             Some("application/octet-stream"), // Binary protocol message
         )
         .await;
@@ -839,7 +839,7 @@ mod send_to_owners {
             "tests/test_data/omni/omni_crowdsale_participation_tx.json",
             "c1ff92f278432d6e14e08ab60f2dceab4d8b4396b4d7e62b5b10e88e840b39d4",
             "omni_crowdsale_participation_1",
-            Some(ProtocolVariant::OmniSimpleSend),
+            Some(ProtocolVariant::OmniTransfer), // Type 0 = Simple Send
             Some("application/octet-stream"), // Binary protocol message
         )
         .await;
@@ -858,7 +858,7 @@ mod send_to_owners {
             "tests/test_data/omni/omni_crowdsale_participation_8fbd96.json",
             "8fbd9600ae1b3cc96406e983d7bbc017a0f2cf99f6e32a3ffd5a88ee9b39ebe2",
             "omni_crowdsale_participation_2",
-            Some(ProtocolVariant::OmniSimpleSend), // Type 0 = Simple Send used for crowdsale participation
+            Some(ProtocolVariant::OmniTransfer), // Type 0 = Simple Send used for crowdsale participation
             Some("application/octet-stream"),      // Binary protocol message
         )
         .await;
@@ -883,7 +883,7 @@ mod trade_offers {
             "tests/test_data/omni/omni_manual_property_creation_tx.json",
             "73914fb386c19f09181ac01cb3680eaee01268ef0781dff9f25d5c069b5334f0",
             "omni_manual_property_creation",
-            Some(ProtocolVariant::OmniPropertyCreation), // Type 54 = Manual Property Creation
+            Some(ProtocolVariant::OmniIssuance), // Type 54 = Manual Property Creation
             Some("text/plain"), // Contains text description in property creation
         )
         .await;
@@ -902,7 +902,7 @@ mod trade_offers {
             "tests/test_data/omni/omni_revoke_property_tokens_tx.json",
             "7429731487105e72ab915a77e677a59d08e6be43b4e8daab58906058382ffbce",
             "omni_revoke_property_tokens",
-            Some(ProtocolVariant::OmniPropertyCreation), // Type 56 = Revoke Property Tokens
+            Some(ProtocolVariant::OmniDestruction), // Type 56 = Revoke Property Tokens
             Some("application/octet-stream"),            // Binary protocol message
         )
         .await;
@@ -928,7 +928,7 @@ mod property_creation {
             "tests/test_data/omni/omni_crowdsale_creation_eda3d2.json",
             "eda3d2bb0d23797e6f3c76be50b0a28f57e24c1ad387e926ce9c4b1f1b5c9e30",
             "omni_crowdsale_creation",
-            Some(ProtocolVariant::OmniPropertyCreation), // Type 51 = Variable Property Creation (Crowdsale)
+            Some(ProtocolVariant::OmniIssuance), // Type 51 = Variable Property Creation (Crowdsale)
             Some("application/octet-stream"),            // Binary protocol message
         )
         .await;
@@ -946,7 +946,7 @@ mod property_creation {
             "tests/test_data/omni/omni_property_fixed_tx.json",
             "725ba706446baa48a2416ab2ffc229c56600d59f31b782ac6c5c82868e1ad97f",
             "omni_property_fixed",
-            Some(ProtocolVariant::OmniDEXOffer),
+            Some(ProtocolVariant::OmniDEX), // Type 25 = MetaDEX Trade
             Some("application/octet-stream"), // Binary protocol message
         )
         .await;
@@ -965,7 +965,7 @@ mod property_creation {
             "tests/test_data/omni/omni_variable_property_creation_tx.json",
             "b01d1594a7e2083ebcd428706045df003f290c4dc7bd6d77c93df9fcca68232f",
             "omni_variable_property_creation",
-            Some(ProtocolVariant::OmniPropertyCreation),
+            Some(ProtocolVariant::OmniIssuance), // Type 51 = Variable Property Creation
             Some("application/octet-stream"), // Binary protocol message
         )
         .await;
@@ -984,7 +984,7 @@ mod property_creation {
             "tests/test_data/omni/omni_dex_sell_offer_2_tx.json",
             "9a017721f168c0a733d7a8495ffbab102c5c56ac3907f57382dc10a18357b004",
             "omni_dex_sell_offer_2",
-            Some(ProtocolVariant::OmniDEXOffer),
+            Some(ProtocolVariant::OmniDEX), // Type 20 = DEX Sell Offer
             Some("application/octet-stream"), // Binary protocol message
         )
         .await;
@@ -1032,7 +1032,7 @@ mod edge_cases {
             "tests/test_data/omni/omni_dex_accept_offer_tx.json",
             "3d7742608f3df0436c7d482465b092344c083105fb4d8f5f7745494074ec1d3b",
             "omni_dex_accept_offer",
-            Some(ProtocolVariant::OmniDEXOffer), // Type 22 = DEx Accept Offer
+            Some(ProtocolVariant::OmniDEX), // Type 22 = DEx Accept Offer
             Some("application/octet-stream"),    // Binary protocol message
         )
         .await;

@@ -234,7 +234,7 @@ async fn test_stage3_classification_stats_calculations() {
                     Some(ProtocolVariant::AsciiIdentifierTB0001)
                 }
                 ProtocolType::BitcoinStamps => Some(ProtocolVariant::StampsClassic),
-                ProtocolType::OmniLayer => Some(ProtocolVariant::OmniSimpleSend),
+                ProtocolType::OmniLayer => Some(ProtocolVariant::OmniTransfer),
                 ProtocolType::Chancecoin => Some(ProtocolVariant::ChancecoinUnknown),
                 ProtocolType::PPk => Some(ProtocolVariant::PPkProfile),
                 ProtocolType::OpReturnSignalled => Some(ProtocolVariant::OpReturnProtocol47930),

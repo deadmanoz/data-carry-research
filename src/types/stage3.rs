@@ -320,11 +320,14 @@ pub enum ProtocolVariant {
     AsciiIdentifierOther,      // Other ASCII protocols (NEWBCOIN, PRVCY)
     AsciiIdentifierUnknown,    // Unknown ASCII identifier protocol
 
-    // Omni Layer variants
-    OmniSimpleSend,          // Type 0: Simple Send
-    OmniSendToOwners,        // Type 3: Send To Owners
-    OmniDEXOffer,            // Type 20: DEx Offer
-    OmniPropertyCreation,    // Type 50/51: Property Creation
+    // Omni Layer variants (7 semantic categories + 1 special case)
+    OmniTransfer,            // Types 0,2,4,5: P2P asset transfers
+    OmniDistribution,        // Type 3: Broadcast to all holders (dividends/airdrops)
+    OmniIssuance,            // Types 50,51,52,54,55: Property creation & token minting
+    OmniDestruction,         // Type 56: Token burning/revocation
+    OmniDEX,                 // Types 20,22,25-28: Exchange operations
+    OmniAdministration,      // Types 53,70,71,72,185,186: Admin controls & restrictions
+    OmniUtility,             // Types 31,200: Notifications & arbitrary data
     OmniFailedDeobfuscation, // Exodus address present but deobfuscation failed
 
     // Chancecoin variants
@@ -389,10 +392,13 @@ impl std::fmt::Display for ProtocolVariant {
             ProtocolVariant::AsciiIdentifierMetronotes => "Metronotes",
             ProtocolVariant::AsciiIdentifierOther => "Other ASCII Protocol",
             ProtocolVariant::AsciiIdentifierUnknown => "Unknown Variant",
-            ProtocolVariant::OmniSimpleSend => "Simple Send",
-            ProtocolVariant::OmniSendToOwners => "Send To Owners",
-            ProtocolVariant::OmniDEXOffer => "DEX Offer",
-            ProtocolVariant::OmniPropertyCreation => "Property Creation",
+            ProtocolVariant::OmniTransfer => "Transfer",
+            ProtocolVariant::OmniDistribution => "Distribution",
+            ProtocolVariant::OmniIssuance => "Issuance",
+            ProtocolVariant::OmniDestruction => "Destruction",
+            ProtocolVariant::OmniDEX => "DEX",
+            ProtocolVariant::OmniAdministration => "Administration",
+            ProtocolVariant::OmniUtility => "Utility",
             ProtocolVariant::OmniFailedDeobfuscation => "Failed Deobfuscation",
             ProtocolVariant::ChancecoinSend => "Send",
             ProtocolVariant::ChancecoinOrder => "Order",
@@ -701,9 +707,23 @@ mod tests {
 
     #[test]
     fn test_protocol_variant_display() {
+        // Bitcoin Stamps
         assert_eq!(ProtocolVariant::StampsClassic.to_string(), "Classic");
+
+        // Counterparty
         assert_eq!(ProtocolVariant::CounterpartyTransfer.to_string(), "Transfer");
-        assert_eq!(ProtocolVariant::OmniSimpleSend.to_string(), "Simple Send");
+
+        // Omni Layer - Test all 8 variants
+        assert_eq!(ProtocolVariant::OmniTransfer.to_string(), "Transfer");
+        assert_eq!(ProtocolVariant::OmniDistribution.to_string(), "Distribution");
+        assert_eq!(ProtocolVariant::OmniIssuance.to_string(), "Issuance");
+        assert_eq!(ProtocolVariant::OmniDestruction.to_string(), "Destruction");
+        assert_eq!(ProtocolVariant::OmniDEX.to_string(), "DEX");
+        assert_eq!(ProtocolVariant::OmniAdministration.to_string(), "Administration");
+        assert_eq!(ProtocolVariant::OmniUtility.to_string(), "Utility");
+        assert_eq!(ProtocolVariant::OmniFailedDeobfuscation.to_string(), "Failed Deobfuscation");
+
+        // DataStorage
         assert_eq!(
             ProtocolVariant::DataStorageProofOfBurn.to_string(),
             "Proof of Burn"

@@ -66,7 +66,7 @@ fn create_populated_test_db() -> (Database, String) {
             "omni_tx_1",
             300000,
             ProtocolType::OmniLayer,
-            Some(ProtocolVariant::OmniSimpleSend),
+            Some(ProtocolVariant::OmniTransfer),
             vec![],
             true,
             "ContainsRealPubkey",

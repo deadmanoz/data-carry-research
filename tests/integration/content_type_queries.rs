@@ -117,7 +117,7 @@ fn test_content_type_schema_and_queries() {
     let result3 = ClassificationResult {
         txid: "txid3".to_string(),
         protocol: ProtocolType::OmniLayer,
-        variant: Some(ProtocolVariant::OmniSimpleSend),
+        variant: Some(ProtocolVariant::OmniTransfer),
         classification_details: details3,
         classification_timestamp: timestamp,
     };

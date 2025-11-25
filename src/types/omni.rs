@@ -136,37 +136,42 @@ impl OmniMessageType {
     /// Map to protocol variant for classification
     pub fn get_variant(&self) -> ProtocolVariant {
         match self {
-            // Transfer operations
+            // Asset Transfers - P2P value movement between parties
             Self::SimpleSend | Self::RestrictedSend | Self::SendAll | Self::SendNonFungible => {
-                ProtocolVariant::OmniSimpleSend
+                ProtocolVariant::OmniTransfer
             }
 
-            Self::SendToOwners => ProtocolVariant::OmniSendToOwners,
+            // Dividend Distribution - Broadcast to all token holders
+            Self::SendToOwners => ProtocolVariant::OmniDistribution,
 
-            // Trading operations
+            // Property Creation & Supply Expansion
+            Self::CreatePropertyFixed
+            | Self::CreatePropertyVariable
+            | Self::PromoteProperty
+            | Self::CreatePropertyManual
+            | Self::GrantPropertyTokens => ProtocolVariant::OmniIssuance,
+
+            // Token Destruction - Voluntary burning/revocation
+            Self::RevokePropertyTokens => ProtocolVariant::OmniDestruction,
+
+            // Decentralised Exchange Operations
             Self::TradeOffer
             | Self::AcceptOfferBTC
             | Self::MetaDEXTrade
             | Self::MetaDEXCancelPrice
             | Self::MetaDEXCancelPair
-            | Self::MetaDEXCancelEcosystem => ProtocolVariant::OmniDEXOffer,
+            | Self::MetaDEXCancelEcosystem => ProtocolVariant::OmniDEX,
 
-            // Property management
-            Self::CreatePropertyFixed
-            | Self::CreatePropertyVariable
-            | Self::PromoteProperty
-            | Self::CloseCrowdsale
-            | Self::CreatePropertyManual
-            | Self::GrantPropertyTokens
-            | Self::RevokePropertyTokens
+            // Administrative Controls & Restrictions
+            Self::CloseCrowdsale
             | Self::ChangeIssuerAddress
             | Self::EnableFreezing
             | Self::DisableFreezing
             | Self::FreezePropertyTokens
-            | Self::UnfreezePropertyTokens => ProtocolVariant::OmniPropertyCreation,
+            | Self::UnfreezePropertyTokens => ProtocolVariant::OmniAdministration,
 
-            // Other operations default to simple send
-            Self::Notification | Self::AnyData => ProtocolVariant::OmniSimpleSend,
+            // Utility Operations - Notifications & data storage
+            Self::Notification | Self::AnyData => ProtocolVariant::OmniUtility,
         }
     }
 }
@@ -190,4 +195,121 @@ pub struct OmniPacket {
     pub sequence_number: u8,
     pub obfuscated_data: [u8; 31],
     pub deobfuscated_data: Option<[u8; 31]>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Test semantic variant mapping for edge cases to prevent future regressions
+    #[test]
+    fn test_get_variant_semantic_mappings() {
+        // Transfer operations (basic P2P)
+        assert_eq!(
+            OmniMessageType::SimpleSend.get_variant(),
+            ProtocolVariant::OmniTransfer
+        );
+        assert_eq!(
+            OmniMessageType::SendAll.get_variant(),
+            ProtocolVariant::OmniTransfer
+        );
+
+        // Distribution (broadcast to holders) - distinct from Transfer
+        assert_eq!(
+            OmniMessageType::SendToOwners.get_variant(),
+            ProtocolVariant::OmniDistribution
+        );
+
+        // Issuance - including PromoteProperty (Type 52)
+        assert_eq!(
+            OmniMessageType::PromoteProperty.get_variant(),
+            ProtocolVariant::OmniIssuance
+        );
+        assert_eq!(
+            OmniMessageType::GrantPropertyTokens.get_variant(),
+            ProtocolVariant::OmniIssuance
+        );
+
+        // Destruction - ONLY token burning (Type 56)
+        assert_eq!(
+            OmniMessageType::RevokePropertyTokens.get_variant(),
+            ProtocolVariant::OmniDestruction
+        );
+
+        // Administration - freezing operations (NOT destruction)
+        assert_eq!(
+            OmniMessageType::EnableFreezing.get_variant(),
+            ProtocolVariant::OmniAdministration
+        );
+        assert_eq!(
+            OmniMessageType::FreezePropertyTokens.get_variant(),
+            ProtocolVariant::OmniAdministration
+        );
+        assert_eq!(
+            OmniMessageType::UnfreezePropertyTokens.get_variant(),
+            ProtocolVariant::OmniAdministration
+        );
+        assert_eq!(
+            OmniMessageType::CloseCrowdsale.get_variant(),
+            ProtocolVariant::OmniAdministration
+        );
+
+        // DEX operations
+        assert_eq!(
+            OmniMessageType::TradeOffer.get_variant(),
+            ProtocolVariant::OmniDEX
+        );
+        assert_eq!(
+            OmniMessageType::MetaDEXTrade.get_variant(),
+            ProtocolVariant::OmniDEX
+        );
+
+        // Utility - notifications and data (Type 31, 200)
+        assert_eq!(
+            OmniMessageType::Notification.get_variant(),
+            ProtocolVariant::OmniUtility
+        );
+        assert_eq!(
+            OmniMessageType::AnyData.get_variant(),
+            ProtocolVariant::OmniUtility
+        );
+    }
+
+    /// Verify all 25 message types map to exactly one variant
+    #[test]
+    fn test_all_message_types_mapped() {
+        let all_types = vec![
+            OmniMessageType::SimpleSend,
+            OmniMessageType::RestrictedSend,
+            OmniMessageType::SendToOwners,
+            OmniMessageType::SendAll,
+            OmniMessageType::SendNonFungible,
+            OmniMessageType::TradeOffer,
+            OmniMessageType::AcceptOfferBTC,
+            OmniMessageType::MetaDEXTrade,
+            OmniMessageType::MetaDEXCancelPrice,
+            OmniMessageType::MetaDEXCancelPair,
+            OmniMessageType::MetaDEXCancelEcosystem,
+            OmniMessageType::Notification,
+            OmniMessageType::CreatePropertyFixed,
+            OmniMessageType::CreatePropertyVariable,
+            OmniMessageType::PromoteProperty,
+            OmniMessageType::CloseCrowdsale,
+            OmniMessageType::CreatePropertyManual,
+            OmniMessageType::GrantPropertyTokens,
+            OmniMessageType::RevokePropertyTokens,
+            OmniMessageType::ChangeIssuerAddress,
+            OmniMessageType::EnableFreezing,
+            OmniMessageType::DisableFreezing,
+            OmniMessageType::FreezePropertyTokens,
+            OmniMessageType::UnfreezePropertyTokens,
+            OmniMessageType::AnyData,
+        ];
+
+        // Verify all types return a variant (no panics, no unmapped types)
+        for msg_type in all_types {
+            let _variant = msg_type.get_variant();
+            // If this doesn't panic, the mapping exists
+        }
+    }
 }

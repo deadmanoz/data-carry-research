@@ -134,10 +134,13 @@ pub fn verify_classification(
                     "Other ASCII Protocol" => ProtocolVariant::AsciiIdentifierOther,
                     "Unknown Variant" => ProtocolVariant::AsciiIdentifierUnknown,
                     // Omni Layer variants (Display strings)
-                    "Simple Send" => ProtocolVariant::OmniSimpleSend,
-                    "Send To Owners" => ProtocolVariant::OmniSendToOwners,
-                    "Property Creation" => ProtocolVariant::OmniPropertyCreation,
-                    "DEX Offer" => ProtocolVariant::OmniDEXOffer,
+                    "Transfer" => ProtocolVariant::OmniTransfer,
+                    "Distribution" => ProtocolVariant::OmniDistribution,
+                    "Issuance" => ProtocolVariant::OmniIssuance,
+                    "Destruction" => ProtocolVariant::OmniDestruction,
+                    "DEX" => ProtocolVariant::OmniDEX,
+                    "Administration" => ProtocolVariant::OmniAdministration,
+                    "Utility" => ProtocolVariant::OmniUtility,
                     "Failed Deobfuscation" => ProtocolVariant::OmniFailedDeobfuscation,
                     // Bitcoin Stamps variants (Display strings)
                     "Classic" => ProtocolVariant::StampsClassic,
