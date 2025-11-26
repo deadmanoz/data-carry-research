@@ -65,4 +65,4 @@ if [[ -z "$DB_PATH" ]]; then
 fi
 
 # Run Python visualisation CLI with venv
-.venv/bin/python -m visualisation.cli "$COMMAND" --database "$DB_PATH" "${EXTRA_ARGS[@]}"
+.venv/bin/python -m visualisation.cli "$COMMAND" --database "$DB_PATH" ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
