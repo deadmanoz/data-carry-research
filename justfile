@@ -33,6 +33,7 @@ default:
     @echo "  analyse protocol-data-sizes  - Protocol-level data sizes"
     @echo "  analyse comprehensive-data-sizes - All data size analyses"
     @echo "  analyse multisig-configurations - Multisig config exhaustive analysis"
+    @echo "  analyse dust-thresholds      - Bitcoin dust threshold analysis"
     @echo "  stats [db]                   - Quick statistics"
     @echo ""
     @echo "Visualisation (use: just viz <cmd> [db] [opts...]):"
@@ -303,6 +304,7 @@ stats-json db_path=default_db_path:
 #   just analyse protocol-data-sizes ./custom.db --format json
 #   just analyse comprehensive-data-sizes        # All data size analyses
 #   just analyse multisig-configurations         # Exhaustive multisig config analysis
+#   just analyse dust-thresholds                 # Bitcoin dust threshold analysis
 analyse cmd db_path=default_db_path *args="":
     ./scripts/analyse.sh "{{cmd}}" "{{db_path}}" {{args}}
 

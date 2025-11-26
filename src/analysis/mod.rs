@@ -40,6 +40,7 @@ pub mod burn_detector;
 pub mod burn_patterns;
 pub mod content_type_analysis;
 pub mod data_size_stats;
+pub mod dust_analysis;
 pub mod fee_analyser;
 pub mod fee_analysis;
 pub mod file_extension_stats;
@@ -59,6 +60,7 @@ pub use burn_detector::BurnPatternDetector;
 pub use burn_patterns::BurnPatternAnalyser;
 pub use content_type_analysis::ContentTypeAnalyser;
 pub use data_size_stats::DataSizeAnalyser;
+pub use dust_analysis::DustAnalyser;
 pub use fee_analyser::FeeAnalyser;
 pub use fee_analysis::FeeAnalysisEngine;
 pub use file_extension_stats::FileExtensionAnalyser;
@@ -76,11 +78,12 @@ pub use stamps_transport_stats::{StampsTransportAnalyser, StampsTransportAnalysi
 pub use types::{
     BurnPatternAnalysis, ClassificationStatsReport, ComprehensiveDataSizeReport,
     ContentTypeAnalysisReport, ContentTypeCategoryStats, ContentTypeProtocolStats,
-    ContentTypeSpendabilityReport, ContentTypeStats, FeeAnalysisReport, FileExtensionReport,
-    FullAnalysisReport, GlobalValueDistribution, MultisigConfigReport, MultisigConfiguration,
-    ProtocolDataSizeReport, ProtocolValueDistribution, SignatureAnalysisReport,
+    ContentTypeSpendabilityReport, ContentTypeStats, DustAnalysisReport, DustBucket,
+    DustThresholds, FeeAnalysisReport, FileExtensionReport, FullAnalysisReport,
+    GlobalDustStats, GlobalValueDistribution, MultisigConfigReport, MultisigConfiguration,
+    ProtocolDataSizeReport, ProtocolDustStats, ProtocolValueDistribution, SignatureAnalysisReport,
     SpendabilityDataSizeReport, SpendabilityStatsReport, ValidNoneStats, ValueAnalysisReport,
-    ValueBucket, ValueDistributionReport, ValuePercentiles,
+    ValueBucket, ValueDistributionReport, ValuePercentiles, UNCLASSIFIED_SENTINEL,
 };
 pub use value_analysis::ValueAnalysisEngine;
 
@@ -341,6 +344,25 @@ impl AnalysisEngine {
     /// * `AppResult<ContentTypeAnalysisReport>` - Comprehensive content type analysis
     pub fn analyse_content_types(&self) -> AppResult<ContentTypeAnalysisReport> {
         ContentTypeAnalyser::analyse_content_types(&self.database)
+    }
+
+    /// Analyse dust thresholds across all P2MS outputs
+    ///
+    /// Provides comprehensive dust threshold analysis including:
+    /// - Global statistics (all unspent P2MS outputs)
+    /// - Per-protocol breakdown (sorted by canonical ProtocolType enum order)
+    /// - Reconciliation fields for unclassified outputs
+    ///
+    /// **Thresholds** (Bitcoin Core defaults for SPENDING P2MS outputs):
+    /// - **546 sats**: Dust when spending to non-segwit destination (e.g., P2PKH)
+    /// - **294 sats**: Dust when spending to segwit destination (e.g., P2WPKH)
+    ///
+    /// Note: These are destination-based spending thresholds, not creation dust limits.
+    ///
+    /// # Returns
+    /// * `AppResult<DustAnalysisReport>` - Comprehensive dust threshold analysis
+    pub fn analyse_dust_thresholds(&self) -> AppResult<DustAnalysisReport> {
+        DustAnalyser::analyse_dust_thresholds(&self.database)
     }
 
     /// Generate a comprehensive analysis report including all analysis types

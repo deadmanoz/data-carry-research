@@ -5,8 +5,8 @@
 
 use super::types::{
     BurnPatternAnalysis, ClassificationStatsReport, ComprehensiveDataSizeReport,
-    ContentTypeSpendabilityReport, FeeAnalysisReport, FileExtensionReport, FullAnalysisReport,
-    MultisigConfigReport, ProtocolDataSizeReport, SignatureAnalysisReport,
+    ContentTypeSpendabilityReport, DustAnalysisReport, FeeAnalysisReport, FileExtensionReport,
+    FullAnalysisReport, MultisigConfigReport, ProtocolDataSizeReport, SignatureAnalysisReport,
     SpendabilityDataSizeReport, SpendabilityStatsReport, ValueAnalysisReport,
     ValueDistributionReport,
 };
@@ -1364,6 +1364,149 @@ impl ReportFormatter {
                     (compressed_only as f64 / report.total_outputs as f64) * 100.0,
                     (has_uncompressed as f64 / report.total_outputs as f64) * 100.0
                 ));
+
+                Ok(output)
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Dust Threshold Analysis Formatter
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Format dust threshold analysis report
+    ///
+    /// Displays Bitcoin Core spending dust thresholds (546/294 sats) with:
+    /// - Global statistics showing cumulative buckets
+    /// - Per-protocol breakdown sorted by canonical ProtocolType enum order
+    /// - Unclassified output reconciliation notes
+    pub fn format_dust_analysis(
+        report: &DustAnalysisReport,
+        format: &OutputFormat,
+    ) -> AppResult<String> {
+        match format {
+            OutputFormat::Json | OutputFormat::Plotly => Self::export_json(report),
+            OutputFormat::Console => {
+                let mut output = String::new();
+
+                // Header
+                output.push_str("\nDUST THRESHOLD ANALYSIS\n");
+                output.push_str("═══════════════════════════════════════════════════════════════════════════════\n\n");
+
+                // Thresholds explanation
+                output.push_str("Thresholds (Bitcoin Core defaults for SPENDING P2MS outputs):\n");
+                output.push_str(&format!(
+                    "  • Spend to non-segwit (P2PKH): {} sats\n",
+                    report.thresholds.non_segwit_destination_sats
+                ));
+                output.push_str(&format!(
+                    "  • Spend to segwit (P2WPKH):    {} sats\n\n",
+                    report.thresholds.segwit_destination_sats
+                ));
+                output.push_str("Note: These are destination-based spending thresholds, not creation dust limits.\n\n");
+
+                // Global statistics
+                let global = &report.global_stats;
+                output.push_str(&format!(
+                    "GLOBAL STATISTICS ({} outputs, {})\n",
+                    Self::format_number(global.total_outputs),
+                    format_sats_as_btc(global.total_value_sats)
+                ));
+                output.push_str("───────────────────────────────────────────────────────────────────────────────\n");
+
+                // Below 546 (cumulative)
+                output.push_str(&format!(
+                    "  Below {} sats (dust for non-segwit):  {} ({:>5.1}%)   {} ({:>5.1}%)\n",
+                    report.thresholds.non_segwit_destination_sats,
+                    Self::format_number(global.below_non_segwit_threshold.output_count),
+                    global.below_non_segwit_threshold.percentage_of_outputs,
+                    format_sats_as_btc(global.below_non_segwit_threshold.total_value_sats),
+                    global.below_non_segwit_threshold.percentage_of_value
+                ));
+
+                // Below 294 (subset)
+                output.push_str(&format!(
+                    "    ├─ Below {} sats (dust for all):    {} ({:>5.1}%)   {} ({:>5.1}%)\n",
+                    report.thresholds.segwit_destination_sats,
+                    Self::format_number(global.below_segwit_threshold.output_count),
+                    global.below_segwit_threshold.percentage_of_outputs,
+                    format_sats_as_btc(global.below_segwit_threshold.total_value_sats),
+                    global.below_segwit_threshold.percentage_of_value
+                ));
+
+                // Mid-band (294-545 sats) - calculated as difference
+                let mid_band_count = global
+                    .below_non_segwit_threshold
+                    .output_count
+                    .saturating_sub(global.below_segwit_threshold.output_count);
+                let mid_band_value = global
+                    .below_non_segwit_threshold
+                    .total_value_sats
+                    .saturating_sub(global.below_segwit_threshold.total_value_sats);
+                let mid_band_pct_outputs = global.below_non_segwit_threshold.percentage_of_outputs
+                    - global.below_segwit_threshold.percentage_of_outputs;
+                let mid_band_pct_value = global.below_non_segwit_threshold.percentage_of_value
+                    - global.below_segwit_threshold.percentage_of_value;
+
+                output.push_str(&format!(
+                    "    └─ {}-{} sats (segwit-only):      {} ({:>5.1}%)   {} ({:>5.1}%)\n",
+                    report.thresholds.segwit_destination_sats,
+                    report.thresholds.non_segwit_destination_sats - 1,
+                    Self::format_number(mid_band_count),
+                    mid_band_pct_outputs.max(0.0),
+                    format_sats_as_btc(mid_band_value),
+                    mid_band_pct_value.max(0.0)
+                ));
+
+                // Above dust
+                output.push_str(&format!(
+                    "  At or above {} sats (not dust):     {} ({:>5.1}%)   {} ({:>5.1}%)\n\n",
+                    report.thresholds.non_segwit_destination_sats,
+                    Self::format_number(global.above_dust.output_count),
+                    global.above_dust.percentage_of_outputs,
+                    format_sats_as_btc(global.above_dust.total_value_sats),
+                    global.above_dust.percentage_of_value
+                ));
+
+                // Per-protocol breakdown
+                if !report.protocol_breakdown.is_empty() {
+                    output.push_str("PER-PROTOCOL BREAKDOWN\n");
+                    output.push_str("───────────────────────────────────────────────────────────────────────────────────────────────────\n");
+                    output.push_str(&format!(
+                        "{:<28} │ {:>10} │ {:>14} │ {:>14} │ {:>14} │\n",
+                        "Protocol", "Total", "<546 sats", "<294 sats", "≥546 sats"
+                    ));
+                    output.push_str("─────────────────────────────┼────────────┼────────────────┼────────────────┼────────────────┤\n");
+
+                    for protocol_stats in &report.protocol_breakdown {
+                        output.push_str(&format!(
+                            "{:<28} │ {:>10} │ {:>6} ({:>4.0}%) │ {:>6} ({:>4.0}%) │ {:>6} ({:>4.0}%) │\n",
+                            Self::format_protocol_name(&protocol_stats.protocol.to_string()),
+                            Self::format_number(protocol_stats.total_outputs),
+                            Self::format_number(protocol_stats.below_non_segwit_threshold.output_count),
+                            protocol_stats.below_non_segwit_threshold.percentage_of_outputs,
+                            Self::format_number(protocol_stats.below_segwit_threshold.output_count),
+                            protocol_stats.below_segwit_threshold.percentage_of_outputs,
+                            Self::format_number(protocol_stats.above_dust.output_count),
+                            protocol_stats.above_dust.percentage_of_outputs,
+                        ));
+                    }
+                    output.push('\n');
+                }
+
+                // Unclassified outputs note
+                if report.unclassified_count > 0 {
+                    let unclassified_pct = if global.total_outputs > 0 {
+                        (report.unclassified_count as f64 / global.total_outputs as f64) * 100.0
+                    } else {
+                        0.0
+                    };
+                    output.push_str(&format!(
+                        "Note: {} outputs ({:.2}%) not yet classified. Run Stage 3 to classify.\n",
+                        Self::format_number(report.unclassified_count),
+                        unclassified_pct
+                    ));
+                }
 
                 Ok(output)
             }

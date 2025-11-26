@@ -196,6 +196,25 @@ pub enum AnalysisCommands {
         #[arg(long, default_value = "console")]
         format: String,
     },
+
+    /// Analyse P2MS outputs against Bitcoin dust thresholds
+    ///
+    /// Reports outputs below Bitcoin Core's dust limits when spending to different
+    /// destination types:
+    /// - 546 sats: threshold when spending to non-segwit destination (e.g., P2PKH)
+    /// - 294 sats: threshold when spending to segwit destination (e.g., P2WPKH)
+    ///
+    /// Works without Stage 3 (outputs shown as unclassified); run Stage 3 for
+    /// per-protocol breakdown.
+    DustThresholds {
+        /// Database path (overrides config.toml)
+        #[arg(long)]
+        database_path: Option<PathBuf>,
+
+        /// Output format (console or json)
+        #[arg(long, default_value = "console")]
+        format: String,
+    },
 }
 
 pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
@@ -592,6 +611,19 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
             let analysis = engine.analyse_multisig_configurations()?;
             let output =
                 ReportFormatter::format_multisig_config_report(&analysis, &parse_format(format))?;
+            print!("{}", output);
+            Ok(())
+        }
+
+        AnalysisCommands::DustThresholds {
+            database_path,
+            format,
+        } => {
+            let db_path = get_db_path(database_path)?;
+            let engine = AnalysisEngine::new(&db_path)?;
+            let analysis = engine.analyse_dust_thresholds()?;
+            let output =
+                ReportFormatter::format_dust_analysis(&analysis, &parse_format(format))?;
             print!("{}", output);
             Ok(())
         }
