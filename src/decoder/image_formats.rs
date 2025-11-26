@@ -37,8 +37,8 @@ impl ImageFormat {
     }
 }
 
-// Re-export extract_base64_after_stamp from shared validation module
-pub use crate::types::stamps::validation::extract_base64_after_stamp;
+// Re-export canonical extraction function from shared validation module
+pub use crate::types::stamps::validation::extract_stamps_payload;
 
 /// Check if data appears to be base64-encoded
 pub fn is_base64_data(data: &[u8]) -> bool {
@@ -100,7 +100,7 @@ mod tests {
     #[test]
     fn test_base64_extraction_after_stamp() {
         let data = b"stamp:iVBORw0KGgoAAAANSUhEUgAAABgAAAAY=";
-        let extracted = extract_base64_after_stamp(data);
+        let extracted = extract_stamps_payload(data);
         assert_eq!(
             extracted,
             Some(b"iVBORw0KGgoAAAANSUhEUgAAABgAAAAY=".to_vec())
@@ -110,7 +110,7 @@ mod tests {
     #[test]
     fn test_case_insensitive_stamp_extraction() {
         let data = b"STAMP:iVBORw0KGgoAAAANSUhEUgAAABgAAAAY=";
-        let extracted = extract_base64_after_stamp(data);
+        let extracted = extract_stamps_payload(data);
         assert!(extracted.is_some());
     }
 }

@@ -26,7 +26,9 @@ use self::protocol_detection::{
     fetch_transaction, try_bitcoin_stamps, try_counterparty, try_likely_data_storage,
     try_likely_legitimate_p2ms, try_omni, DecodedProtocol,
 };
-use crate::types::stamps::validation::{detect_content_type_from_payload, find_stamp_signature};
+use crate::types::stamps::validation::{
+    detect_content_type_from_payload, extract_stamps_payload, find_stamp_signature,
+};
 use crate::types::stamps::{classify_json_data, StampsVariant};
 use base64::Engine;
 
@@ -584,126 +586,33 @@ impl ProtocolDecoder {
 
         info!("Decoding Bitcoin Stamps data for transaction: {}", txid);
 
-        // Extract the data after stamp signature
-        // Format can be either:
-        // 1. [2-byte length prefix] + signature + data (pure stamps with length)
-        // 2. signature + data (Counterparty-embedded or simple stamps)
-        let (stamps_offset, sig_variant) =
-            find_stamp_signature(&decrypted_data).ok_or_else(|| {
-                DecoderError::InvalidTransaction(format!(
-                    "No Bitcoin Stamps signature found in transaction {}",
-                    txid
-                ))
-            })?;
+        // Use the shared extraction function (same as Stage 3)
+        // This handles Pure vs Counterparty-embedded stamps with proper Latin-1 conversion
+        let cleaned_data = extract_stamps_payload(&decrypted_data).ok_or_else(|| {
+            DecoderError::InvalidTransaction(format!(
+                "No Bitcoin Stamps signature found in transaction {}",
+                txid
+            ))
+        })?;
 
-        info!(
-            "Found {:?} signature at offset {} (length: {} bytes)",
-            sig_variant,
-            stamps_offset,
-            sig_variant.len()
-        );
-
-        let sig_len = sig_variant.len();
-        let data_start = stamps_offset + sig_len;
-
-        // Length prefix ONLY for pure Bitcoin Stamps (stamp at offset 2)
-        // Counterparty-embedded has stamp at other offsets (like 28) with NO length prefix
-        let raw_data = if stamps_offset == 2 {
-            // Pure Bitcoin Stamps: [2-byte length] + "stamp(s):" + data
-            let length_bytes = [decrypted_data[0], decrypted_data[1]];
-            let total_length = ((length_bytes[0] as usize) << 8) | (length_bytes[1] as usize);
-
-            if total_length >= sig_len && total_length <= decrypted_data.len() {
-                let data_length = total_length - sig_len;
-                info!(
-                    "Pure stamps (offset 2) with length prefix: {} bytes",
-                    data_length
-                );
-                &decrypted_data[data_start..(data_start + data_length)]
+        // Log signature info for debugging
+        if let Some((stamps_offset, sig_variant)) = find_stamp_signature(&decrypted_data) {
+            let transport_type = if stamps_offset == 2 {
+                "Pure Bitcoin Stamps"
             } else {
-                info!("Invalid length, using all remaining data");
-                &decrypted_data[data_start..]
-            }
-        } else {
-            // Counterparty-embedded or other: NO length prefix
+                "Counterparty-embedded"
+            };
             info!(
-                "Counterparty-embedded (offset {}), using all remaining data",
-                stamps_offset
+                "Found {:?} signature at offset {} ({}) - {} bytes payload",
+                sig_variant,
+                stamps_offset,
+                transport_type,
+                cleaned_data.len()
             );
-            &decrypted_data[data_start..]
-        };
+        }
 
-        // Detect if this is a Counterparty-embedded stamp
-        // stamps_offset == 2: Pure Bitcoin Stamps (2-byte length prefix before STAMP)
-        // stamps_offset != 2: Counterparty-embedded (STAMP after CNTRPRTY prefix + message type)
-        //   Typical offset: 28 bytes (8-byte CNTRPRTY + 4-byte message type + ~16 bytes message data)
-        let is_counterparty_embedded = stamps_offset != 2;
-
-        debug!("Raw data after 'stamp:' prefix: {} bytes", raw_data.len());
-
-        // For Counterparty-embedded stamps, apply special processing:
-        // 1. Convert the full payload from Latin-1 (description field encoding) to UTF-8
-        // 2. Filter to only base64 characters, ignoring any interspersed control bytes
-        // 3. Tidy padding so the decoder sees a contiguous base64 string
-        let cleaned_string: Option<String> = if is_counterparty_embedded {
-            // Step 1: Convert Latin-1 (ISO-8859-1) to UTF-8 string
-            // Counterparty description field uses Latin-1 encoding
-            // This matches Electrum's decodeURIComponent(escape(descr))
-            let latin1_string: String = raw_data.iter().map(|&b| b as char).collect();
-
-            // Step 2: Filter to only base64 characters
-            let mut data_str: String = latin1_string
-                .chars()
-                .filter(|&c| {
-                    // Keep ONLY valid base64 characters: A-Za-z0-9+/=
-                    c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '='
-                })
-                .collect();
-
-            debug!(
-                "Cleaned Counterparty-embedded data: {} -> {} chars",
-                raw_data.len(),
-                data_str.len()
-            );
-
-            if data_str.is_empty() {
-                None
-            } else {
-                // Per Electrum-Counterparty: Base64 may have junk data after it
-                // Also, if multiple P2MS outputs were concatenated, there may be intermediate '=' padding
-                // Find the last '=' and truncate there
-                if let Some(last_equals) = data_str.rfind('=') {
-                    data_str.truncate(last_equals + 1);
-
-                    // Remove any intermediate '=' characters (from concatenated base64 segments)
-                    // Keep only the final 1-2 '=' characters for padding
-                    let original_len = data_str.len();
-                    let cleaned: String = data_str
-                        .chars()
-                        .enumerate()
-                        .filter(|(i, c)| *c != '=' || *i >= original_len - 2)
-                        .map(|(_, c)| c)
-                        .collect();
-                    data_str = cleaned;
-                }
-
-                debug!("Final base64: {} chars", data_str.len());
-                Some(data_str)
-            }
-        } else {
-            // Pure stamps (stamp at offset 2): no cleanup needed
-            None
-        };
-
-        let cleaned_data: &[u8] = if let Some(ref s) = cleaned_string {
-            debug!(
-                "Cleaned data for Counterparty-embedded stamp: {} bytes",
-                s.len()
-            );
-            s.as_bytes()
-        } else {
-            raw_data
-        };
+        // Reference for handle_payload closure
+        let cleaned_data_ref = cleaned_data.as_slice();
 
         // Shared payload handler keeps Stage 3 and Stage 4 aligned
         let handle_payload = |payload: Vec<u8>| -> DecoderResult<Option<DecodedData>> {
@@ -917,33 +826,33 @@ impl ProtocolDecoder {
             }
         };
 
-        // Try base64 decoding first when heuristics indicate, otherwise use raw payload
-        let is_base64 = is_base64_data(cleaned_data);
+        // Try base64 decoding - Bitcoin Stamps payloads are typically base64 encoded
+        // The shared extract_stamps_payload already cleaned the data for us
+        let is_base64 = is_base64_data(cleaned_data_ref);
         debug!(
-            "Is base64 (heuristic): {}, force_base64: {}, cleaned_data length: {}",
+            "Is base64 (heuristic): {}, cleaned_data length: {}",
             is_base64,
-            is_counterparty_embedded,
-            cleaned_data.len()
+            cleaned_data_ref.len()
         );
 
-        if is_base64 || is_counterparty_embedded {
-            match BASE64_LENIENT.decode(cleaned_data) {
-                Ok(decoded_bytes) => {
-                    debug!("Base64 decode successful: {} bytes", decoded_bytes.len());
-                    return handle_payload(decoded_bytes);
-                }
-                Err(e) => {
-                    debug!(
-                        "Base64 decode failed for transaction {} ({} bytes): {}",
-                        txid,
-                        cleaned_data.len(),
-                        e
-                    );
-                }
+        // Always try base64 decode first since extract_stamps_payload already cleaned the data
+        match BASE64_LENIENT.decode(cleaned_data_ref) {
+            Ok(decoded_bytes) => {
+                debug!("Base64 decode successful: {} bytes", decoded_bytes.len());
+                return handle_payload(decoded_bytes);
+            }
+            Err(e) => {
+                debug!(
+                    "Base64 decode failed for transaction {} ({} bytes): {}",
+                    txid,
+                    cleaned_data_ref.len(),
+                    e
+                );
             }
         }
 
-        handle_payload(cleaned_data.to_vec())
+        // Fallback to raw payload if base64 decode fails
+        handle_payload(cleaned_data)
     }
 
     /// Decode Counterparty protocol data

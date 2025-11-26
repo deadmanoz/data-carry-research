@@ -724,4 +724,144 @@ mod variant_classification {
         assert_eq!(variant, Some(StampsVariant::Data));
         assert_eq!(content_type, Some("application/octet-stream"));
     }
+
+    /// Regression test for issue where Counterparty-embedded stamps were misclassified.
+    ///
+    /// Bug: Latin-1 to UTF-8 conversion was missing for Counterparty-embedded stamps,
+    /// causing base64 decode to fail and stamps to be classified as Data instead of
+    /// their actual type (SRC20, Classic, etc.).
+    ///
+    /// Fixed in: extract_stamps_payload() with proper Latin-1 conversion for offset > 2
+    #[test]
+    fn test_counterparty_embedded_src20_regression() {
+        use base64::{engine::general_purpose, Engine};
+
+        // Simulate Counterparty-embedded format: [CNTRPRTY prefix][stamp:][base64 SRC-20]
+        // Stamp signature at offset > 2 indicates Counterparty transport
+        let src20_json = r#"{"p":"src-20","op":"transfer","tick":"STEVE","amt":"100000000"}"#;
+        let base64_data = general_purpose::STANDARD.encode(src20_json.as_bytes());
+
+        // Counterparty-embedded: 8 bytes CNTRPRTY + 4 bytes message type + stamp:base64
+        let mut counterparty_embedded: Vec<u8> = Vec::new();
+        counterparty_embedded.extend_from_slice(b"CNTRPRTY"); // 8 bytes - Counterparty prefix
+        counterparty_embedded.extend_from_slice(&[0x00, 0x00, 0x00, 0x1F]); // 4 bytes - message type
+        counterparty_embedded.extend_from_slice(b"stamp:"); // 6 bytes - stamp signature
+        counterparty_embedded.extend_from_slice(base64_data.as_bytes()); // base64 SRC-20
+
+        // Stamp signature should be found at offset 12 (8 + 4)
+        let (variant, content_type, _) = detect_stamps_variant_with_content(&counterparty_embedded);
+
+        // Should detect SRC-20, NOT Data
+        assert_eq!(
+            variant,
+            Some(StampsVariant::SRC20),
+            "Counterparty-embedded SRC-20 should be detected as SRC20, not {:?}",
+            variant
+        );
+        assert_eq!(
+            content_type,
+            Some("application/json"),
+            "SRC-20 should have application/json content type"
+        );
+    }
+
+    /// Test that Pure stamps (offset 0) still work correctly
+    #[test]
+    fn test_pure_stamps_offset_0_src20() {
+        use base64::{engine::general_purpose, Engine};
+
+        let src20_json = r#"{"p":"src-20","op":"mint","tick":"TEST","amt":"1000"}"#;
+        let base64_data = general_purpose::STANDARD.encode(src20_json.as_bytes());
+
+        // Pure stamps at offset 0: [stamp:][base64]
+        let mut pure_stamps: Vec<u8> = Vec::new();
+        pure_stamps.extend_from_slice(b"stamp:");
+        pure_stamps.extend_from_slice(base64_data.as_bytes());
+
+        let (variant, content_type, _) = detect_stamps_variant_with_content(&pure_stamps);
+
+        assert_eq!(variant, Some(StampsVariant::SRC20));
+        assert_eq!(content_type, Some("application/json"));
+    }
+
+    /// Test that SRC-20 with hyphenless "src20" protocol field is detected
+    /// (This was another bug found during investigation)
+    #[test]
+    fn test_src20_without_hyphen() {
+        use base64::{engine::general_purpose, Engine};
+
+        // Some stamps use "src20" instead of "src-20"
+        let src20_json = r#"{"p":"src20","op":"mint","tick":"KAREN","amt":"100000"}"#;
+        let base64_data = general_purpose::STANDARD.encode(src20_json.as_bytes());
+
+        let mut payload: Vec<u8> = Vec::new();
+        payload.extend_from_slice(b"stamp:");
+        payload.extend_from_slice(base64_data.as_bytes());
+
+        let (variant, content_type, _) = detect_stamps_variant_with_content(&payload);
+
+        // Should still detect as SRC20 even without hyphen
+        assert_eq!(
+            variant,
+            Some(StampsVariant::SRC20),
+            "SRC-20 with 'src20' (no hyphen) should be detected as SRC20"
+        );
+        assert_eq!(content_type, Some("application/json"));
+    }
+
+    /// Regression test for Counterparty-embedded stamps with data URI prefix.
+    ///
+    /// Bug: When Counterparty-embedded stamps contained data URI prefixes like
+    /// "data:image/png;base64,", the prefix was NOT stripped before base64 character
+    /// filtering, causing "dataimagepngbase64" to be prepended to the actual data.
+    ///
+    /// Fixed in: extract_stamps_payload() now calls strip_data_uri_prefix_str()
+    /// BEFORE base64 character filtering for Counterparty-embedded stamps.
+    #[test]
+    fn test_counterparty_embedded_with_data_uri_prefix() {
+        use base64::{engine::general_purpose, Engine};
+
+        // Create actual PNG data (minimal valid header)
+        let png_header = [
+            0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
+            0x00, 0x00, 0x00, 0x0D, // IHDR chunk length
+            b'I', b'H', b'D', b'R', // IHDR chunk type
+            0x00, 0x00, 0x00, 0x01, // Width: 1
+            0x00, 0x00, 0x00, 0x01, // Height: 1
+            0x08, 0x02, // Bit depth 8, RGB
+            0x00, 0x00, 0x00, // Compression, filter, interlace
+            0x90, 0x77, 0x53, 0xDE, // CRC
+        ];
+        let base64_png = general_purpose::STANDARD.encode(png_header);
+
+        // Counterparty-embedded with data URI prefix
+        // Format: [CNTRPRTY][msg_type][stamp:data:image/png;base64,<base64_data>]
+        let mut counterparty_embedded: Vec<u8> = Vec::new();
+        counterparty_embedded.extend_from_slice(b"CNTRPRTY");
+        counterparty_embedded.extend_from_slice(&[0x00, 0x00, 0x00, 0x1F]); // Message type
+        counterparty_embedded.extend_from_slice(b"stamp:");
+        counterparty_embedded.extend_from_slice(b"data:image/png;base64,");
+        counterparty_embedded.extend_from_slice(base64_png.as_bytes());
+
+        let (variant, content_type, image_format) =
+            detect_stamps_variant_with_content(&counterparty_embedded);
+
+        // Should detect as Classic (PNG image), NOT Data
+        assert_eq!(
+            variant,
+            Some(StampsVariant::Classic),
+            "Counterparty-embedded PNG with data URI prefix should be Classic, not {:?}",
+            variant
+        );
+        assert_eq!(
+            content_type,
+            Some("image/png"),
+            "PNG should have image/png content type"
+        );
+        assert_eq!(
+            image_format,
+            Some(ImageFormat::Png),
+            "Should detect PNG image format"
+        );
+    }
 }
