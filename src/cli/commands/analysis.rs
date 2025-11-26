@@ -279,12 +279,15 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
                 std::path::PathBuf::from("./output_data/plots/value_distributions.json");
 
             if let Some(output_path) = output {
-                std::fs::write(&output_path, formatted_output)?;
+                std::fs::write(output_path, formatted_output)?;
                 println!(
                     "Value distribution analysis written to: {}",
                     output_path.display()
                 );
-            } else if matches!(parse_format(format), OutputFormat::Json | OutputFormat::Plotly) {
+            } else if matches!(
+                parse_format(format),
+                OutputFormat::Json | OutputFormat::Plotly
+            ) {
                 // Auto-write JSON/Plotly output to default path
                 std::fs::create_dir_all(default_output_path.parent().unwrap())?;
                 std::fs::write(&default_output_path, formatted_output)?;
@@ -370,14 +373,15 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
             mime_type,
         } => {
             let db_path = get_db_path(database_path)?;
-            use crate::database::Database;
             use crate::analysis::ContentTypeAnalyser;
+            use crate::database::Database;
             let db = Database::new_v2(&db_path)?;
 
             // Handle filtering modes
             if let Some(protocol_str) = protocol {
                 // Protocol-specific analysis
-                let analysis = ContentTypeAnalyser::analyse_protocol_content_types(&db, protocol_str)?;
+                let analysis =
+                    ContentTypeAnalyser::analyse_protocol_content_types(&db, protocol_str)?;
                 match parse_format(format) {
                     OutputFormat::Json | OutputFormat::Plotly => {
                         println!("{}", serde_json::to_string_pretty(&analysis)?);
@@ -395,7 +399,10 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
                             println!("{:<40} {:>10} {:>11}", "MIME Type", "Count", "% of Total");
                             println!("{:-<40} {:->10} {:->11}", "", "", "");
                             for ct in &analysis.content_types {
-                                println!("{:<40} {:>10} {:>10.2}%", ct.mime_type, ct.count, ct.percentage);
+                                println!(
+                                    "{:<40} {:>10} {:>10.2}%",
+                                    ct.mime_type, ct.count, ct.percentage
+                                );
                             }
                         }
                     }
@@ -412,10 +419,12 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
                         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
                         println!();
                         for protocol_stats in &analysis {
-                            println!("{}: {} outputs ({:.2}%)",
+                            println!(
+                                "{}: {} outputs ({:.2}%)",
                                 protocol_stats.protocol,
                                 protocol_stats.with_content_type,
-                                protocol_stats.coverage_percentage);
+                                protocol_stats.coverage_percentage
+                            );
                         }
                     }
                 }
@@ -431,28 +440,48 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
                         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
                         println!();
                         println!("Total outputs: {}", analysis.total_outputs);
-                        println!("With content type: {} ({:.2}%)",
-                            analysis.outputs_with_content_type,
-                            analysis.content_type_percentage);
-                        println!("Without content type: {}", analysis.outputs_without_content_type);
+                        println!(
+                            "With content type: {} ({:.2}%)",
+                            analysis.outputs_with_content_type, analysis.content_type_percentage
+                        );
+                        println!(
+                            "Without content type: {}",
+                            analysis.outputs_without_content_type
+                        );
                         println!();
 
                         // Valid None cases
                         println!("Valid None Cases (Architecturally Correct):");
-                        println!("  LikelyDataStorage: {}", analysis.valid_none_stats.likely_data_storage);
-                        println!("  LikelyLegitimateMultisig: {}", analysis.valid_none_stats.likely_legitimate_multisig);
-                        println!("  StampsUnknown: {}", analysis.valid_none_stats.stamps_unknown);
-                        println!("  OmniFailedDeobfuscation: {}", analysis.valid_none_stats.omni_failed_deobfuscation);
-                        println!("  Total valid None: {}", analysis.valid_none_stats.total_valid_none);
+                        println!(
+                            "  LikelyDataStorage: {}",
+                            analysis.valid_none_stats.likely_data_storage
+                        );
+                        println!(
+                            "  LikelyLegitimateMultisig: {}",
+                            analysis.valid_none_stats.likely_legitimate_multisig
+                        );
+                        println!(
+                            "  StampsUnknown: {}",
+                            analysis.valid_none_stats.stamps_unknown
+                        );
+                        println!(
+                            "  OmniFailedDeobfuscation: {}",
+                            analysis.valid_none_stats.omni_failed_deobfuscation
+                        );
+                        println!(
+                            "  Total valid None: {}",
+                            analysis.valid_none_stats.total_valid_none
+                        );
                         println!();
 
                         // Invalid None cases
                         if !analysis.invalid_none_stats.is_empty() {
                             println!("Invalid None Cases (Missing Content Types):");
                             for protocol_stats in &analysis.invalid_none_stats {
-                                println!("  {}: {} outputs missing content types",
-                                    protocol_stats.protocol,
-                                    protocol_stats.without_content_type);
+                                println!(
+                                    "  {}: {} outputs missing content types",
+                                    protocol_stats.protocol, protocol_stats.without_content_type
+                                );
                             }
                             println!();
                         }
@@ -462,10 +491,10 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
                         println!("{:<20} {:>10} {:>11}", "Category", "Count", "% of Total");
                         println!("{:-<20} {:->10} {:->11}", "", "", "");
                         for category in &analysis.category_breakdown {
-                            println!("{:<20} {:>10} {:>10.2}%",
-                                category.category,
-                                category.count,
-                                category.percentage);
+                            println!(
+                                "{:<20} {:>10} {:>10.2}%",
+                                category.category, category.count, category.percentage
+                            );
                         }
                         println!();
 
@@ -474,11 +503,19 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
                         println!("{:<40} {:>10} {:>11}", "MIME Type", "Count", "% of Total");
                         println!("{:-<40} {:->10} {:->11}", "", "", "");
                         for (i, ct) in analysis.content_type_breakdown.iter().enumerate() {
-                            if i >= 15 { break; } // Show top 15
-                            println!("{:<40} {:>10} {:>10.2}%", ct.mime_type, ct.count, ct.percentage);
+                            if i >= 15 {
+                                break;
+                            } // Show top 15
+                            println!(
+                                "{:<40} {:>10} {:>10.2}%",
+                                ct.mime_type, ct.count, ct.percentage
+                            );
                         }
                         if analysis.content_type_breakdown.len() > 15 {
-                            println!("  ... and {} more", analysis.content_type_breakdown.len() - 15);
+                            println!(
+                                "  ... and {} more",
+                                analysis.content_type_breakdown.len() - 15
+                            );
                         }
                     }
                 }
@@ -560,4 +597,3 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
         }
     }
 }
-

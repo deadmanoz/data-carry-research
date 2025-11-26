@@ -356,7 +356,7 @@ mod tests {
         );
         output.script_type = "p2pkh".to_string(); // NOT multisig
 
-        let result = detect(&vec![output]);
+        let result = detect(&[output]);
         assert!(
             result.is_none(),
             "Guard should prevent classification of non-multisig"
