@@ -210,7 +210,7 @@ def get_protocol_distribution(
             SELECT
                 tout.height,
                 tc.protocol,
-                COUNT(tout.id) as count
+                COUNT(*) as count
             FROM transaction_classifications tc
             JOIN transaction_outputs tout ON tc.txid = tout.txid
             WHERE tout.script_type = 'multisig'
@@ -294,7 +294,7 @@ def get_spendability_distribution(db_path: str, bin_by: Optional[str] = None) ->
         SELECT
             tout.height,
             poc.is_spendable,
-            COUNT(poc.id) as count
+            COUNT(*) as count
         FROM p2ms_output_classifications poc
         JOIN transaction_outputs tout ON poc.txid = tout.txid AND poc.vout = tout.vout
         WHERE tout.script_type = 'multisig'

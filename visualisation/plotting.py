@@ -134,17 +134,40 @@ def plot_temporal_distribution(
     return fig
 
 
-# Protocol colour mapping
-PROTOCOL_COLOURS = {
-    'BitcoinStamps': '#E74C3C',          # Red (dominant)
-    'Counterparty': '#3498DB',           # Blue (second)
-    'OmniLayer': '#9B59B6',              # Purple
-    'LikelyLegitimateMultisig': '#2ECC71',   # Green
-    'DataStorage': '#F39C12',            # Orange
-    'Chancecoin': '#1ABC9C',             # Teal
-    'AsciiIdentifierProtocols': '#E67E22',   # Dark orange
-    'Unknown': '#95A5A6',                # Gray
+# Protocol display name mapping (database name -> display name)
+PROTOCOL_DISPLAY_NAMES = {
+    'BitcoinStamps': 'Bitcoin Stamps',
+    'Counterparty': 'Counterparty',
+    'OmniLayer': 'Omni Layer',
+    'LikelyLegitimateMultisig': 'Likely Legitimate Multisig',
+    'DataStorage': 'Data Storage',
+    'Chancecoin': 'Chancecoin',
+    'AsciiIdentifierProtocols': 'ASCII Identifier Protocols',
+    'PPk': 'PPk',
+    'LikelyDataStorage': 'Likely Data Storage',
+    'OpReturnSignalled': 'OP_RETURN Signalled',
+    'Unknown': 'Unknown',
 }
+
+# Protocol colour mapping (uses display names)
+PROTOCOL_COLOURS = {
+    'Bitcoin Stamps': '#E74C3C',             # Red (dominant)
+    'Counterparty': '#3498DB',               # Blue (second)
+    'Omni Layer': '#9B59B6',                 # Purple
+    'Likely Legitimate Multisig': '#2ECC71', # Green
+    'Data Storage': '#F39C12',               # Orange
+    'Chancecoin': '#1ABC9C',                 # Teal
+    'ASCII Identifier Protocols': '#E67E22', # Dark orange
+    'PPk': '#FF6B9D',                        # Pink
+    'Likely Data Storage': '#7F8C8D',        # Slate grey
+    'OP_RETURN Signalled': '#D4A574',        # Tan
+    'Unknown': '#95A5A6',                    # Gray
+}
+
+
+def get_display_name(protocol: str) -> str:
+    """Convert database protocol name to display name."""
+    return PROTOCOL_DISPLAY_NAMES.get(protocol, protocol)
 
 
 def plot_protocol_distribution(

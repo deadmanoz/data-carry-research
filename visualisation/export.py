@@ -28,30 +28,48 @@ def export_protocol_distribution_plotly(
     protocol_totals = df_pivot.sum().sort_values(ascending=False)
     df_pivot = df_pivot[protocol_totals.index]
     
-    # Protocol colours matching matplotlib implementation
+    # Protocol display name mapping (database name -> display name)
+    PROTOCOL_DISPLAY_NAMES = {
+        'BitcoinStamps': 'Bitcoin Stamps',
+        'Counterparty': 'Counterparty',
+        'OmniLayer': 'Omni Layer',
+        'LikelyLegitimateMultisig': 'Likely Legitimate Multisig',
+        'DataStorage': 'Data Storage',
+        'Chancecoin': 'Chancecoin',
+        'AsciiIdentifierProtocols': 'ASCII Identifier Protocols',
+        'PPk': 'PPk',
+        'LikelyDataStorage': 'Likely Data Storage',
+        'OpReturnSignalled': 'OP_RETURN Signalled',
+        'Unknown': 'Unknown',
+    }
+
+    # Protocol colours (uses display names)
     PROTOCOL_COLOURS = {
-        'BitcoinStamps': '#E74C3C',
+        'Bitcoin Stamps': '#E74C3C',
         'Counterparty': '#3498DB',
-        'OmniLayer': '#9B59B6',
-        'LikelyLegitimateMultisig': '#2ECC71',
-        'DataStorage': '#F39C12',
+        'Omni Layer': '#9B59B6',
+        'Likely Legitimate Multisig': '#2ECC71',
+        'Data Storage': '#F39C12',
         'Chancecoin': '#1ABC9C',
-        'AsciiIdentifierProtocols': '#E67E22',
-        'Protocol47930': '#BB3A00',
+        'ASCII Identifier Protocols': '#E67E22',
+        'PPk': '#FF6B9D',
+        'Likely Data Storage': '#7F8C8D',
+        'OP_RETURN Signalled': '#D4A574',
         'Unknown': '#95A5A6',
     }
     
     # Create traces for stacked bar chart
     traces: List[Dict[str, Any]] = []
-    
+
     for protocol in df_pivot.columns:
+        display_name = PROTOCOL_DISPLAY_NAMES.get(protocol, protocol)
         trace = {
             "x": df_pivot.index.strftime('%Y-%m-%d').tolist(),
             "y": df_pivot[protocol].tolist(),
-            "name": protocol,
+            "name": display_name,
             "type": "bar",
             "marker": {
-                "color": PROTOCOL_COLOURS.get(protocol, '#CCCCCC')
+                "color": PROTOCOL_COLOURS.get(display_name, '#CCCCCC')
             }
         }
         traces.append(trace)
