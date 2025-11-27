@@ -4,7 +4,7 @@
 //! showing economic metrics by protocol including BTC value distribution, output counts,
 //! and fee context.
 
-use super::types::{
+use crate::types::analysis_results::{
     FeeAnalysisReport, GlobalValueDistribution, OverallValueStats, ProtocolFeeStats,
     ProtocolValueDistribution, ProtocolValueStats, ValueAnalysisReport, ValueBucket,
     ValueDistributionReport, ValuePercentiles,

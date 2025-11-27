@@ -55,7 +55,6 @@ pub mod stamps_signature_stats;
 pub mod stamps_transport_stats;
 pub mod stamps_weekly_fee_analysis;
 pub mod tx_size_analysis;
-pub mod types;
 pub mod value_analysis;
 
 // Re-export main types and interfaces
@@ -81,7 +80,7 @@ pub use stamps_signature_stats::{StampsSignatureAnalyser, StampsSignatureAnalysi
 pub use stamps_transport_stats::{StampsTransportAnalyser, StampsTransportAnalysis};
 pub use stamps_weekly_fee_analysis::StampsWeeklyFeeAnalyser;
 pub use tx_size_analysis::TxSizeAnalyser;
-pub use types::{
+pub use crate::types::analysis_results::{
     BurnPatternAnalysis, ClassificationStatsReport, ComprehensiveDataSizeReport,
     ContentTypeAnalysisReport, ContentTypeCategoryStats, ContentTypeProtocolStats,
     ContentTypeSpendabilityReport, ContentTypeStats, DistributionBucket, DustAnalysisReport,

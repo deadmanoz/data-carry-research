@@ -17,7 +17,7 @@
 //! - **Data Keys**: Invalid EC points used for data embedding
 //! - **Real Keys**: Valid secp256k1 EC points that could be signing keys
 
-use super::types::{
+use crate::types::analysis_results::{
     KeyCountDistribution, KeyCountStats, OverallSpendability, ProtocolSpendabilityStats,
     ReasonStats, SpendabilityStatsReport, TransactionSpendabilityStats,
 };

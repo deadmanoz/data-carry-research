@@ -5,7 +5,7 @@
 //! count- and size-based metrics so reports can highlight which payload formats
 //! dominate the dataset.
 
-use super::types::{CategoryBreakdown, CategoryTotals, ExtensionStats, FileExtensionReport};
+use crate::types::analysis_results::{CategoryBreakdown, CategoryTotals, ExtensionStats, FileExtensionReport};
 use crate::database::Database;
 use crate::errors::{AppError, AppResult};
 use crate::types::content_detection::ContentType;

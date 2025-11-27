@@ -29,6 +29,9 @@ pub mod ppk;
 pub mod spendability;
 pub mod stamps;
 
+// Analysis result types
+pub mod analysis_results;
+
 // Re-export everything for backward compatibility
 pub use common::*;
 pub use stage1::*;

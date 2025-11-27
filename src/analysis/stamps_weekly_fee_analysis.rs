@@ -18,7 +18,7 @@
 //! - **Plotly**: Plotly-native trace format with `{data: [...], layout: {...}}`
 
 use super::plotly_types::{PlotlyChart, PlotlyLayout, PlotlyTrace};
-use super::types::{StampsFeeSummary, StampsWeeklyFeeReport, WeeklyStampsFeeStats};
+use crate::types::analysis_results::{StampsFeeSummary, StampsWeeklyFeeReport, WeeklyStampsFeeStats};
 use crate::database::Database;
 use crate::errors::AppResult;
 use chrono::{TimeZone, Utc};

@@ -2,7 +2,7 @@
 //!
 //! This module provides comprehensive analysis of protocol classifications.
 
-use super::types::{ClassificationStatsReport, ProtocolBreakdown, SignatureDetectionStats};
+use crate::types::analysis_results::{ClassificationStatsReport, ProtocolBreakdown, SignatureDetectionStats};
 use crate::database::Database;
 use crate::errors::AppResult;
 
@@ -38,7 +38,7 @@ impl ProtocolStatsAnalyser {
 
         let sample_classifications = stmt
             .query_map([], |row| {
-                Ok(super::types::ClassificationSample {
+                Ok(crate::types::analysis_results::ClassificationSample {
                     protocol: row.get(0)?,
                     variant: row.get(1)?,
                     classification_method: row.get(2)?,
@@ -71,7 +71,7 @@ impl ProtocolStatsAnalyser {
         }
 
         // Helper function to get protocol stats
-        let get_protocol_stats = |protocol: &str| -> AppResult<super::types::ProtocolStats> {
+        let get_protocol_stats = |protocol: &str| -> AppResult<crate::types::analysis_results::ProtocolStats> {
             let count: i64 = conn.query_row(
                 "SELECT COUNT(*) FROM transaction_classifications WHERE protocol = ?",
                 [protocol],
@@ -90,7 +90,7 @@ impl ProtocolStatsAnalyser {
 
             let variants = stmt
                 .query_map([protocol], |row| {
-                    Ok(super::types::VariantStats {
+                    Ok(crate::types::analysis_results::VariantStats {
                         variant: row.get(0)?,
                         classification_method: row.get(1)?,
                         count: row.get::<_, i64>(2)? as usize,
@@ -98,7 +98,7 @@ impl ProtocolStatsAnalyser {
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
 
-            Ok(super::types::ProtocolStats {
+            Ok(crate::types::analysis_results::ProtocolStats {
                 count: count as usize,
                 percentage,
                 variants,
@@ -161,7 +161,7 @@ impl ProtocolStatsAnalyser {
                     0.0
                 };
 
-                Ok(super::types::MethodStats {
+                Ok(crate::types::analysis_results::MethodStats {
                     method: row.get(0)?,
                     count: count as usize,
                     percentage,
@@ -182,7 +182,7 @@ impl ProtocolStatsAnalyser {
     /// HTML, Compressed, and Data variants.
     pub fn get_stamps_variant_breakdown(
         db: &Database,
-    ) -> AppResult<Vec<super::types::VariantStats>> {
+    ) -> AppResult<Vec<crate::types::analysis_results::VariantStats>> {
         let conn = db.connection();
 
         let mut stmt = conn.prepare(
@@ -202,7 +202,7 @@ impl ProtocolStatsAnalyser {
 
         let variants = stmt
             .query_map([], |row| {
-                Ok(super::types::VariantStats {
+                Ok(crate::types::analysis_results::VariantStats {
                     variant: row.get(0)?,
                     classification_method: row.get(1)?,
                     count: row.get::<_, i64>(2)? as usize,

@@ -5,7 +5,7 @@
 //! global and per-protocol breakdowns.
 
 use super::plotly_types::{get_protocol_colour, PlotlyChart, PlotlyLayout, PlotlyTrace};
-use super::types::{
+use crate::types::analysis_results::{
     GlobalTxSizeDistribution, ProtocolTxSizeDistribution, TxSizeBucket, TxSizeDistributionReport,
     TxSizePercentiles,
 };

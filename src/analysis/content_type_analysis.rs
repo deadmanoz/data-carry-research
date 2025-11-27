@@ -9,7 +9,7 @@
 //! CRITICAL: All queries filter by `is_spent = 0 AND script_type = 'multisig'` to ensure
 //! statistics reflect only unspent P2MS outputs (the true UTXO set).
 
-use super::types::{
+use crate::types::analysis_results::{
     ContentTypeAnalysisReport, ContentTypeCategoryStats, ContentTypeProtocolStats,
     ContentTypeStats, ValidNoneStats,
 };

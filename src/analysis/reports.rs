@@ -5,7 +5,7 @@
 
 use super::plotly_types::{get_protocol_colour, PlotlyChart};
 use super::tx_size_analysis::TX_SIZE_BUCKET_RANGES;
-use super::types::{
+use crate::types::analysis_results::{
     BurnPatternAnalysis, ClassificationStatsReport, ComprehensiveDataSizeReport,
     ContentTypeSpendabilityReport, DustAnalysisReport, FeeAnalysisReport, FileExtensionReport,
     FullAnalysisReport, MultisigConfigReport, ProtocolDataSizeReport, SignatureAnalysisReport,
@@ -1767,7 +1767,7 @@ impl ReportFormatter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::analysis::types::{
+    use crate::types::analysis_results::{
         CategoryBreakdown, CategoryTotals, ExtensionStats, FileExtensionReport,
     };
 

@@ -47,9 +47,9 @@
 //! The configuration table covers all common patterns from 1-of-1 through 1-of-7,
 //! with fallback estimation for higher-order or non-standard configurations.
 
-use crate::analysis::types::{MultisigConfigReport, MultisigConfiguration};
 use crate::database::Database;
 use crate::errors::AppResult;
+use crate::types::analysis_results::{MultisigConfigReport, MultisigConfiguration};
 use std::collections::BTreeMap;
 
 /// Multisig configuration analysis engine

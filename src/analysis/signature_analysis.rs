@@ -3,7 +3,7 @@
 //! This module provides comprehensive analysis of protocol signature detection,
 //! replacing the raw SQL queries from the justfile with structured analysis.
 
-use super::types::{BurnPatternCorrelation, ConfidenceStats, SignatureAnalysisReport};
+use crate::types::analysis_results::{BurnPatternCorrelation, ConfidenceStats, SignatureAnalysisReport};
 use crate::database::{Database, QueryHelper};
 use crate::errors::AppResult;
 
@@ -26,7 +26,7 @@ impl SignatureAnalyser {
         // Convert to MethodStats
         let classification_methods = results
             .into_iter()
-            .map(|(method, count, percentage)| super::types::MethodStats {
+            .map(|(method, count, percentage)| crate::types::analysis_results::MethodStats {
                 method,
                 count,
                 percentage,
@@ -64,7 +64,7 @@ impl SignatureAnalyser {
              GROUP BY protocol, pattern_count
              ORDER BY protocol, pattern_count",
             |row| {
-                Ok(super::types::PatternProtocolCorrelation {
+                Ok(crate::types::analysis_results::PatternProtocolCorrelation {
                     protocol: row.get(0)?,
                     burn_patterns_count: row.get::<_, i64>(1)? as usize,
                     transactions: row.get::<_, i64>(2)? as usize,

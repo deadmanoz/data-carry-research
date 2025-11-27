@@ -3,7 +3,7 @@
 //! This module provides comprehensive data size (bytes) reporting for P2MS outputs,
 //! analysing blockchain storage footprint across protocols, spendability, and content types.
 
-use super::types::{
+use crate::types::analysis_results::{
     CategoryDataMetrics, CategorySpendabilityData, ComprehensiveDataSizeReport, ContentTypeData,
     ContentTypeSpendabilityReport, OverallDataSummary, ProtocolDataSize, ProtocolDataSizeReport,
     ProtocolSpendabilityData, ReasonSpendabilityData, SpendabilityDataMetrics,
