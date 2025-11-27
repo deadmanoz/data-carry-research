@@ -22,24 +22,6 @@ use std::str::FromStr;
 pub struct DustAnalyser;
 
 impl DustAnalyser {
-    /// Calculate percentage safely, returning 0.0 for zero total
-    fn safe_percentage(part: usize, total: usize) -> f64 {
-        if total == 0 {
-            0.0
-        } else {
-            (part as f64 / total as f64) * 100.0
-        }
-    }
-
-    /// Calculate percentage safely for u64 values
-    fn safe_percentage_u64(part: u64, total: u64) -> f64 {
-        if total == 0 {
-            0.0
-        } else {
-            (part as f64 / total as f64) * 100.0
-        }
-    }
-
     /// Analyse dust thresholds across all P2MS outputs
     ///
     /// Provides comprehensive dust threshold analysis including:
@@ -85,42 +67,24 @@ impl DustAnalyser {
                 Ok(GlobalDustStats {
                     total_outputs,
                     total_value_sats,
-                    below_non_segwit_threshold: DustBucket {
-                        output_count: count_below_546,
-                        total_value_sats: value_below_546,
-                        percentage_of_outputs: Self::safe_percentage(
-                            count_below_546,
-                            total_outputs,
-                        ),
-                        percentage_of_value: Self::safe_percentage_u64(
-                            value_below_546,
-                            total_value_sats,
-                        ),
-                    },
-                    below_segwit_threshold: DustBucket {
-                        output_count: count_below_294,
-                        total_value_sats: value_below_294,
-                        percentage_of_outputs: Self::safe_percentage(
-                            count_below_294,
-                            total_outputs,
-                        ),
-                        percentage_of_value: Self::safe_percentage_u64(
-                            value_below_294,
-                            total_value_sats,
-                        ),
-                    },
-                    above_dust: DustBucket {
-                        output_count: count_above_dust,
-                        total_value_sats: value_above_dust,
-                        percentage_of_outputs: Self::safe_percentage(
-                            count_above_dust,
-                            total_outputs,
-                        ),
-                        percentage_of_value: Self::safe_percentage_u64(
-                            value_above_dust,
-                            total_value_sats,
-                        ),
-                    },
+                    below_non_segwit_threshold: DustBucket::new(
+                        count_below_546,
+                        value_below_546,
+                        total_outputs,
+                        total_value_sats,
+                    ),
+                    below_segwit_threshold: DustBucket::new(
+                        count_below_294,
+                        value_below_294,
+                        total_outputs,
+                        total_value_sats,
+                    ),
+                    above_dust: DustBucket::new(
+                        count_above_dust,
+                        value_above_dust,
+                        total_outputs,
+                        total_value_sats,
+                    ),
                 })
             },
         )?;
@@ -224,33 +188,24 @@ impl DustAnalyser {
                 protocol,
                 total_outputs,
                 total_value_sats,
-                below_non_segwit_threshold: DustBucket {
-                    output_count: count_below_546,
-                    total_value_sats: value_below_546,
-                    percentage_of_outputs: Self::safe_percentage(count_below_546, total_outputs),
-                    percentage_of_value: Self::safe_percentage_u64(
-                        value_below_546,
-                        total_value_sats,
-                    ),
-                },
-                below_segwit_threshold: DustBucket {
-                    output_count: count_below_294,
-                    total_value_sats: value_below_294,
-                    percentage_of_outputs: Self::safe_percentage(count_below_294, total_outputs),
-                    percentage_of_value: Self::safe_percentage_u64(
-                        value_below_294,
-                        total_value_sats,
-                    ),
-                },
-                above_dust: DustBucket {
-                    output_count: count_above_dust,
-                    total_value_sats: value_above_dust,
-                    percentage_of_outputs: Self::safe_percentage(count_above_dust, total_outputs),
-                    percentage_of_value: Self::safe_percentage_u64(
-                        value_above_dust,
-                        total_value_sats,
-                    ),
-                },
+                below_non_segwit_threshold: DustBucket::new(
+                    count_below_546,
+                    value_below_546,
+                    total_outputs,
+                    total_value_sats,
+                ),
+                below_segwit_threshold: DustBucket::new(
+                    count_below_294,
+                    value_below_294,
+                    total_outputs,
+                    total_value_sats,
+                ),
+                above_dust: DustBucket::new(
+                    count_above_dust,
+                    value_above_dust,
+                    total_outputs,
+                    total_value_sats,
+                ),
             });
         }
 
@@ -287,18 +242,15 @@ impl DustAnalyser {
         let global = &report.global_stats;
 
         // Count consistency
-        if global.below_segwit_threshold.output_count
-            > global.below_non_segwit_threshold.output_count
-        {
+        if global.below_segwit_threshold.count > global.below_non_segwit_threshold.count {
             tracing::warn!(
                 "Inconsistency: below_294 count ({}) > below_546 count ({})",
-                global.below_segwit_threshold.output_count,
-                global.below_non_segwit_threshold.output_count
+                global.below_segwit_threshold.count,
+                global.below_non_segwit_threshold.count
             );
         }
 
-        let bucket_sum =
-            global.below_non_segwit_threshold.output_count + global.above_dust.output_count;
+        let bucket_sum = global.below_non_segwit_threshold.count + global.above_dust.count;
         if bucket_sum != global.total_outputs {
             tracing::warn!(
                 "Inconsistency: below_546 + above_dust ({}) != total_outputs ({})",
@@ -319,18 +271,15 @@ impl DustAnalyser {
         }
 
         // Value consistency
-        if global.below_segwit_threshold.total_value_sats
-            > global.below_non_segwit_threshold.total_value_sats
-        {
+        if global.below_segwit_threshold.value > global.below_non_segwit_threshold.value {
             tracing::warn!(
                 "Inconsistency: below_294 value ({}) > below_546 value ({})",
-                global.below_segwit_threshold.total_value_sats,
-                global.below_non_segwit_threshold.total_value_sats
+                global.below_segwit_threshold.value,
+                global.below_non_segwit_threshold.value
             );
         }
 
-        let value_bucket_sum =
-            global.below_non_segwit_threshold.total_value_sats + global.above_dust.total_value_sats;
+        let value_bucket_sum = global.below_non_segwit_threshold.value + global.above_dust.value;
         if value_bucket_sum != global.total_value_sats {
             tracing::warn!(
                 "Inconsistency: below_546 value + above_dust value ({}) != total_value ({})",

@@ -3,16 +3,19 @@
 //! This module provides formatting functionality for analysis results,
 //! replacing the echo statements in justfile commands with structured output.
 
+use super::plotly_types::{get_protocol_colour, PlotlyChart};
+use super::tx_size_analysis::TX_SIZE_BUCKET_RANGES;
 use super::types::{
     BurnPatternAnalysis, ClassificationStatsReport, ComprehensiveDataSizeReport,
     ContentTypeSpendabilityReport, DustAnalysisReport, FeeAnalysisReport, FileExtensionReport,
     FullAnalysisReport, MultisigConfigReport, ProtocolDataSizeReport, SignatureAnalysisReport,
-    SpendabilityDataSizeReport, SpendabilityStatsReport, ValueAnalysisReport,
-    ValueDistributionReport,
+    SpendabilityDataSizeReport, SpendabilityStatsReport, StampsWeeklyFeeReport,
+    TxSizeDistributionReport, ValueAnalysisReport, ValueDistributionReport,
 };
 use crate::errors::AppResult;
 use crate::utils::currency::{format_rate_as_btc, format_sats_as_btc, format_sats_as_btc_f64};
 use serde::Serialize;
+use std::str::FromStr;
 
 /// Output format options for analysis reports
 #[derive(Debug, Clone, Default)]
@@ -331,8 +334,8 @@ impl ReportFormatter {
                             bucket.range_min,
                             max_display,
                             Self::format_number(bucket.count),
-                            bucket.percentage_of_outputs,
-                            format_sats_as_btc(bucket.total_value)
+                            bucket.pct_count,
+                            format_sats_as_btc(bucket.value)
                         ));
                     }
                 }
@@ -912,24 +915,6 @@ impl ReportFormatter {
             })
             .collect();
 
-        // Protocol colours matching visualisation/export.py
-        let get_protocol_colour = |protocol: &str| -> &str {
-            match protocol {
-                "BitcoinStamps" => "#E74C3C",
-                "Counterparty" => "#3498DB",
-                "OmniLayer" => "#9B59B6",
-                "LikelyLegitimateMultisig" => "#2ECC71",
-                "DataStorage" => "#F39C12",
-                "Chancecoin" => "#1ABC9C",
-                "AsciiIdentifierProtocols" => "#E67E22",
-                "PPk" => "#16A085",
-                "OpReturnSignalled" => "#BB3A00",
-                "LikelyDataStorage" => "#D35400",
-                "Unknown" => "#95A5A6",
-                _ => "#CCCCCC",
-            }
-        };
-
         // Create traces: one for global, then one per protocol
         let mut traces = Vec::new();
 
@@ -951,20 +936,36 @@ impl ReportFormatter {
             }
         }));
 
-        // Per-protocol traces (sorted by total count, descending)
+        // Per-protocol traces (sorted by canonical ProtocolType enum order)
         let mut protocol_dists = report.protocol_distributions.clone();
-        protocol_dists.sort_by(|a, b| b.total_outputs.cmp(&a.total_outputs));
+        protocol_dists.sort_by(|a, b| {
+            use crate::types::ProtocolType;
+            use std::str::FromStr;
+            let a_order = ProtocolType::from_str(&a.protocol)
+                .map(|p| p as u8)
+                .unwrap_or(u8::MAX);
+            let b_order = ProtocolType::from_str(&b.protocol)
+                .map(|p| p as u8)
+                .unwrap_or(u8::MAX);
+            a_order.cmp(&b_order)
+        });
 
         for protocol_dist in &protocol_dists {
             let protocol_counts: Vec<usize> =
                 protocol_dist.buckets.iter().map(|b| b.count).collect();
 
+            // Use display_name() for user-facing trace names, fall back to raw string
+            let display_name = crate::types::ProtocolType::from_str(&protocol_dist.protocol)
+                .map(|p| p.display_name().to_string())
+                .unwrap_or_else(|_| protocol_dist.protocol.clone());
+
             traces.push(json!({
                 "x": bucket_labels,
                 "y": protocol_counts,
-                "name": protocol_dist.protocol,
+                "name": display_name,
                 "type": "bar",
                 "marker": {
+                    // Use raw protocol string for colour lookup (matches get_protocol_colour keys)
                     "color": get_protocol_colour(&protocol_dist.protocol)
                 },
                 "visible": "legendonly"  // Hidden by default, show in legend
@@ -1418,35 +1419,35 @@ impl ReportFormatter {
                 output.push_str(&format!(
                     "  Below {} sats (dust for non-segwit):  {} ({:>5.1}%)   {} ({:>5.1}%)\n",
                     report.thresholds.non_segwit_destination_sats,
-                    Self::format_number(global.below_non_segwit_threshold.output_count),
-                    global.below_non_segwit_threshold.percentage_of_outputs,
-                    format_sats_as_btc(global.below_non_segwit_threshold.total_value_sats),
-                    global.below_non_segwit_threshold.percentage_of_value
+                    Self::format_number(global.below_non_segwit_threshold.count),
+                    global.below_non_segwit_threshold.pct_count,
+                    format_sats_as_btc(global.below_non_segwit_threshold.value),
+                    global.below_non_segwit_threshold.pct_value
                 ));
 
                 // Below 294 (subset)
                 output.push_str(&format!(
                     "    ├─ Below {} sats (dust for all):    {} ({:>5.1}%)   {} ({:>5.1}%)\n",
                     report.thresholds.segwit_destination_sats,
-                    Self::format_number(global.below_segwit_threshold.output_count),
-                    global.below_segwit_threshold.percentage_of_outputs,
-                    format_sats_as_btc(global.below_segwit_threshold.total_value_sats),
-                    global.below_segwit_threshold.percentage_of_value
+                    Self::format_number(global.below_segwit_threshold.count),
+                    global.below_segwit_threshold.pct_count,
+                    format_sats_as_btc(global.below_segwit_threshold.value),
+                    global.below_segwit_threshold.pct_value
                 ));
 
                 // Mid-band (294-545 sats) - calculated as difference
                 let mid_band_count = global
                     .below_non_segwit_threshold
-                    .output_count
-                    .saturating_sub(global.below_segwit_threshold.output_count);
+                    .count
+                    .saturating_sub(global.below_segwit_threshold.count);
                 let mid_band_value = global
                     .below_non_segwit_threshold
-                    .total_value_sats
-                    .saturating_sub(global.below_segwit_threshold.total_value_sats);
-                let mid_band_pct_outputs = global.below_non_segwit_threshold.percentage_of_outputs
-                    - global.below_segwit_threshold.percentage_of_outputs;
-                let mid_band_pct_value = global.below_non_segwit_threshold.percentage_of_value
-                    - global.below_segwit_threshold.percentage_of_value;
+                    .value
+                    .saturating_sub(global.below_segwit_threshold.value);
+                let mid_band_pct_outputs = global.below_non_segwit_threshold.pct_count
+                    - global.below_segwit_threshold.pct_count;
+                let mid_band_pct_value = global.below_non_segwit_threshold.pct_value
+                    - global.below_segwit_threshold.pct_value;
 
                 output.push_str(&format!(
                     "    └─ {}-{} sats (segwit-only):      {} ({:>5.1}%)   {} ({:>5.1}%)\n",
@@ -1462,10 +1463,10 @@ impl ReportFormatter {
                 output.push_str(&format!(
                     "  At or above {} sats (not dust):     {} ({:>5.1}%)   {} ({:>5.1}%)\n\n",
                     report.thresholds.non_segwit_destination_sats,
-                    Self::format_number(global.above_dust.output_count),
-                    global.above_dust.percentage_of_outputs,
-                    format_sats_as_btc(global.above_dust.total_value_sats),
-                    global.above_dust.percentage_of_value
+                    Self::format_number(global.above_dust.count),
+                    global.above_dust.pct_count,
+                    format_sats_as_btc(global.above_dust.value),
+                    global.above_dust.pct_value
                 ));
 
                 // Per-protocol breakdown
@@ -1483,12 +1484,12 @@ impl ReportFormatter {
                             "{:<28} │ {:>10} │ {:>6} ({:>4.0}%) │ {:>6} ({:>4.0}%) │ {:>6} ({:>4.0}%) │\n",
                             Self::format_protocol_name(&protocol_stats.protocol.to_string()),
                             Self::format_number(protocol_stats.total_outputs),
-                            Self::format_number(protocol_stats.below_non_segwit_threshold.output_count),
-                            protocol_stats.below_non_segwit_threshold.percentage_of_outputs,
-                            Self::format_number(protocol_stats.below_segwit_threshold.output_count),
-                            protocol_stats.below_segwit_threshold.percentage_of_outputs,
-                            Self::format_number(protocol_stats.above_dust.output_count),
-                            protocol_stats.above_dust.percentage_of_outputs,
+                            Self::format_number(protocol_stats.below_non_segwit_threshold.count),
+                            protocol_stats.below_non_segwit_threshold.pct_count,
+                            Self::format_number(protocol_stats.below_segwit_threshold.count),
+                            protocol_stats.below_segwit_threshold.pct_count,
+                            Self::format_number(protocol_stats.above_dust.count),
+                            protocol_stats.above_dust.pct_count,
                         ));
                     }
                     output.push('\n');
@@ -1506,6 +1507,255 @@ impl ReportFormatter {
                         Self::format_number(report.unclassified_count),
                         unclassified_pct
                     ));
+                }
+
+                Ok(output)
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Bitcoin Stamps Weekly Fee Analysis Formatter
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Format Bitcoin Stamps weekly fee analysis report
+    ///
+    /// Displays weekly fee aggregation for Bitcoin Stamps transactions with:
+    /// - Console: Human-readable table with BTC values
+    /// - JSON: Raw structured data with satoshi values
+    /// - Plotly: Plotly-native trace format for visualisation
+    pub fn format_stamps_weekly_fees(
+        report: &StampsWeeklyFeeReport,
+        format: &OutputFormat,
+    ) -> AppResult<String> {
+        match format {
+            OutputFormat::Json => Self::export_json(report),
+            OutputFormat::Plotly => {
+                let chart: PlotlyChart = report.to_plotly_chart();
+                Self::export_json(&chart)
+            }
+            OutputFormat::Console => {
+                let mut output = String::new();
+
+                // Header
+                output.push_str("\nBITCOIN STAMPS WEEKLY FEE ANALYSIS\n");
+                output.push_str("═══════════════════════════════════════════════════════════════════════════════\n\n");
+
+                // Handle empty report
+                if report.total_weeks == 0 {
+                    output.push_str("No Bitcoin Stamps transactions found.\n");
+                    return Ok(output);
+                }
+
+                // Summary section
+                let summary = &report.summary;
+                output.push_str(&format!(
+                    "Date Range: {} to {}\n",
+                    summary.date_range_start, summary.date_range_end
+                ));
+                output.push_str(&format!(
+                    "Total Transactions: {}\n",
+                    Self::format_number(report.total_transactions)
+                ));
+                output.push_str(&format!(
+                    "Total Fees: {} BTC ({} sats)\n",
+                    format_sats_as_btc(report.total_fees_sats),
+                    Self::format_number(report.total_fees_sats as usize)
+                ));
+                output.push_str(&format!(
+                    "Average Fee/Tx: {} sats\n",
+                    Self::format_number(summary.avg_fee_per_tx_sats as usize)
+                ));
+                output.push_str(&format!(
+                    "Average Fee/Byte: {:.2} sats\n\n",
+                    summary.avg_fee_per_byte_sats
+                ));
+
+                // Weekly breakdown table
+                output.push_str("WEEKLY BREAKDOWN\n");
+                output.push_str("───────────────────────────────────────────────────────────────────────────────────────────────────\n");
+                output.push_str(&format!(
+                    "{:<12} │ {:>10} │ {:>16} │ {:>14} │ {:>11} │ {:>10}\n",
+                    "Week Start",
+                    "Tx Count",
+                    "Total Fees (BTC)",
+                    "Avg Fee (sats)",
+                    "Script KB",
+                    "sats/byte"
+                ));
+                output.push_str("─────────────┼────────────┼──────────────────┼────────────────┼─────────────┼────────────\n");
+
+                for week in &report.weekly_data {
+                    let script_kb = week.total_script_bytes as f64 / 1024.0;
+                    output.push_str(&format!(
+                        "{:<12} │ {:>10} │ {:>16} │ {:>14} │ {:>10.2} │ {:>10.2}\n",
+                        week.week_start_iso,
+                        Self::format_number(week.transaction_count),
+                        format_sats_as_btc(week.total_fees_sats),
+                        Self::format_number(week.avg_fee_sats.round() as usize),
+                        script_kb,
+                        week.avg_fee_per_byte_sats
+                    ));
+                }
+
+                output.push('\n');
+                output.push_str(&format!(
+                    "Total Weeks: {}\n",
+                    Self::format_number(report.total_weeks)
+                ));
+                output.push_str(
+                    "\nNote: Week boundaries are Thursday-to-Wednesday (fixed 7-day buckets).\n",
+                );
+                output.push_str("      For Plotly-compatible JSON output, use --format plotly\n");
+
+                Ok(output)
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Transaction Size Distribution Formatter
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Format transaction size distribution report
+    ///
+    /// Displays transaction size analysis for P2MS transactions with:
+    /// - Global distribution with histogram buckets
+    /// - Per-protocol breakdown with size and fee statistics
+    /// - Percentile analysis for understanding size distributions
+    pub fn format_tx_sizes(
+        report: &TxSizeDistributionReport,
+        format: &OutputFormat,
+    ) -> AppResult<String> {
+        match format {
+            OutputFormat::Json => Self::export_json(report),
+            OutputFormat::Plotly => {
+                let chart = report.to_plotly_chart();
+                Self::export_json(&chart)
+            }
+            OutputFormat::Console => {
+                let mut output = String::new();
+                let global = &report.global_distribution;
+
+                // Header
+                output.push_str("\n=== TRANSACTION SIZE DISTRIBUTION ===\n\n");
+
+                // Global distribution
+                output.push_str(&format!(
+                    "GLOBAL DISTRIBUTION ({} transactions)\n",
+                    Self::format_number(global.total_transactions)
+                ));
+                output.push_str(&format!(
+                    "Excluded: {} transactions (NULL/zero size or NULL fee)\n",
+                    Self::format_number(global.excluded_null_count)
+                ));
+                output.push_str(&format!(
+                    "Total Fees Paid: {}\n",
+                    format_sats_as_btc(global.total_fees_sats)
+                ));
+
+                // Size range
+                if let (Some(min), Some(max)) = (global.min_size_bytes, global.max_size_bytes) {
+                    output.push_str(&format!(
+                        "Size Range: {} - {} bytes\n",
+                        Self::format_number(min as usize),
+                        Self::format_number(max as usize)
+                    ));
+                }
+                output.push_str(&format!(
+                    "Average: {} bytes\n\n",
+                    Self::format_number(global.avg_size_bytes.round() as usize)
+                ));
+
+                // Percentiles
+                if let Some(p) = &global.percentiles {
+                    output.push_str("PERCENTILES:\n");
+                    output.push_str(&format!(
+                        "  25th:  {} bytes\n",
+                        Self::format_number(p.p25 as usize)
+                    ));
+                    output.push_str(&format!(
+                        "  50th:  {} bytes (median)\n",
+                        Self::format_number(p.p50 as usize)
+                    ));
+                    output.push_str(&format!(
+                        "  75th:  {} bytes\n",
+                        Self::format_number(p.p75 as usize)
+                    ));
+                    output.push_str(&format!(
+                        "  90th:  {} bytes\n",
+                        Self::format_number(p.p90 as usize)
+                    ));
+                    output.push_str(&format!(
+                        "  95th:  {} bytes\n",
+                        Self::format_number(p.p95 as usize)
+                    ));
+                    output.push_str(&format!(
+                        "  99th:  {} bytes\n\n",
+                        Self::format_number(p.p99 as usize)
+                    ));
+                }
+
+                // Bucket distribution
+                output.push_str("BUCKET DISTRIBUTION:\n");
+                output.push_str(&format!(
+                    "  {:<22} │ {:>12} │ {:>7} │ {:>14} │\n",
+                    "Range (bytes)", "Transactions", "%", "Total Fees"
+                ));
+                output.push_str(
+                    "  ───────────────────────┼──────────────┼─────────┼────────────────┤\n",
+                );
+
+                for (i, bucket) in global.buckets.iter().enumerate() {
+                    // Use stored percentage computed during analysis
+                    let pct = bucket.pct_count;
+
+                    // Format range - last bucket shows "100,000+" instead of max u32
+                    let is_last = i == TX_SIZE_BUCKET_RANGES.len() - 1;
+                    let range_str = if is_last {
+                        format!("{}+", Self::format_number(bucket.range_min as usize))
+                    } else {
+                        format!(
+                            "{} - {}",
+                            Self::format_number(bucket.range_min as usize),
+                            Self::format_number(bucket.range_max as usize)
+                        )
+                    };
+
+                    output.push_str(&format!(
+                        "  {:<22} │ {:>12} │ {:>6.1}% │ {:>14} │\n",
+                        range_str,
+                        Self::format_number(bucket.count),
+                        pct,
+                        format_sats_as_btc(bucket.value)
+                    ));
+                }
+                output.push('\n');
+
+                // Per-protocol breakdown
+                if !report.protocol_distributions.is_empty() {
+                    output.push_str("=== PER-PROTOCOL BREAKDOWN ===\n");
+                    output.push_str(
+                        "(NOTE: Fees may double-count transactions with multiple protocols)\n",
+                    );
+                    output.push_str("(Excluded rows: NULL/zero size or NULL fee, per-protocol counts shown)\n\n");
+                    output.push_str(&format!(
+                        "{:<28} │ {:>12} │ {:>10} │ {:>10} │ {:>12} │\n",
+                        "Protocol", "Transactions", "Excluded", "Avg Size", "Avg Fee/Byte"
+                    ));
+                    output.push_str("─────────────────────────────┼──────────────┼────────────┼────────────┼──────────────┤\n");
+
+                    for dist in &report.protocol_distributions {
+                        output.push_str(&format!(
+                            "{:<28} │ {:>12} │ {:>10} │ {:>8} B │ {:>10.1} sat/B │\n",
+                            Self::format_protocol_name(&dist.protocol.to_string()),
+                            Self::format_number(dist.total_transactions),
+                            Self::format_number(dist.excluded_null_count),
+                            Self::format_number(dist.avg_size_bytes.round() as usize),
+                            dist.avg_fee_per_byte
+                        ));
+                    }
+                    output.push('\n');
                 }
 
                 Ok(output)

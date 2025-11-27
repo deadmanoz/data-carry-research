@@ -90,7 +90,6 @@ impl FeeAnalysisEngine {
         Ok(StorageCostAnalysis {
             total_p2ms_data_bytes: total_p2ms_data_bytes as usize,
             average_cost_per_byte,
-            cost_distribution: Vec::new(), // Can be extended later with bucketed analysis
         })
     }
 }

@@ -139,8 +139,18 @@ impl ValueAnalysisEngine {
             )
             .collect();
 
-        // Sort by output count descending (most prevalent protocols first)
-        protocol_value_breakdown.sort_by(|a, b| b.output_count.cmp(&a.output_count));
+        // Sort by canonical ProtocolType enum order for consistent JSON output
+        protocol_value_breakdown.sort_by(|a, b| {
+            use crate::types::ProtocolType;
+            use std::str::FromStr;
+            let a_order = ProtocolType::from_str(&a.protocol)
+                .map(|p| p as u8)
+                .unwrap_or(u8::MAX);
+            let b_order = ProtocolType::from_str(&b.protocol)
+                .map(|p| p as u8)
+                .unwrap_or(u8::MAX);
+            a_order.cmp(&b_order)
+        });
 
         // Calculate overall statistics
         let overall_statistics = OverallValueStats {
@@ -494,26 +504,14 @@ impl ValueAnalysisEngine {
             let count = count as usize;
             let bucket_total_value = bucket_total_value as u64;
 
-            let percentage_of_outputs = if total_outputs > 0 {
-                (count as f64 / total_outputs as f64) * 100.0
-            } else {
-                0.0
-            };
-
-            let percentage_of_value = if total_value > 0 {
-                (bucket_total_value as f64 / total_value as f64) * 100.0
-            } else {
-                0.0
-            };
-
-            buckets.push(ValueBucket {
-                range_min: *range_min,
-                range_max: *range_max,
+            buckets.push(ValueBucket::new(
+                *range_min,
+                *range_max,
                 count,
-                total_value: bucket_total_value,
-                percentage_of_outputs,
-                percentage_of_value,
-            });
+                bucket_total_value,
+                total_outputs,
+                total_value,
+            ));
         }
 
         Ok(buckets)
@@ -592,7 +590,7 @@ mod tests {
             .expect("Should have 1B+ bucket");
 
         assert_eq!(large_bucket.count, 1, "Large value should be in top bucket");
-        assert_eq!(large_bucket.total_value, 1_000_000_000);
+        assert_eq!(large_bucket.value, 1_000_000_000);
     }
 
     #[test]
@@ -755,7 +753,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(target_bucket.count, 100);
-        assert_eq!(target_bucket.percentage_of_outputs, 100.0);
+        assert_eq!(target_bucket.pct_count, 100.0);
 
         // All other buckets should be empty
         let non_empty_buckets = report

@@ -228,8 +228,18 @@ impl SpendabilityStatsAnalyser {
             })
             .collect();
 
-        // Sort by total outputs descending
-        protocol_stats.sort_by(|a, b| b.total_outputs.cmp(&a.total_outputs));
+        // Sort by canonical ProtocolType enum order for consistent JSON output
+        protocol_stats.sort_by(|a, b| {
+            use crate::types::ProtocolType;
+            use std::str::FromStr;
+            let a_order = ProtocolType::from_str(&a.protocol)
+                .map(|p| p as u8)
+                .unwrap_or(u8::MAX);
+            let b_order = ProtocolType::from_str(&b.protocol)
+                .map(|p| p as u8)
+                .unwrap_or(u8::MAX);
+            a_order.cmp(&b_order)
+        });
 
         Ok(protocol_stats)
     }

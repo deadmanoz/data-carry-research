@@ -9,6 +9,7 @@ use super::types::{CategoryBreakdown, CategoryTotals, ExtensionStats, FileExtens
 use crate::database::Database;
 use crate::errors::{AppError, AppResult};
 use crate::types::content_detection::ContentType;
+use crate::utils::math::{safe_percentage, safe_percentage_u64};
 use std::collections::BTreeMap;
 
 /// Analyser responsible for computing file extension statistics.
@@ -124,12 +125,12 @@ fn build_report(raw: Vec<ExtensionAggregate>) -> AppResult<FileExtensionReport> 
                         transaction_count: entry.transaction_count,
                         output_count: entry.output_count,
                         total_bytes: entry.total_bytes,
-                        transaction_percentage: percentage(
+                        transaction_percentage: safe_percentage(
                             entry.transaction_count,
                             total_transactions,
                         ),
-                        output_percentage: percentage(entry.output_count, total_outputs),
-                        byte_percentage: percentage_u64(entry.total_bytes, total_bytes),
+                        output_percentage: safe_percentage(entry.output_count, total_outputs),
+                        byte_percentage: safe_percentage_u64(entry.total_bytes, total_bytes),
                     }
                 })
                 .collect();
@@ -141,12 +142,12 @@ fn build_report(raw: Vec<ExtensionAggregate>) -> AppResult<FileExtensionReport> 
                     transaction_count: category_transaction_count,
                     output_count: category_output_count,
                     total_bytes: category_total_bytes,
-                    transaction_percentage: percentage(
+                    transaction_percentage: safe_percentage(
                         category_transaction_count,
                         total_transactions,
                     ),
-                    output_percentage: percentage(category_output_count, total_outputs),
-                    byte_percentage: percentage_u64(category_total_bytes, total_bytes),
+                    output_percentage: safe_percentage(category_output_count, total_outputs),
+                    byte_percentage: safe_percentage_u64(category_total_bytes, total_bytes),
                 },
             }
         })
@@ -165,22 +166,6 @@ fn build_report(raw: Vec<ExtensionAggregate>) -> AppResult<FileExtensionReport> 
         total_bytes,
         categories,
     })
-}
-
-fn percentage(count: usize, total: usize) -> f64 {
-    if total == 0 {
-        0.0
-    } else {
-        (count as f64 * 100.0) / total as f64
-    }
-}
-
-fn percentage_u64(count: u64, total: u64) -> f64 {
-    if total == 0 {
-        0.0
-    } else {
-        (count as f64 * 100.0) / total as f64
-    }
 }
 
 #[derive(Debug, Clone)]

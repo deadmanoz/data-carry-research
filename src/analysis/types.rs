@@ -5,6 +5,8 @@
 
 use crate::analysis::stamps_signature_stats::StampsSignatureAnalysis;
 use crate::analysis::stamps_transport_stats::StampsTransportAnalysis;
+use crate::types::ProtocolType;
+use crate::utils::math::{safe_percentage, safe_percentage_u64};
 use serde::{Deserialize, Serialize};
 
 /// Comprehensive burn pattern analysis results
@@ -57,15 +59,6 @@ pub struct FeeStatistics {
 pub struct StorageCostAnalysis {
     pub total_p2ms_data_bytes: usize,
     pub average_cost_per_byte: f64,
-    pub cost_distribution: Vec<CostBucket>,
-}
-
-/// Cost bucket for fee distribution analysis
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct CostBucket {
-    pub range_min: f64,
-    pub range_max: f64,
-    pub transaction_count: usize,
 }
 
 /// Protocol classification statistics report
@@ -435,16 +428,84 @@ pub struct OverallDataSummary {
     pub spendable_percentage: f64,
 }
 
-/// Value distribution histogram bucket
+// ═══════════════════════════════════════════════════════════════════════════
+// Generic Distribution Bucket
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Generic histogram bucket for distribution analysis
+///
+/// Bucket semantics: [range_min, range_max) - inclusive min, exclusive max.
+/// Last bucket is open-ended: [range_min, ∞) when range_max == T::MAX.
+///
+/// The `value` field always represents satoshis:
+/// - For ValueBucket: total output value in satoshis
+/// - For TxSizeBucket: total transaction fees in satoshis
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ValueBucket {
-    pub range_min: u64,             // Minimum value in satoshis
-    pub range_max: u64,             // Maximum value in satoshis
-    pub count: usize,               // Number of outputs in this range
-    pub total_value: u64,           // Total satoshis in this bucket
-    pub percentage_of_outputs: f64, // % of total outputs
-    pub percentage_of_value: f64,   // % of total value
+pub struct DistributionBucket<T: Copy> {
+    /// Lower bound of bucket range (inclusive)
+    pub range_min: T,
+    /// Upper bound of bucket range (exclusive, except last bucket)
+    pub range_max: T,
+    /// Number of items in this bucket
+    pub count: usize,
+    /// Aggregate satoshis (output values for ValueBucket, fees for TxSizeBucket)
+    pub value: u64,
+    /// Percentage of total count
+    pub pct_count: f64,
+    /// Percentage of total value
+    pub pct_value: f64,
 }
+
+impl<T: Copy> DistributionBucket<T> {
+    /// Create a new bucket with computed percentages
+    ///
+    /// Percentages are computed using `safe_percentage*` which returns 0.0
+    /// when totals are zero (no NaN or division-by-zero).
+    pub fn new(
+        range_min: T,
+        range_max: T,
+        count: usize,
+        value: u64,
+        total_count: usize,
+        total_value: u64,
+    ) -> Self {
+        Self {
+            range_min,
+            range_max,
+            count,
+            value,
+            pct_count: safe_percentage(count, total_count),
+            pct_value: safe_percentage_u64(value, total_value),
+        }
+    }
+
+    /// Create a zeroed bucket for streaming aggregation
+    ///
+    /// Use when accumulating counts/values before totals are known.
+    /// Call `compute_percentages()` after aggregation is complete.
+    pub fn new_zeroed(range_min: T, range_max: T) -> Self {
+        Self {
+            range_min,
+            range_max,
+            count: 0,
+            value: 0,
+            pct_count: 0.0,
+            pct_value: 0.0,
+        }
+    }
+
+    /// Compute percentages after streaming aggregation
+    pub fn compute_percentages(&mut self, total_count: usize, total_value: u64) {
+        self.pct_count = safe_percentage(self.count, total_count);
+        self.pct_value = safe_percentage_u64(self.value, total_value);
+    }
+}
+
+/// Type alias for satoshi value distributions (range bounds in satoshis)
+pub type ValueBucket = DistributionBucket<u64>;
+
+/// Type alias for transaction size distributions (range bounds in bytes)
+pub type TxSizeBucket = DistributionBucket<u32>;
 
 /// Protocol-specific value distribution
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -604,8 +665,6 @@ pub struct ValidNoneStats {
 // Dust Threshold Analysis Types
 // ═══════════════════════════════════════════════════════════════════════════
 
-use crate::types::ProtocolType;
-
 /// Sentinel value used to distinguish truly unclassified outputs from classified-as-Unknown
 /// This value cannot collide with any real protocol string in ProtocolType
 pub const UNCLASSIFIED_SENTINEL: &str = "__UNCLASSIFIED_SENTINEL__";
@@ -671,17 +730,37 @@ pub struct GlobalDustStats {
     pub above_dust: DustBucket,
 }
 
-/// Statistics for a dust threshold bucket
+/// Dust threshold bucket (threshold-based, NOT histogram)
+///
+/// **IMPORTANT**: This is NOT a histogram bucket. It represents cumulative
+/// counts below/above fixed thresholds:
+/// - `below_segwit_threshold`: outputs < 294 sats (subset of below_non_segwit)
+/// - `below_non_segwit_threshold`: outputs < 546 sats
+/// - `above_dust`: outputs >= 546 sats
+///
+/// Do NOT treat as ranged buckets - these are cumulative categories.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DustBucket {
     /// Number of outputs in this bucket
-    pub output_count: usize,
+    pub count: usize,
     /// Total value of outputs in this bucket (satoshis)
-    pub total_value_sats: u64,
+    pub value: u64,
     /// Percentage of total outputs in this bucket
-    pub percentage_of_outputs: f64,
+    pub pct_count: f64,
     /// Percentage of total value in this bucket
-    pub percentage_of_value: f64,
+    pub pct_value: f64,
+}
+
+impl DustBucket {
+    /// Create a new dust bucket with computed percentages
+    pub fn new(count: usize, value: u64, total_count: usize, total_value: u64) -> Self {
+        Self {
+            count,
+            value,
+            pct_count: safe_percentage(count, total_count),
+            pct_value: safe_percentage_u64(value, total_value),
+        }
+    }
 }
 
 /// Per-protocol dust statistics using typed protocol enum
@@ -701,4 +780,160 @@ pub struct ProtocolDustStats {
     pub below_segwit_threshold: DustBucket,
     /// >= 546 sats
     pub above_dust: DustBucket,
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Bitcoin Stamps Weekly Fee Analysis Types
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Weekly fee statistics for Bitcoin Stamps transactions
+///
+/// Aggregates transaction fees at the TRANSACTION level (not output level)
+/// to avoid double-counting fees for multi-output transactions.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct StampsWeeklyFeeReport {
+    /// Number of weeks with data
+    pub total_weeks: usize,
+    /// Total number of distinct Bitcoin Stamps transactions
+    pub total_transactions: usize,
+    /// Sum of all transaction fees in satoshis
+    pub total_fees_sats: u64,
+    /// Per-week breakdown ordered by week_bucket
+    pub weekly_data: Vec<WeeklyStampsFeeStats>,
+    /// Summary statistics across all weeks
+    pub summary: StampsFeeSummary,
+}
+
+/// Statistics for a single week of Bitcoin Stamps transactions
+///
+/// Week boundaries are Thursday-to-Wednesday (Unix epoch started Thursday 1970-01-01).
+/// Each bucket is exactly 604800 seconds (7 days) with no drift.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WeeklyStampsFeeStats {
+    /// Integer bucket number for ordering (timestamp / 604800)
+    pub week_bucket: i64,
+    /// Unix timestamp of week start (for Plotly/programmatic use)
+    pub week_start_ts: i64,
+    /// ISO 8601 date for display (YYYY-MM-DD)
+    pub week_start_iso: String,
+    /// Week end date for display (YYYY-MM-DD)
+    pub week_end_iso: String,
+    /// Number of distinct transactions in this week
+    pub transaction_count: usize,
+    /// Sum of fees in satoshis
+    pub total_fees_sats: u64,
+    /// Average fee per transaction in satoshis
+    pub avg_fee_sats: f64,
+    /// Sum of P2MS script_size bytes
+    pub total_script_bytes: u64,
+    /// Fee efficiency: total_fees / total_script_bytes (0.0 if no script bytes)
+    pub avg_fee_per_byte_sats: f64,
+}
+
+/// Summary statistics for Bitcoin Stamps fee analysis
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StampsFeeSummary {
+    /// First week start date (ISO 8601) or empty string if no data
+    pub date_range_start: String,
+    /// Last week end date (ISO 8601) or empty string if no data
+    pub date_range_end: String,
+    /// Total fees in BTC (presentation convenience)
+    pub total_fees_btc: f64,
+    /// Average fee per transaction across all weeks in satoshis
+    pub avg_fee_per_tx_sats: f64,
+    /// Average fee per byte across all weeks in satoshis
+    pub avg_fee_per_byte_sats: f64,
+}
+
+impl Default for StampsFeeSummary {
+    fn default() -> Self {
+        Self {
+            date_range_start: String::new(),
+            date_range_end: String::new(),
+            total_fees_btc: 0.0,
+            avg_fee_per_tx_sats: 0.0,
+            avg_fee_per_byte_sats: 0.0,
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Transaction Size Distribution Analysis Types
+// ═══════════════════════════════════════════════════════════════════════════
+
+// NOTE: TxSizeBucket is now a type alias for DistributionBucket<u32>
+// defined above with the other distribution bucket types.
+
+/// Transaction size percentiles
+///
+/// Calculated using in-memory sort: `sorted_vec[(n - 1) * p / 100]`
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct TxSizePercentiles {
+    pub p25: u32,
+    /// 50th percentile IS the median
+    pub p50: u32,
+    pub p75: u32,
+    pub p90: u32,
+    pub p95: u32,
+    pub p99: u32,
+}
+
+/// Global transaction size distribution across all P2MS transactions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GlobalTxSizeDistribution {
+    /// Total number of transactions analysed
+    pub total_transactions: usize,
+    /// Sum of all transaction fees (satoshis)
+    pub total_fees_sats: u64,
+    /// Sum of all transaction sizes (bytes) - for average calculation
+    pub total_size_bytes: u64,
+    /// Histogram buckets
+    pub buckets: Vec<TxSizeBucket>,
+    /// Size percentiles (None if empty dataset)
+    pub percentiles: Option<TxSizePercentiles>,
+    /// Minimum transaction size observed (None if empty)
+    pub min_size_bytes: Option<u32>,
+    /// Maximum transaction size observed (None if empty)
+    pub max_size_bytes: Option<u32>,
+    /// Average transaction size (0.0 if empty)
+    pub avg_size_bytes: f64,
+    /// Count of excluded transactions (NULL/zero size or NULL fee)
+    pub excluded_null_count: usize,
+}
+
+/// Protocol-specific transaction size distribution
+///
+/// NOTE ON FEE TOTALS: A transaction classified under multiple protocols
+/// (e.g., both Stamps and Counterparty) will have its fees counted in EACH
+/// protocol's total_fees_sats. This is intentional - it shows the fee cost
+/// associated with transactions containing each protocol. The global
+/// total_fees_sats is the true deduplicated total. Per-protocol fees
+/// should NOT be summed to compare against global total.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProtocolTxSizeDistribution {
+    /// Protocol type (uses enum for type safety)
+    pub protocol: ProtocolType,
+    /// Total number of transactions for this protocol
+    pub total_transactions: usize,
+    /// Sum of fees (may double-count for multi-protocol transactions)
+    pub total_fees_sats: u64,
+    /// Histogram buckets
+    pub buckets: Vec<TxSizeBucket>,
+    /// Size percentiles (None if empty dataset)
+    pub percentiles: Option<TxSizePercentiles>,
+    /// Average transaction size (0.0 if empty)
+    pub avg_size_bytes: f64,
+    /// Average fee per byte (0.0 if total_size_bytes == 0)
+    pub avg_fee_per_byte: f64,
+    /// Count of excluded transactions for this protocol
+    pub excluded_null_count: usize,
+}
+
+/// Comprehensive transaction size distribution report
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TxSizeDistributionReport {
+    /// Global distribution across all P2MS transactions
+    pub global_distribution: GlobalTxSizeDistribution,
+    /// Per-protocol distributions (sorted by canonical ProtocolType order)
+    pub protocol_distributions: Vec<ProtocolTxSizeDistribution>,
 }

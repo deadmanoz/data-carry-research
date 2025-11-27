@@ -164,40 +164,46 @@ fn test_global_dust_analysis_boundaries() -> AppResult<()> {
     let report = DustAnalyser::analyse_dust_thresholds(&db)?;
 
     // Verify global totals
-    assert_eq!(report.global_stats.total_outputs, 7, "Should have 7 total outputs");
+    assert_eq!(
+        report.global_stats.total_outputs, 7,
+        "Should have 7 total outputs"
+    );
     // 0 + 293 + 294 + 545 + 546 + 547 + 1000 = 3225
-    assert_eq!(report.global_stats.total_value_sats, 3225, "Total value should be 3225 sats");
+    assert_eq!(
+        report.global_stats.total_value_sats, 3225,
+        "Total value should be 3225 sats"
+    );
 
     // Below 546 (cumulative): 0, 293, 294, 545 = 4 outputs
     assert_eq!(
-        report.global_stats.below_non_segwit_threshold.output_count, 4,
+        report.global_stats.below_non_segwit_threshold.count, 4,
         "4 outputs below 546 sats"
     );
     // Value: 0 + 293 + 294 + 545 = 1132
     assert_eq!(
-        report.global_stats.below_non_segwit_threshold.total_value_sats, 1132,
+        report.global_stats.below_non_segwit_threshold.value, 1132,
         "Value below 546: 1132 sats"
     );
 
     // Below 294 (subset): 0, 293 = 2 outputs
     assert_eq!(
-        report.global_stats.below_segwit_threshold.output_count, 2,
+        report.global_stats.below_segwit_threshold.count, 2,
         "2 outputs below 294 sats"
     );
     // Value: 0 + 293 = 293
     assert_eq!(
-        report.global_stats.below_segwit_threshold.total_value_sats, 293,
+        report.global_stats.below_segwit_threshold.value, 293,
         "Value below 294: 293 sats"
     );
 
     // Above dust (>= 546): 546, 547, 1000 = 3 outputs
     assert_eq!(
-        report.global_stats.above_dust.output_count, 3,
+        report.global_stats.above_dust.count, 3,
         "3 outputs at or above 546 sats"
     );
     // Value: 546 + 547 + 1000 = 2093
     assert_eq!(
-        report.global_stats.above_dust.total_value_sats, 2093,
+        report.global_stats.above_dust.value, 2093,
         "Value above dust: 2093 sats"
     );
 
@@ -212,7 +218,11 @@ fn test_per_protocol_breakdown() -> AppResult<()> {
     let report = DustAnalyser::analyse_dust_thresholds(&db)?;
 
     // Should have 2 protocols
-    assert_eq!(report.protocol_breakdown.len(), 2, "Should have 2 protocols");
+    assert_eq!(
+        report.protocol_breakdown.len(),
+        2,
+        "Should have 2 protocols"
+    );
 
     // Find BitcoinStamps (all below 546)
     let stamps = report
@@ -221,9 +231,12 @@ fn test_per_protocol_breakdown() -> AppResult<()> {
         .find(|p| p.protocol == ProtocolType::BitcoinStamps)
         .expect("Should have BitcoinStamps");
     assert_eq!(stamps.total_outputs, 4, "BitcoinStamps has 4 outputs");
-    assert_eq!(stamps.below_non_segwit_threshold.output_count, 4, "All 4 below 546");
-    assert_eq!(stamps.below_segwit_threshold.output_count, 2, "2 below 294");
-    assert_eq!(stamps.above_dust.output_count, 0, "0 above dust");
+    assert_eq!(
+        stamps.below_non_segwit_threshold.count, 4,
+        "All 4 below 546"
+    );
+    assert_eq!(stamps.below_segwit_threshold.count, 2, "2 below 294");
+    assert_eq!(stamps.above_dust.count, 0, "0 above dust");
 
     // Find Counterparty (all at or above 546)
     let cp = report
@@ -232,9 +245,9 @@ fn test_per_protocol_breakdown() -> AppResult<()> {
         .find(|p| p.protocol == ProtocolType::Counterparty)
         .expect("Should have Counterparty");
     assert_eq!(cp.total_outputs, 3, "Counterparty has 3 outputs");
-    assert_eq!(cp.below_non_segwit_threshold.output_count, 0, "0 below 546");
-    assert_eq!(cp.below_segwit_threshold.output_count, 0, "0 below 294");
-    assert_eq!(cp.above_dust.output_count, 3, "All 3 above dust");
+    assert_eq!(cp.below_non_segwit_threshold.count, 0, "0 below 546");
+    assert_eq!(cp.below_segwit_threshold.count, 0, "0 below 294");
+    assert_eq!(cp.above_dust.count, 3, "All 3 above dust");
 
     Ok(())
 }
@@ -249,8 +262,14 @@ fn test_protocol_ordering() -> AppResult<()> {
     // Protocols should be sorted by canonical ProtocolType enum discriminant order
     // BitcoinStamps comes before Counterparty in the enum
     assert_eq!(report.protocol_breakdown.len(), 2);
-    assert_eq!(report.protocol_breakdown[0].protocol, ProtocolType::BitcoinStamps);
-    assert_eq!(report.protocol_breakdown[1].protocol, ProtocolType::Counterparty);
+    assert_eq!(
+        report.protocol_breakdown[0].protocol,
+        ProtocolType::BitcoinStamps
+    );
+    assert_eq!(
+        report.protocol_breakdown[1].protocol,
+        ProtocolType::Counterparty
+    );
 
     Ok(())
 }
@@ -265,14 +284,17 @@ fn test_empty_database() -> AppResult<()> {
     // All counts should be zero
     assert_eq!(report.global_stats.total_outputs, 0);
     assert_eq!(report.global_stats.total_value_sats, 0);
-    assert_eq!(report.global_stats.below_non_segwit_threshold.output_count, 0);
-    assert_eq!(report.global_stats.below_segwit_threshold.output_count, 0);
-    assert_eq!(report.global_stats.above_dust.output_count, 0);
+    assert_eq!(report.global_stats.below_non_segwit_threshold.count, 0);
+    assert_eq!(report.global_stats.below_segwit_threshold.count, 0);
+    assert_eq!(report.global_stats.above_dust.count, 0);
 
     // All percentages should be 0.0 (not NaN from division by zero)
-    assert_eq!(report.global_stats.below_non_segwit_threshold.percentage_of_outputs, 0.0);
-    assert_eq!(report.global_stats.below_segwit_threshold.percentage_of_outputs, 0.0);
-    assert_eq!(report.global_stats.above_dust.percentage_of_outputs, 0.0);
+    assert_eq!(
+        report.global_stats.below_non_segwit_threshold.pct_count,
+        0.0
+    );
+    assert_eq!(report.global_stats.below_segwit_threshold.pct_count, 0.0);
+    assert_eq!(report.global_stats.above_dust.pct_count, 0.0);
 
     // No protocol breakdown
     assert!(report.protocol_breakdown.is_empty());
@@ -310,8 +332,14 @@ fn test_spent_outputs_excluded() -> AppResult<()> {
     let report = DustAnalyser::analyse_dust_thresholds(&db)?;
 
     // Should only count the unspent output
-    assert_eq!(report.global_stats.total_outputs, 1, "Should only count unspent output");
-    assert_eq!(report.global_stats.total_value_sats, 500, "Should only count unspent value");
+    assert_eq!(
+        report.global_stats.total_outputs, 1,
+        "Should only count unspent output"
+    );
+    assert_eq!(
+        report.global_stats.total_value_sats, 500,
+        "Should only count unspent value"
+    );
 
     Ok(())
 }
@@ -381,12 +409,18 @@ fn test_unclassified_vs_unknown() -> AppResult<()> {
         .protocol_breakdown
         .iter()
         .find(|p| p.protocol == ProtocolType::Unknown);
-    assert!(unknown.is_some(), "Unknown should appear in protocol breakdown");
+    assert!(
+        unknown.is_some(),
+        "Unknown should appear in protocol breakdown"
+    );
     assert_eq!(unknown.unwrap().total_outputs, 1);
 
     // Unclassified should be tracked separately
     assert_eq!(report.unclassified_count, 1, "1 unclassified output");
-    assert_eq!(report.unclassified_value_sats, 600, "Unclassified value: 600 sats");
+    assert_eq!(
+        report.unclassified_value_sats, 600,
+        "Unclassified value: 600 sats"
+    );
 
     // Reconciliation: classified_outputs_total + unclassified_count = global.total_outputs
     assert_eq!(
@@ -406,29 +440,39 @@ fn test_consistency_validation() -> AppResult<()> {
     let report = DustAnalyser::analyse_dust_thresholds(&db)?;
 
     // Count consistency: below_546.count + above_dust.count == total_outputs
-    let bucket_sum = report.global_stats.below_non_segwit_threshold.output_count
-        + report.global_stats.above_dust.output_count;
-    assert_eq!(bucket_sum, report.global_stats.total_outputs, "Bucket counts should sum to total");
+    let bucket_sum =
+        report.global_stats.below_non_segwit_threshold.count + report.global_stats.above_dust.count;
+    assert_eq!(
+        bucket_sum, report.global_stats.total_outputs,
+        "Bucket counts should sum to total"
+    );
 
     // Value consistency: below_546.value + above_dust.value == total_value_sats
-    let value_sum = report.global_stats.below_non_segwit_threshold.total_value_sats
-        + report.global_stats.above_dust.total_value_sats;
-    assert_eq!(value_sum, report.global_stats.total_value_sats, "Bucket values should sum to total");
+    let value_sum =
+        report.global_stats.below_non_segwit_threshold.value + report.global_stats.above_dust.value;
+    assert_eq!(
+        value_sum, report.global_stats.total_value_sats,
+        "Bucket values should sum to total"
+    );
 
     // Subset consistency: below_294 <= below_546
     assert!(
-        report.global_stats.below_segwit_threshold.output_count
-            <= report.global_stats.below_non_segwit_threshold.output_count,
+        report.global_stats.below_segwit_threshold.count
+            <= report.global_stats.below_non_segwit_threshold.count,
         "Below 294 should be subset of below 546"
     );
     assert!(
-        report.global_stats.below_segwit_threshold.total_value_sats
-            <= report.global_stats.below_non_segwit_threshold.total_value_sats,
+        report.global_stats.below_segwit_threshold.value
+            <= report.global_stats.below_non_segwit_threshold.value,
         "Below 294 value should be subset of below 546 value"
     );
 
     // Protocol reconciliation
-    let protocol_total: usize = report.protocol_breakdown.iter().map(|p| p.total_outputs).sum();
+    let protocol_total: usize = report
+        .protocol_breakdown
+        .iter()
+        .map(|p| p.total_outputs)
+        .sum();
     assert_eq!(
         protocol_total + report.unclassified_count,
         report.global_stats.total_outputs,
@@ -447,7 +491,7 @@ fn test_percentage_calculations() -> AppResult<()> {
 
     // 4 out of 7 outputs below 546 = ~57.14%
     let expected_below_546_pct = (4.0 / 7.0) * 100.0;
-    let actual = report.global_stats.below_non_segwit_threshold.percentage_of_outputs;
+    let actual = report.global_stats.below_non_segwit_threshold.pct_count;
     assert!(
         (actual - expected_below_546_pct).abs() < 0.01,
         "Below 546 percentage: expected {:.2}, got {:.2}",
@@ -457,7 +501,7 @@ fn test_percentage_calculations() -> AppResult<()> {
 
     // 2 out of 7 outputs below 294 = ~28.57%
     let expected_below_294_pct = (2.0 / 7.0) * 100.0;
-    let actual = report.global_stats.below_segwit_threshold.percentage_of_outputs;
+    let actual = report.global_stats.below_segwit_threshold.pct_count;
     assert!(
         (actual - expected_below_294_pct).abs() < 0.01,
         "Below 294 percentage: expected {:.2}, got {:.2}",
@@ -467,7 +511,7 @@ fn test_percentage_calculations() -> AppResult<()> {
 
     // 3 out of 7 outputs above dust = ~42.86%
     let expected_above_pct = (3.0 / 7.0) * 100.0;
-    let actual = report.global_stats.above_dust.percentage_of_outputs;
+    let actual = report.global_stats.above_dust.pct_count;
     assert!(
         (actual - expected_above_pct).abs() < 0.01,
         "Above dust percentage: expected {:.2}, got {:.2}",
@@ -476,8 +520,8 @@ fn test_percentage_calculations() -> AppResult<()> {
     );
 
     // Percentages should sum to ~100%
-    let pct_sum = report.global_stats.below_non_segwit_threshold.percentage_of_outputs
-        + report.global_stats.above_dust.percentage_of_outputs;
+    let pct_sum = report.global_stats.below_non_segwit_threshold.pct_count
+        + report.global_stats.above_dust.pct_count;
     assert!(
         (pct_sum - 100.0).abs() < 0.01,
         "Output percentages should sum to 100%, got {:.2}",
@@ -536,10 +580,10 @@ fn test_all_outputs_in_one_bucket() -> AppResult<()> {
     let report = DustAnalyser::analyse_dust_thresholds(&db)?;
 
     assert_eq!(report.global_stats.total_outputs, 5);
-    assert_eq!(report.global_stats.below_non_segwit_threshold.output_count, 0);
-    assert_eq!(report.global_stats.below_segwit_threshold.output_count, 0);
-    assert_eq!(report.global_stats.above_dust.output_count, 5);
-    assert_eq!(report.global_stats.above_dust.percentage_of_outputs, 100.0);
+    assert_eq!(report.global_stats.below_non_segwit_threshold.count, 0);
+    assert_eq!(report.global_stats.below_segwit_threshold.count, 0);
+    assert_eq!(report.global_stats.above_dust.count, 5);
+    assert_eq!(report.global_stats.above_dust.pct_count, 100.0);
 
     Ok(())
 }
@@ -578,8 +622,14 @@ fn test_non_multisig_outputs_excluded() -> AppResult<()> {
     let report = DustAnalyser::analyse_dust_thresholds(&db)?;
 
     // Should only count the multisig output
-    assert_eq!(report.global_stats.total_outputs, 1, "Should only count multisig output");
-    assert_eq!(report.global_stats.total_value_sats, 500, "Should only count multisig value");
+    assert_eq!(
+        report.global_stats.total_outputs, 1,
+        "Should only count multisig output"
+    );
+    assert_eq!(
+        report.global_stats.total_value_sats, 500,
+        "Should only count multisig value"
+    );
 
     Ok(())
 }
