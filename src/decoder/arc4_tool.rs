@@ -18,6 +18,7 @@ use crate::processor::stage3::counterparty::CounterpartyClassifier;
 use crate::rpc::BitcoinRpcClient;
 use crate::types::counterparty::COUNTERPARTY_PREFIX;
 use crate::types::stamps::validation::{self, StampsProcessingResult};
+use crate::types::stamps::StampsTransport;
 use crate::types::{Stage3Config, Tier2PatternsConfig, TransactionOutput};
 use anyhow::{Context, Result};
 
@@ -72,16 +73,6 @@ pub struct RawArc4 {
 
     /// Decrypted data after simple ARC4
     pub decrypted: Vec<u8>,
-}
-
-/// Bitcoin Stamps transport mechanism
-#[derive(Debug)]
-pub enum StampsTransport {
-    /// Pure Bitcoin Stamps (no Counterparty envelope)
-    Pure,
-
-    /// Stamps embedded in Counterparty transaction
-    CounterpartyEmbedded,
 }
 
 /// Perform ARC4 deobfuscation analysis on a transaction
@@ -221,7 +212,7 @@ fn try_stamps_path(p2ms_outputs: &[TransactionOutput], arc4_key: &[u8]) -> Optio
         .windows(COUNTERPARTY_PREFIX.len())
         .any(|w| w == COUNTERPARTY_PREFIX)
     {
-        StampsTransport::CounterpartyEmbedded
+        StampsTransport::Counterparty
     } else {
         StampsTransport::Pure
     };

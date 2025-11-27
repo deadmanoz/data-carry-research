@@ -1201,9 +1201,8 @@ fn print_arc4_text(result: &crate::decoder::arc4_tool::Arc4Result, show_raw: boo
         println!(
             "  ✓ Success ({:?})",
             match stamps.transport {
-                crate::decoder::arc4_tool::StampsTransport::Pure => "Pure",
-                crate::decoder::arc4_tool::StampsTransport::CounterpartyEmbedded =>
-                    "Counterparty-embedded",
+                crate::types::stamps::StampsTransport::Pure => "Pure",
+                crate::types::stamps::StampsTransport::Counterparty => "Counterparty",
             }
         );
         println!(
@@ -1284,8 +1283,8 @@ fn print_arc4_json(result: &crate::decoder::arc4_tool::Arc4Result) {
                 "decrypted": hex::encode(&stamps.decrypted),
                 "signature_offset": stamps.signature_offset,
                 "transport": match stamps.transport {
-                    crate::decoder::arc4_tool::StampsTransport::Pure => "pure",
-                    crate::decoder::arc4_tool::StampsTransport::CounterpartyEmbedded => "counterparty_embedded",
+                    crate::types::stamps::StampsTransport::Pure => "pure",
+                    crate::types::stamps::StampsTransport::Counterparty => "counterparty",
                 },
             })
         }),

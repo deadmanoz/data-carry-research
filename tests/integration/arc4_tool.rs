@@ -7,6 +7,7 @@
 /// Tests will be skipped if RPC is not available.
 use crate::common::rpc_helpers::create_test_rpc_client;
 use data_carry_research::decoder::arc4_tool;
+use data_carry_research::types::stamps::StampsTransport;
 
 /// Test ARC4 deobfuscation on a known Counterparty transaction
 #[tokio::test]
@@ -107,11 +108,11 @@ async fn test_arc4_bitcoin_stamps() {
 
     // Verify transport type
     match stamps.transport {
-        arc4_tool::StampsTransport::Pure => {
+        StampsTransport::Pure => {
             println!("✅ Bitcoin Stamps (Pure) ARC4 test passed");
         }
-        arc4_tool::StampsTransport::CounterpartyEmbedded => {
-            println!("✅ Bitcoin Stamps (Counterparty-embedded) ARC4 test passed");
+        StampsTransport::Counterparty => {
+            println!("✅ Bitcoin Stamps (Counterparty) ARC4 test passed");
         }
     }
 
@@ -155,11 +156,8 @@ async fn test_arc4_counterparty_embedded_stamps() {
 
     let stamps = result.stamps.unwrap();
 
-    // Verify it's recognised as Counterparty-embedded
-    matches!(
-        stamps.transport,
-        arc4_tool::StampsTransport::CounterpartyEmbedded
-    );
+    // Verify it's recognised as Counterparty transport
+    matches!(stamps.transport, StampsTransport::Counterparty);
 
     // Verify both signatures present (case-insensitive for stamp)
     let cntrprty_prefix = b"CNTRPRTY";
