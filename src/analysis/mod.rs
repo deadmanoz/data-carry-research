@@ -45,6 +45,7 @@ pub mod fee_analyser;
 pub mod fee_analysis;
 pub mod file_extension_stats;
 pub mod multisig_config_stats;
+pub mod plotly_types;
 pub mod protocol_stats;
 pub mod pubkey_validator;
 pub mod reports;
@@ -52,6 +53,8 @@ pub mod signature_analysis;
 pub mod spendability_stats;
 pub mod stamps_signature_stats;
 pub mod stamps_transport_stats;
+pub mod stamps_weekly_fee_analysis;
+pub mod tx_size_analysis;
 pub mod types;
 pub mod value_analysis;
 
@@ -65,6 +68,7 @@ pub use fee_analyser::FeeAnalyser;
 pub use fee_analysis::FeeAnalysisEngine;
 pub use file_extension_stats::FileExtensionAnalyser;
 pub use multisig_config_stats::MultisigConfigAnalyser;
+pub use plotly_types::PlotlyChart;
 pub use protocol_stats::ProtocolStatsAnalyser;
 pub use pubkey_validator::{
     aggregate_validation_for_outputs, validate_from_metadata, validate_pubkeys,
@@ -75,15 +79,19 @@ pub use signature_analysis::SignatureAnalyser;
 pub use spendability_stats::SpendabilityStatsAnalyser;
 pub use stamps_signature_stats::{StampsSignatureAnalyser, StampsSignatureAnalysis};
 pub use stamps_transport_stats::{StampsTransportAnalyser, StampsTransportAnalysis};
+pub use stamps_weekly_fee_analysis::StampsWeeklyFeeAnalyser;
+pub use tx_size_analysis::TxSizeAnalyser;
 pub use types::{
     BurnPatternAnalysis, ClassificationStatsReport, ComprehensiveDataSizeReport,
     ContentTypeAnalysisReport, ContentTypeCategoryStats, ContentTypeProtocolStats,
-    ContentTypeSpendabilityReport, ContentTypeStats, DustAnalysisReport, DustBucket,
-    DustThresholds, FeeAnalysisReport, FileExtensionReport, FullAnalysisReport,
-    GlobalDustStats, GlobalValueDistribution, MultisigConfigReport, MultisigConfiguration,
-    ProtocolDataSizeReport, ProtocolDustStats, ProtocolValueDistribution, SignatureAnalysisReport,
-    SpendabilityDataSizeReport, SpendabilityStatsReport, ValidNoneStats, ValueAnalysisReport,
-    ValueBucket, ValueDistributionReport, ValuePercentiles, UNCLASSIFIED_SENTINEL,
+    ContentTypeSpendabilityReport, ContentTypeStats, DistributionBucket, DustAnalysisReport,
+    DustBucket, DustThresholds, FeeAnalysisReport, FileExtensionReport, FullAnalysisReport,
+    GlobalDustStats, GlobalTxSizeDistribution, GlobalValueDistribution, MultisigConfigReport,
+    MultisigConfiguration, ProtocolDataSizeReport, ProtocolDustStats, ProtocolTxSizeDistribution,
+    ProtocolValueDistribution, SignatureAnalysisReport, SpendabilityDataSizeReport,
+    SpendabilityStatsReport, StampsFeeSummary, StampsWeeklyFeeReport, TxSizeBucket,
+    TxSizeDistributionReport, TxSizePercentiles, ValidNoneStats, ValueAnalysisReport, ValueBucket,
+    ValueDistributionReport, ValuePercentiles, WeeklyStampsFeeStats, UNCLASSIFIED_SENTINEL,
 };
 pub use value_analysis::ValueAnalysisEngine;
 
@@ -363,6 +371,44 @@ impl AnalysisEngine {
     /// * `AppResult<DustAnalysisReport>` - Comprehensive dust threshold analysis
     pub fn analyse_dust_thresholds(&self) -> AppResult<DustAnalysisReport> {
         DustAnalyser::analyse_dust_thresholds(&self.database)
+    }
+
+    /// Analyse Bitcoin Stamps transaction fees aggregated by week
+    ///
+    /// Provides temporal fee analysis for Bitcoin Stamps transactions including:
+    /// - Weekly aggregation with fixed 7-day buckets (Thursday-to-Wednesday)
+    /// - Transaction-level de-duplication (fees counted once per tx, not per output)
+    /// - Fee efficiency metrics (sats/byte based on script_size)
+    /// - Plotly-compatible output format for visualisation
+    ///
+    /// **Key Design Decisions**:
+    /// - Transaction-level aggregation avoids double-counting for multi-output transactions
+    /// - Week bucketing via `(timestamp / 604800)` - no drift, fixed 7-day buckets
+    /// - No is_spent filter on script bytes (fee paid regardless of spend status)
+    ///
+    /// # Returns
+    /// * `AppResult<StampsWeeklyFeeReport>` - Weekly fee statistics with Plotly support
+    pub fn analyse_stamps_weekly_fees(&self) -> AppResult<StampsWeeklyFeeReport> {
+        StampsWeeklyFeeAnalyser::analyse_weekly_fees(&self.database)
+    }
+
+    /// Analyse transaction size distribution across all P2MS transactions
+    ///
+    /// Provides comprehensive size distribution analysis to explain fee patterns:
+    /// - Global distribution across all P2MS transactions
+    /// - Per-protocol distributions (sorted by canonical ProtocolType order)
+    /// - Histogram buckets for visual analysis
+    /// - Percentiles (p25, p50, p75, p90, p95, p99)
+    ///
+    /// **Key Design Decisions**:
+    /// - Transaction-level analysis (not output level)
+    /// - Excludes transactions with NULL/zero size or NULL fee
+    /// - Fee double-counting for multi-protocol transactions is documented
+    ///
+    /// # Returns
+    /// * `AppResult<TxSizeDistributionReport>` - Comprehensive size distribution
+    pub fn analyse_tx_sizes(&self) -> AppResult<TxSizeDistributionReport> {
+        TxSizeAnalyser::analyse_tx_sizes(&self.database)
     }
 
     /// Generate a comprehensive analysis report including all analysis types

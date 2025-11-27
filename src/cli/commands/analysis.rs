@@ -215,6 +215,53 @@ pub enum AnalysisCommands {
         #[arg(long, default_value = "console")]
         format: String,
     },
+
+    /// Analyse transaction size distribution for P2MS transactions
+    ///
+    /// Provides histogram distribution of transaction sizes (bytes) with:
+    /// - Global distribution across all P2MS transactions
+    /// - Per-protocol breakdown sorted by canonical protocol order
+    /// - Percentiles (p25, p50, p75, p90, p95, p99)
+    /// - Fee statistics per size bucket
+    ///
+    /// Uses enriched_transactions table; requires Stage 2 completion.
+    TxSizes {
+        /// Database path (overrides config.toml)
+        #[arg(long)]
+        database_path: Option<PathBuf>,
+
+        /// Output format (console, json, or plotly)
+        #[arg(long, default_value = "console")]
+        format: String,
+
+        /// Output file path
+        #[arg(long, short = 'o')]
+        output: Option<PathBuf>,
+    },
+
+    /// Analyse Bitcoin Stamps transaction fees aggregated by week
+    ///
+    /// Produces temporal fee analysis for Bitcoin Stamps transactions with weekly
+    /// aggregation. Output formats:
+    /// - console: Human-readable table with BTC values
+    /// - json: Raw structured data with satoshi values
+    /// - plotly: Plotly-native trace format for web visualisation
+    ///
+    /// Week boundaries are Thursday-to-Wednesday (fixed 7-day buckets).
+    /// Fees are counted per transaction (not per output) to avoid double-counting.
+    StampsWeeklyFees {
+        /// Database path (overrides config.toml)
+        #[arg(long)]
+        database_path: Option<PathBuf>,
+
+        /// Output format (console, json, or plotly)
+        #[arg(long, default_value = "console")]
+        format: String,
+
+        /// Output file path
+        #[arg(long, short = 'o')]
+        output: Option<PathBuf>,
+    },
 }
 
 pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
@@ -622,9 +669,85 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
             let db_path = get_db_path(database_path)?;
             let engine = AnalysisEngine::new(&db_path)?;
             let analysis = engine.analyse_dust_thresholds()?;
-            let output =
-                ReportFormatter::format_dust_analysis(&analysis, &parse_format(format))?;
+            let output = ReportFormatter::format_dust_analysis(&analysis, &parse_format(format))?;
             print!("{}", output);
+            Ok(())
+        }
+
+        AnalysisCommands::TxSizes {
+            database_path,
+            format,
+            output,
+        } => {
+            let db_path = get_db_path(database_path)?;
+            let engine = AnalysisEngine::new(&db_path)?;
+            let analysis = engine.analyse_tx_sizes()?;
+            let formatted_output =
+                ReportFormatter::format_tx_sizes(&analysis, &parse_format(format))?;
+
+            // Default output path for JSON/Plotly formats
+            let default_output_path = std::path::PathBuf::from("./output_data/plots/tx_sizes.json");
+
+            if let Some(output_path) = output {
+                std::fs::write(output_path, &formatted_output)?;
+                println!(
+                    "Transaction size analysis written to: {}",
+                    output_path.display()
+                );
+            } else if matches!(
+                parse_format(format),
+                OutputFormat::Json | OutputFormat::Plotly
+            ) {
+                // Auto-write JSON/Plotly output to default path
+                std::fs::create_dir_all(default_output_path.parent().unwrap())?;
+                std::fs::write(&default_output_path, &formatted_output)?;
+                println!(
+                    "Transaction size analysis written to: {}",
+                    default_output_path.display()
+                );
+            } else {
+                // Console format: print to stdout
+                print!("{}", formatted_output);
+            }
+            Ok(())
+        }
+
+        AnalysisCommands::StampsWeeklyFees {
+            database_path,
+            format,
+            output,
+        } => {
+            let db_path = get_db_path(database_path)?;
+            let engine = AnalysisEngine::new(&db_path)?;
+            let analysis = engine.analyse_stamps_weekly_fees()?;
+            let formatted_output =
+                ReportFormatter::format_stamps_weekly_fees(&analysis, &parse_format(format))?;
+
+            // Default output path for JSON/Plotly formats
+            let default_output_path =
+                std::path::PathBuf::from("./output_data/plots/stamps_weekly_fees.json");
+
+            if let Some(output_path) = output {
+                std::fs::write(output_path, formatted_output)?;
+                println!(
+                    "Stamps weekly fee analysis written to: {}",
+                    output_path.display()
+                );
+            } else if matches!(
+                parse_format(format),
+                OutputFormat::Json | OutputFormat::Plotly
+            ) {
+                // Auto-write JSON/Plotly output to default path
+                std::fs::create_dir_all(default_output_path.parent().unwrap())?;
+                std::fs::write(&default_output_path, formatted_output)?;
+                println!(
+                    "Stamps weekly fee analysis written to: {}",
+                    default_output_path.display()
+                );
+            } else {
+                // Console format: print to stdout
+                print!("{}", formatted_output);
+            }
             Ok(())
         }
     }
