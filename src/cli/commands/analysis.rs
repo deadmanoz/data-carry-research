@@ -3,6 +3,100 @@ use crate::errors::{AppError, AppResult};
 use clap::{Args, Subcommand};
 use std::path::PathBuf;
 
+use crate::analysis::{AnalysisEngine, OutputFormat, ReportFormatter};
+
+// ===== Helper Functions =====
+
+/// Get database path from CLI argument or config file
+fn get_db_path_from_config(
+    cli_path: &Option<PathBuf>,
+    app_config: &Option<AppConfig>,
+) -> AppResult<String> {
+    if let Some(path) = cli_path {
+        Ok(path.to_string_lossy().to_string())
+    } else if let Some(config) = app_config {
+        Ok(config.database.default_path.to_string_lossy().to_string())
+    } else {
+        Err(AppError::Config(
+            "No database path provided. Use --database-path or configure database.default_path in config.toml".to_string()
+        ))
+    }
+}
+
+/// Parse output format string to OutputFormat enum
+fn parse_format(format_str: &str) -> OutputFormat {
+    match format_str.to_lowercase().as_str() {
+        "json" => OutputFormat::Json,
+        "plotly" => OutputFormat::Plotly,
+        _ => OutputFormat::Console,
+    }
+}
+
+/// Write output to file with safe directory creation
+fn write_output_to_file(path: &PathBuf, content: &str, description: &str) -> AppResult<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(path, content)?;
+    println!("{} written to: {}", description, path.display());
+    Ok(())
+}
+
+/// Run a simple analysis command (database_path + format only)
+fn run_simple_analysis<T, F, G>(
+    database_path: &Option<PathBuf>,
+    format: &str,
+    app_config: &Option<AppConfig>,
+    analyse_fn: F,
+    format_fn: G,
+) -> AppResult<()>
+where
+    F: FnOnce(&AnalysisEngine) -> AppResult<T>,
+    G: FnOnce(&T, &OutputFormat) -> AppResult<String>,
+{
+    let db_path = get_db_path_from_config(database_path, app_config)?;
+    let engine = AnalysisEngine::new(&db_path)?;
+    let analysis = analyse_fn(&engine)?;
+    let output = format_fn(&analysis, &parse_format(format))?;
+    print!("{}", output);
+    Ok(())
+}
+
+/// Run an analysis command with file output support
+#[allow(clippy::too_many_arguments)]
+fn run_analysis_with_file_output<T, F, G>(
+    database_path: &Option<PathBuf>,
+    format: &str,
+    output_path: &Option<PathBuf>,
+    default_filename: &str,
+    description: &str,
+    app_config: &Option<AppConfig>,
+    analyse_fn: F,
+    format_fn: G,
+) -> AppResult<()>
+where
+    F: FnOnce(&AnalysisEngine) -> AppResult<T>,
+    G: FnOnce(&T, &OutputFormat) -> AppResult<String>,
+{
+    let db_path = get_db_path_from_config(database_path, app_config)?;
+    let engine = AnalysisEngine::new(&db_path)?;
+    let analysis = analyse_fn(&engine)?;
+    let parsed_format = parse_format(format);
+    let formatted_output = format_fn(&analysis, &parsed_format)?;
+
+    if let Some(path) = output_path {
+        write_output_to_file(path, &formatted_output, description)?;
+    } else if matches!(parsed_format, OutputFormat::Json | OutputFormat::Plotly) {
+        let default_path = PathBuf::from(format!("./output_data/plots/{}", default_filename));
+        write_output_to_file(&default_path, &formatted_output, description)?;
+    } else {
+        print!("{}", formatted_output);
+    }
+    Ok(())
+}
+
+// ===== Command Definitions =====
+
 /// Analysis commands for database statistics and reports
 #[derive(Args)]
 pub struct AnalyseCommand {
@@ -265,172 +359,112 @@ pub enum AnalysisCommands {
 }
 
 pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
-    use crate::analysis::{AnalysisEngine, OutputFormat, ReportFormatter};
-
     // Load configuration for default database path
     let app_config = AppConfig::load().ok();
-
-    // Helper to get database path (CLI arg or config default)
-    let get_db_path = |cli_path: &Option<PathBuf>| -> AppResult<String> {
-        if let Some(path) = cli_path {
-            Ok(path.to_string_lossy().to_string())
-        } else if let Some(config) = &app_config {
-            Ok(config.database.default_path.to_string_lossy().to_string())
-        } else {
-            Err(AppError::Config(
-                "No database path provided. Use --database-path or configure database.default_path in config.toml".to_string()
-            ))
-        }
-    };
-
-    // Helper to parse output format
-    let parse_format = |format_str: &str| -> OutputFormat {
-        match format_str.to_lowercase().as_str() {
-            "json" => OutputFormat::Json,
-            "plotly" => OutputFormat::Plotly,
-            _ => OutputFormat::Console,
-        }
-    };
 
     match analysis_type {
         AnalysisCommands::BurnPatterns {
             database_path,
             format,
-        } => {
-            let db_path = get_db_path(database_path)?;
-            let engine = AnalysisEngine::new(&db_path)?;
-            let analysis = engine.analyse_burn_patterns()?;
-            let output = ReportFormatter::format_burn_patterns(&analysis, &parse_format(format))?;
-            print!("{}", output);
-            Ok(())
-        }
+        } => run_simple_analysis(
+            database_path,
+            format,
+            &app_config,
+            |e| e.analyse_burn_patterns(),
+            ReportFormatter::format_burn_patterns,
+        ),
 
         AnalysisCommands::Fees {
             database_path,
             format,
-        } => {
-            let db_path = get_db_path(database_path)?;
-            let engine = AnalysisEngine::new(&db_path)?;
-            let analysis = engine.analyse_fees()?;
-            let output = ReportFormatter::format_fee_analysis(&analysis, &parse_format(format))?;
-            print!("{}", output);
-            Ok(())
-        }
+        } => run_simple_analysis(
+            database_path,
+            format,
+            &app_config,
+            |e| e.analyse_fees(),
+            ReportFormatter::format_fee_analysis,
+        ),
 
         AnalysisCommands::Value {
             database_path,
             format,
-        } => {
-            let db_path = get_db_path(database_path)?;
-            let engine = AnalysisEngine::new(&db_path)?;
-            let analysis = engine.analyse_value()?;
-            let output = ReportFormatter::format_value_analysis(&analysis, &parse_format(format))?;
-            print!("{}", output);
-            Ok(())
-        }
+        } => run_simple_analysis(
+            database_path,
+            format,
+            &app_config,
+            |e| e.analyse_value(),
+            ReportFormatter::format_value_analysis,
+        ),
 
         AnalysisCommands::ValueDistributions {
             database_path,
             format,
             output,
-        } => {
-            let db_path = get_db_path(database_path)?;
-            let engine = AnalysisEngine::new(&db_path)?;
-            let analysis = engine.analyse_value_distributions()?;
-            let formatted_output =
-                ReportFormatter::format_value_distributions(&analysis, &parse_format(format))?;
-
-            // Default output path for JSON/Plotly formats
-            let default_output_path =
-                std::path::PathBuf::from("./output_data/plots/value_distributions.json");
-
-            if let Some(output_path) = output {
-                std::fs::write(output_path, formatted_output)?;
-                println!(
-                    "Value distribution analysis written to: {}",
-                    output_path.display()
-                );
-            } else if matches!(
-                parse_format(format),
-                OutputFormat::Json | OutputFormat::Plotly
-            ) {
-                // Auto-write JSON/Plotly output to default path
-                std::fs::create_dir_all(default_output_path.parent().unwrap())?;
-                std::fs::write(&default_output_path, formatted_output)?;
-                println!(
-                    "Value distribution analysis written to: {}",
-                    default_output_path.display()
-                );
-            } else {
-                // Console format: print to stdout
-                print!("{}", formatted_output);
-            }
-            Ok(())
-        }
+        } => run_analysis_with_file_output(
+            database_path,
+            format,
+            output,
+            "value_distributions.json",
+            "Value distribution analysis",
+            &app_config,
+            |e| e.analyse_value_distributions(),
+            ReportFormatter::format_value_distributions,
+        ),
 
         AnalysisCommands::Classifications {
             database_path,
             format,
-        } => {
-            let db_path = get_db_path(database_path)?;
-            let engine = AnalysisEngine::new(&db_path)?;
-            let analysis = engine.analyse_classifications()?;
-            let output =
-                ReportFormatter::format_classification_stats(&analysis, &parse_format(format))?;
-            print!("{}", output);
-            Ok(())
-        }
+        } => run_simple_analysis(
+            database_path,
+            format,
+            &app_config,
+            |e| e.analyse_classifications(),
+            ReportFormatter::format_classification_stats,
+        ),
 
         AnalysisCommands::Signatures {
             database_path,
             format,
-        } => {
-            let db_path = get_db_path(database_path)?;
-            let engine = AnalysisEngine::new(&db_path)?;
-            let analysis = engine.analyse_signatures()?;
-            let output =
-                ReportFormatter::format_signature_analysis(&analysis, &parse_format(format))?;
-            print!("{}", output);
-            Ok(())
-        }
+        } => run_simple_analysis(
+            database_path,
+            format,
+            &app_config,
+            |e| e.analyse_signatures(),
+            ReportFormatter::format_signature_analysis,
+        ),
 
         AnalysisCommands::Spendability {
             database_path,
             format,
-        } => {
-            let db_path = get_db_path(database_path)?;
-            let engine = AnalysisEngine::new(&db_path)?;
-            let analysis = engine.analyse_spendability()?;
-            let output =
-                ReportFormatter::format_spendability_report(&analysis, &parse_format(format))?;
-            print!("{}", output);
-            Ok(())
-        }
+        } => run_simple_analysis(
+            database_path,
+            format,
+            &app_config,
+            |e| e.analyse_spendability(),
+            ReportFormatter::format_spendability_report,
+        ),
 
         AnalysisCommands::Full {
             database_path,
             format,
-        } => {
-            let db_path = get_db_path(database_path)?;
-            let engine = AnalysisEngine::new(&db_path)?;
-            let report = engine.generate_full_report()?;
-            let output = ReportFormatter::format_full_report(&report, &parse_format(format))?;
-            print!("{}", output);
-            Ok(())
-        }
+        } => run_simple_analysis(
+            database_path,
+            format,
+            &app_config,
+            |e| e.generate_full_report(),
+            ReportFormatter::format_full_report,
+        ),
 
         AnalysisCommands::StampsSignatures {
             database_path,
             format,
-        } => {
-            let db_path = get_db_path(database_path)?;
-            let engine = AnalysisEngine::new(&db_path)?;
-            let analysis = engine.analyse_stamps_signatures()?;
-            let output =
-                ReportFormatter::format_stamps_signatures(&analysis, &parse_format(format))?;
-            print!("{}", output);
-            Ok(())
-        }
+        } => run_simple_analysis(
+            database_path,
+            format,
+            &app_config,
+            |e| e.analyse_stamps_signatures(),
+            ReportFormatter::format_stamps_signatures,
+        ),
 
         AnalysisCommands::ContentTypes {
             database_path,
@@ -438,7 +472,7 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
             protocol,
             mime_type,
         } => {
-            let db_path = get_db_path(database_path)?;
+            let db_path = get_db_path_from_config(database_path, &app_config)?;
             use crate::analysis::ContentTypeAnalyser;
             use crate::database::Database;
             let db = Database::new_v2(&db_path)?;
@@ -592,163 +626,97 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
         AnalysisCommands::ProtocolDataSizes {
             database_path,
             format,
-        } => {
-            let db_path = get_db_path(database_path)?;
-            let engine = AnalysisEngine::new(&db_path)?;
-            let analysis = engine.analyse_protocol_data_sizes()?;
-            let output = ReportFormatter::format_protocol_data_size_report(
-                &analysis,
-                &parse_format(format),
-            )?;
-            print!("{}", output);
-            Ok(())
-        }
+        } => run_simple_analysis(
+            database_path,
+            format,
+            &app_config,
+            |e| e.analyse_protocol_data_sizes(),
+            ReportFormatter::format_protocol_data_size_report,
+        ),
 
         AnalysisCommands::SpendabilityDataSizes {
             database_path,
             format,
-        } => {
-            let db_path = get_db_path(database_path)?;
-            let engine = AnalysisEngine::new(&db_path)?;
-            let analysis = engine.analyse_spendability_data_sizes()?;
-            let output = ReportFormatter::format_spendability_data_size_report(
-                &analysis,
-                &parse_format(format),
-            )?;
-            print!("{}", output);
-            Ok(())
-        }
+        } => run_simple_analysis(
+            database_path,
+            format,
+            &app_config,
+            |e| e.analyse_spendability_data_sizes(),
+            ReportFormatter::format_spendability_data_size_report,
+        ),
 
         AnalysisCommands::ContentTypeSpendability {
             database_path,
             format,
-        } => {
-            let db_path = get_db_path(database_path)?;
-            let engine = AnalysisEngine::new(&db_path)?;
-            let analysis = engine.analyse_content_type_spendability()?;
-            let output = ReportFormatter::format_content_type_spendability_report(
-                &analysis,
-                &parse_format(format),
-            )?;
-            print!("{}", output);
-            Ok(())
-        }
+        } => run_simple_analysis(
+            database_path,
+            format,
+            &app_config,
+            |e| e.analyse_content_type_spendability(),
+            ReportFormatter::format_content_type_spendability_report,
+        ),
 
         AnalysisCommands::ComprehensiveDataSizes {
             database_path,
             format,
-        } => {
-            let db_path = get_db_path(database_path)?;
-            let engine = AnalysisEngine::new(&db_path)?;
-            let analysis = engine.analyse_comprehensive_data_sizes()?;
-            let output = ReportFormatter::format_comprehensive_data_size_report(
-                &analysis,
-                &parse_format(format),
-            )?;
-            print!("{}", output);
-            Ok(())
-        }
+        } => run_simple_analysis(
+            database_path,
+            format,
+            &app_config,
+            |e| e.analyse_comprehensive_data_sizes(),
+            ReportFormatter::format_comprehensive_data_size_report,
+        ),
 
         AnalysisCommands::MultisigConfigurations {
             database_path,
             format,
-        } => {
-            let db_path = get_db_path(database_path)?;
-            let engine = AnalysisEngine::new(&db_path)?;
-            let analysis = engine.analyse_multisig_configurations()?;
-            let output =
-                ReportFormatter::format_multisig_config_report(&analysis, &parse_format(format))?;
-            print!("{}", output);
-            Ok(())
-        }
+        } => run_simple_analysis(
+            database_path,
+            format,
+            &app_config,
+            |e| e.analyse_multisig_configurations(),
+            ReportFormatter::format_multisig_config_report,
+        ),
 
         AnalysisCommands::DustThresholds {
             database_path,
             format,
-        } => {
-            let db_path = get_db_path(database_path)?;
-            let engine = AnalysisEngine::new(&db_path)?;
-            let analysis = engine.analyse_dust_thresholds()?;
-            let output = ReportFormatter::format_dust_analysis(&analysis, &parse_format(format))?;
-            print!("{}", output);
-            Ok(())
-        }
+        } => run_simple_analysis(
+            database_path,
+            format,
+            &app_config,
+            |e| e.analyse_dust_thresholds(),
+            ReportFormatter::format_dust_analysis,
+        ),
 
         AnalysisCommands::TxSizes {
             database_path,
             format,
             output,
-        } => {
-            let db_path = get_db_path(database_path)?;
-            let engine = AnalysisEngine::new(&db_path)?;
-            let analysis = engine.analyse_tx_sizes()?;
-            let formatted_output =
-                ReportFormatter::format_tx_sizes(&analysis, &parse_format(format))?;
-
-            // Default output path for JSON/Plotly formats
-            let default_output_path = std::path::PathBuf::from("./output_data/plots/tx_sizes.json");
-
-            if let Some(output_path) = output {
-                std::fs::write(output_path, &formatted_output)?;
-                println!(
-                    "Transaction size analysis written to: {}",
-                    output_path.display()
-                );
-            } else if matches!(
-                parse_format(format),
-                OutputFormat::Json | OutputFormat::Plotly
-            ) {
-                // Auto-write JSON/Plotly output to default path
-                std::fs::create_dir_all(default_output_path.parent().unwrap())?;
-                std::fs::write(&default_output_path, &formatted_output)?;
-                println!(
-                    "Transaction size analysis written to: {}",
-                    default_output_path.display()
-                );
-            } else {
-                // Console format: print to stdout
-                print!("{}", formatted_output);
-            }
-            Ok(())
-        }
+        } => run_analysis_with_file_output(
+            database_path,
+            format,
+            output,
+            "tx_sizes.json",
+            "Transaction size analysis",
+            &app_config,
+            |e| e.analyse_tx_sizes(),
+            ReportFormatter::format_tx_sizes,
+        ),
 
         AnalysisCommands::StampsWeeklyFees {
             database_path,
             format,
             output,
-        } => {
-            let db_path = get_db_path(database_path)?;
-            let engine = AnalysisEngine::new(&db_path)?;
-            let analysis = engine.analyse_stamps_weekly_fees()?;
-            let formatted_output =
-                ReportFormatter::format_stamps_weekly_fees(&analysis, &parse_format(format))?;
-
-            // Default output path for JSON/Plotly formats
-            let default_output_path =
-                std::path::PathBuf::from("./output_data/plots/stamps_weekly_fees.json");
-
-            if let Some(output_path) = output {
-                std::fs::write(output_path, formatted_output)?;
-                println!(
-                    "Stamps weekly fee analysis written to: {}",
-                    output_path.display()
-                );
-            } else if matches!(
-                parse_format(format),
-                OutputFormat::Json | OutputFormat::Plotly
-            ) {
-                // Auto-write JSON/Plotly output to default path
-                std::fs::create_dir_all(default_output_path.parent().unwrap())?;
-                std::fs::write(&default_output_path, formatted_output)?;
-                println!(
-                    "Stamps weekly fee analysis written to: {}",
-                    default_output_path.display()
-                );
-            } else {
-                // Console format: print to stdout
-                print!("{}", formatted_output);
-            }
-            Ok(())
-        }
+        } => run_analysis_with_file_output(
+            database_path,
+            format,
+            output,
+            "stamps_weekly_fees.json",
+            "Stamps weekly fee analysis",
+            &app_config,
+            |e| e.analyse_stamps_weekly_fees(),
+            ReportFormatter::format_stamps_weekly_fees,
+        ),
     }
 }
