@@ -177,7 +177,8 @@ pub struct Stage2Stats {
     pub total_p2ms_value: u64,
     pub rpc_calls_made: u64,
     pub rpc_errors_encountered: u64,
-    pub cache_hit_rate: f64, // Updated from RPC client before progress reporting
+    pub block_update_failures: u64, // Track block timestamp/hash RPC failures
+    pub cache_hit_rate: f64,        // Updated from RPC client before progress reporting
     pub timing: TimingInfo,
 }
 
@@ -243,6 +244,7 @@ impl StatisticsCollector for Stage2Stats {
         self.total_p2ms_value = 0;
         self.rpc_calls_made = 0;
         self.rpc_errors_encountered = 0;
+        self.block_update_failures = 0;
         self.timing = TimingInfo::new();
     }
 
@@ -268,7 +270,7 @@ impl StatisticsCollector for Stage2Stats {
     }
 
     fn summary(&self) -> String {
-        format!(
+        let base_summary = format!(
             "Stage 2: {} transactions, {} burn patterns ({:.1}%), {} RPC calls ({:.1}% success), {:.1} tx/sec",
             self.transactions_processed,
             self.burn_patterns_found,
@@ -276,7 +278,17 @@ impl StatisticsCollector for Stage2Stats {
             self.rpc_calls_made,
             self.rpc_success_rate(),
             self.processing_rate()
-        )
+        );
+
+        // Append block update failures if any occurred
+        if self.block_update_failures > 0 {
+            format!(
+                "{} | {} block timestamp updates failed",
+                base_summary, self.block_update_failures
+            )
+        } else {
+            base_summary
+        }
     }
 }
 

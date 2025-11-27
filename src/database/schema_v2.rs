@@ -70,6 +70,9 @@ pub fn setup_schema_v2(connection: &Connection) -> AppResult<()> {
             WHERE block_hash IS NOT NULL;
         CREATE INDEX IF NOT EXISTS idx_blocks_timestamp ON blocks(timestamp)
             WHERE timestamp IS NOT NULL;
+        -- Covering index for stamps weekly fee analysis (JOIN on height with timestamp SELECT)
+        CREATE INDEX IF NOT EXISTS idx_blocks_height_timestamp ON blocks(height, timestamp)
+            WHERE timestamp IS NOT NULL;
 
         -- PROCESSING CHECKPOINTS
         CREATE TABLE IF NOT EXISTS processing_checkpoints (
@@ -124,6 +127,15 @@ pub fn setup_schema_v2(connection: &Connection) -> AppResult<()> {
             ON enriched_transactions(txid, height);
         CREATE INDEX IF NOT EXISTS idx_enriched_height_txid
             ON enriched_transactions(height, txid);
+        -- Covering index for stamps weekly fee analysis (JOIN + filter + SELECT)
+        CREATE INDEX IF NOT EXISTS idx_enriched_fee_analysis
+            ON enriched_transactions(txid, height, is_coinbase, transaction_fee)
+            WHERE is_coinbase = 0;
+        -- Covering index for tx_size_analysis (global + per-protocol queries)
+        -- Partial index on P2MS non-coinbase transactions, covering size/fee columns
+        CREATE INDEX IF NOT EXISTS idx_enriched_tx_size_analysis
+            ON enriched_transactions(transaction_size_bytes, transaction_fee)
+            WHERE p2ms_outputs_count > 0 AND is_coinbase = 0;
 
         -- TRANSACTION OUTPUTS (All Types)
         -- Stage 1: P2MS outputs only (from UTXO dump)
@@ -174,6 +186,10 @@ pub fn setup_schema_v2(connection: &Connection) -> AppResult<()> {
         CREATE INDEX IF NOT EXISTS idx_outputs_txid_multisig_unspent
             ON transaction_outputs(txid, script_type, is_spent)
             WHERE script_type = 'multisig' AND is_spent = 0;
+        -- Covering index for stamps weekly fee analysis (CTE 2 JOIN + SUM)
+        CREATE INDEX IF NOT EXISTS idx_outputs_fee_analysis
+            ON transaction_outputs(txid, vout, script_type, script_size)
+            WHERE script_type = 'multisig';
 
         -- ═══════════════════════════════════════════════════════════════════════════
         -- PHASE 3: P2MS Specific Tables
@@ -267,6 +283,8 @@ pub fn setup_schema_v2(connection: &Connection) -> AppResult<()> {
         CREATE INDEX IF NOT EXISTS idx_tc_signature_found ON transaction_classifications(protocol_signature_found);
         CREATE INDEX IF NOT EXISTS idx_tc_content_type ON transaction_classifications(content_type);
         CREATE INDEX IF NOT EXISTS idx_tc_transport ON transaction_classifications(transport_protocol);
+        -- Covering index for stamps weekly fee analysis (CTE 1 JOIN)
+        CREATE INDEX IF NOT EXISTS idx_tc_protocol_txid ON transaction_classifications(protocol, txid);
 
         -- P2MS OUTPUT CLASSIFICATIONS
         -- Stage 3: Populated with protocol classification AND spendability analysis
@@ -304,6 +322,8 @@ pub fn setup_schema_v2(connection: &Connection) -> AppResult<()> {
         CREATE INDEX IF NOT EXISTS idx_poc_variant ON p2ms_output_classifications(variant);
         CREATE INDEX IF NOT EXISTS idx_poc_content_type ON p2ms_output_classifications(content_type);
         CREATE INDEX IF NOT EXISTS idx_poc_spendable ON p2ms_output_classifications(is_spendable);
+        -- Covering index for stamps weekly fee analysis (CTE 2 txid lookup + vout JOIN)
+        CREATE INDEX IF NOT EXISTS idx_poc_txid_vout ON p2ms_output_classifications(txid, vout);
 
         -- ═══════════════════════════════════════════════════════════════════════════
         -- PHASE 5: Triggers (After All Tables Exist)

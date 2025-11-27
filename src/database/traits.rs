@@ -90,6 +90,15 @@ pub trait Stage2Operations {
     /// Check if transaction has an output to a specific address
     /// Replaces: has_exodus_address_output, has_wikileaks_address_output, has_marker_output
     fn has_output_to_address(&self, txid: &str, address: &str) -> AppResult<bool>;
+
+    /// Update blocks with hash and timestamp (Stage 2A backfill)
+    /// Wraps all updates in single transaction for performance
+    /// Uses UPDATE (stub blocks guaranteed by Stage 1)
+    fn update_blocks_batch(&mut self, blocks: &[(u32, String, u64)]) -> AppResult<usize>;
+
+    /// Get heights from list that still need block hash or timestamp (either NULL)
+    /// Handles partial backfill cases where one field is set but not the other
+    fn get_heights_needing_block_info(&self, heights: &[u32]) -> AppResult<Vec<u32>>;
 }
 
 /// Stage 3 database operations - Protocol classification

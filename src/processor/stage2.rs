@@ -11,7 +11,8 @@ use crate::rpc::BitcoinRpcClient;
 use crate::types::statistics::StatisticsCollector;
 use crate::types::{EnrichedTransaction, Stage2Stats, TransactionInput, TransactionOutput};
 use crate::utils::currency::{format_sats_as_btc, format_sats_as_btc_f64};
-use tracing::{debug, error, info};
+use std::collections::HashSet;
+use tracing::{debug, error, info, warn};
 
 /// Result type for transaction enrichment operations
 type EnrichmentResult = AppResult<(
@@ -28,6 +29,9 @@ pub struct Stage2Processor {
     progress_interval: usize,
     progress_tracker: StandardProgressTracker,
     _batch_processor: StandardBatchProcessor,
+    /// Session cache: tracks heights already updated with block hash/timestamp
+    /// Prevents redundant RPC calls across batches within the same run
+    updated_block_heights: HashSet<u32>,
 }
 
 impl Stage2Processor {
@@ -84,6 +88,7 @@ impl Stage2Processor {
             progress_interval,
             progress_tracker,
             _batch_processor: batch_processor,
+            updated_block_heights: HashSet::new(),
         })
     }
 
@@ -153,6 +158,15 @@ impl Stage2Processor {
         stats.finish();
         // Print a newline to end in-place progress (stdout progress line)
         ProgressReporter::finish_progress_line();
+
+        // End-of-session warning for block timestamp failures
+        if stats.block_update_failures > 0 {
+            warn!(
+                "{} block timestamp updates failed - re-run Stage 2 to retry",
+                stats.block_update_failures
+            );
+        }
+
         self.print_final_summary(&mut stats).await?;
 
         Ok(stats)
@@ -181,11 +195,105 @@ impl Stage2Processor {
         self.database
             .insert_enriched_transactions_batch(&enriched_results)?;
 
+        // --- Block timestamp update (Stage 2A) ---
+        self.update_block_timestamps(&enriched_results, stats)
+            .await?;
+
         // Update statistics (safe to do serially after parallel enrichment)
         for (enriched_tx, _, _) in &enriched_results {
             stats.total_fees_analysed += enriched_tx.transaction_fee;
             stats.total_p2ms_value += enriched_tx.total_p2ms_amount;
             stats.burn_patterns_found += enriched_tx.burn_patterns_detected.len() as u64;
+        }
+
+        Ok(())
+    }
+
+    /// Update block timestamps for heights in this batch (Stage 2A)
+    ///
+    /// Populates `blocks.block_hash` and `blocks.timestamp` for blocks referenced by
+    /// transactions in this batch. Uses session-level cache to prevent redundant RPC calls.
+    async fn update_block_timestamps(
+        &mut self,
+        enriched_results: &[(
+            EnrichedTransaction,
+            Vec<TransactionInput>,
+            Vec<TransactionOutput>,
+        )],
+        stats: &mut Stage2Stats,
+    ) -> AppResult<()> {
+        // Step 1: Collect unique heights from this batch (filter by session cache)
+        let batch_heights: Vec<u32> = enriched_results
+            .iter()
+            .map(|(tx, _, _)| tx.height)
+            .filter(|h| !self.updated_block_heights.contains(h))
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+
+        if batch_heights.is_empty() {
+            return Ok(());
+        }
+
+        // Step 2: Query DB for heights needing block info (hash OR timestamp NULL)
+        let heights_needing_update = self
+            .database
+            .get_heights_needing_block_info(&batch_heights)?;
+
+        // Step 3: Fetch block info via RPC for heights that need updating
+        let mut blocks_to_update: Vec<(u32, String, u64)> = Vec::new();
+        for height in &heights_needing_update {
+            // Track RPC calls for block timestamp fetching
+            stats.rpc_calls_made += 1;
+            match self.rpc_client.get_block_hash(*height as u64).await {
+                Ok(block_hash) => {
+                    stats.rpc_calls_made += 1;
+                    match self.rpc_client.get_block(&block_hash).await {
+                        Ok(block_info) => {
+                            if let Some(time) = block_info["time"].as_u64() {
+                                blocks_to_update.push((*height, block_hash, time));
+                            } else {
+                                // Block JSON missing time field - unexpected but handle gracefully
+                                warn!(
+                                    "Block {} (height {}) missing time field in response",
+                                    block_hash, height
+                                );
+                                stats.block_update_failures += 1;
+                            }
+                        }
+                        Err(e) => {
+                            warn!("Failed to fetch block {}: {}", block_hash, e);
+                            stats.block_update_failures += 1;
+                            stats.rpc_errors_encountered += 1;
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!("Failed to get block hash for height {}: {}", height, e);
+                    stats.block_update_failures += 1;
+                    stats.rpc_errors_encountered += 1;
+                }
+            }
+        }
+
+        // Step 4: Update DB (single transaction)
+        if !blocks_to_update.is_empty() {
+            let count = self.database.update_blocks_batch(&blocks_to_update)?;
+            debug!("Updated {} blocks with hash/timestamp", count);
+
+            // CRITICAL: Only cache heights that were SUCCESSFULLY updated
+            // (not all batch_heights - failed RPC calls should be retried)
+            for (height, _, _) in &blocks_to_update {
+                self.updated_block_heights.insert(*height);
+            }
+        }
+
+        // Also cache heights that already had timestamps (from DB query)
+        // These don't need retry - they were already populated
+        for height in &batch_heights {
+            if !heights_needing_update.contains(height) {
+                self.updated_block_heights.insert(*height);
+            }
         }
 
         Ok(())

@@ -159,6 +159,14 @@ impl Stage2Operations for Database {
     fn has_output_to_address(&self, txid: &str, address: &str) -> AppResult<bool> {
         self.connection.has_output_to_address(txid, address)
     }
+
+    fn update_blocks_batch(&mut self, blocks: &[(u32, String, u64)]) -> AppResult<usize> {
+        self.connection.update_blocks_batch(blocks)
+    }
+
+    fn get_heights_needing_block_info(&self, heights: &[u32]) -> AppResult<Vec<u32>> {
+        self.connection.get_heights_needing_block_info(heights)
+    }
 }
 
 impl Stage3Operations for Database {

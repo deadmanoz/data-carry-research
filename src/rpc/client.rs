@@ -30,6 +30,10 @@ pub enum RpcRequest {
         txid: String,
         tx: oneshot::Sender<RpcResult<serde_json::Value>>,
     },
+    GetBlockHash {
+        height: u64,
+        tx: oneshot::Sender<RpcResult<String>>,
+    },
 }
 
 /// Bitcoin RPC client with robust retry logic and async worker pattern
@@ -213,6 +217,19 @@ impl BitcoinRpcClient {
             .map_err(|_| RpcError::ConnectionFailed("RPC worker channel closed".to_string()))?
     }
 
+    /// Get block hash for a given height (lightweight RPC call)
+    pub async fn get_block_hash(&self, height: u64) -> RpcResult<String> {
+        let (tx, rx) = oneshot::channel();
+
+        self.request_tx
+            .send(RpcRequest::GetBlockHash { height, tx })
+            .await
+            .map_err(|_| RpcError::ConnectionFailed("Failed to send RPC request".to_string()))?;
+
+        rx.await
+            .map_err(|_| RpcError::ConnectionFailed("RPC worker channel closed".to_string()))?
+    }
+
     /// Get transaction with verbose JSON output (includes blockhash, confirmations, etc.)
     pub async fn get_transaction_verbose(&self, txid: &str) -> RpcResult<serde_json::Value> {
         let (tx, rx) = oneshot::channel();
@@ -368,6 +385,10 @@ impl RpcWorker {
             }
             RpcRequest::GetTransactionVerbose { txid, tx } => {
                 let result = self.get_transaction_verbose_impl(&txid).await;
+                let _ = tx.send(result);
+            }
+            RpcRequest::GetBlockHash { height, tx } => {
+                let result = self.get_block_hash_impl(height).await;
                 let _ = tx.send(result);
             }
         }
@@ -633,6 +654,35 @@ impl RpcWorker {
             Err(_) => Err(RpcError::Timeout {
                 timeout_seconds: self.config.timeout_seconds,
                 operation: format!("get_transaction_verbose({})", txid),
+            }),
+        }
+    }
+
+    /// Get block hash for a given height (lightweight RPC call)
+    async fn get_block_hash_impl(&self, height: u64) -> RpcResult<String> {
+        let client = Arc::clone(&self.client);
+
+        match execute_with_timeout(self.config.timeout_seconds, move || -> RpcResult<String> {
+            let result: String = client
+                .call("getblockhash", &[serde_json::json!(height)])
+                .map_err(|e| RpcError::CallFailed {
+                    method: "getblockhash".to_string(),
+                    message: e.to_string(),
+                })?;
+
+            debug!("Retrieved block hash for height {}: {}", height, result);
+
+            Ok(result)
+        })
+        .await
+        {
+            Ok(result) => result.map_err(|e| RpcError::CallFailed {
+                method: "spawn_blocking".to_string(),
+                message: format!("Get block hash task failed: {}", e),
+            })?,
+            Err(_) => Err(RpcError::Timeout {
+                timeout_seconds: self.config.timeout_seconds,
+                operation: format!("get_block_hash({})", height),
             }),
         }
     }

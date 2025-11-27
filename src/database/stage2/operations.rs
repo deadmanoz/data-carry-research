@@ -403,4 +403,48 @@ impl Stage2Operations for DatabaseConnection {
             .map_err(AppError::Database)?;
         Ok(exists == 1)
     }
+
+    fn update_blocks_batch(&mut self, blocks: &[(u32, String, u64)]) -> AppResult<usize> {
+        if blocks.is_empty() {
+            return Ok(0);
+        }
+
+        self.execute_transaction(|tx| {
+            let mut stmt = tx
+                .prepare_cached(
+                    "UPDATE blocks SET block_hash = ?2, timestamp = ?3 WHERE height = ?1",
+                )
+                .map_err(AppError::Database)?;
+
+            for (height, hash, timestamp) in blocks {
+                stmt.execute(params![height, hash, timestamp])
+                    .map_err(AppError::Database)?;
+            }
+            Ok(blocks.len())
+        })
+    }
+
+    fn get_heights_needing_block_info(&self, heights: &[u32]) -> AppResult<Vec<u32>> {
+        if heights.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let placeholders: String = heights.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let query = format!(
+            "SELECT height FROM blocks WHERE height IN ({}) AND (timestamp IS NULL OR block_hash IS NULL)",
+            placeholders
+        );
+
+        let conn = self.connection();
+        let mut stmt = conn.prepare(&query).map_err(AppError::Database)?;
+
+        // Use params_from_iter for proper rusqlite parameter binding
+        let rows = stmt
+            .query_map(rusqlite::params_from_iter(heights.iter()), |row| {
+                row.get::<_, u32>(0)
+            })
+            .map_err(AppError::Database)?;
+
+        rows.map(|r| r.map_err(AppError::Database)).collect()
+    }
 }

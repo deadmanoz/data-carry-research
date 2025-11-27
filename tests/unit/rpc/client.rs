@@ -104,6 +104,9 @@ async fn test_rpc_channel_communication() -> Result<()> {
                 RpcRequest::GetTransactionVerbose { .. } => {
                     // Not used in this test
                 }
+                RpcRequest::GetBlockHash { .. } => {
+                    // Not used in this test
+                }
             }
         }
     });
