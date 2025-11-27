@@ -11,5 +11,6 @@ pub mod detection;
 pub mod errors;
 pub mod processor;
 pub mod rpc;
+pub mod shared;
 pub mod types;
 pub mod utils;
