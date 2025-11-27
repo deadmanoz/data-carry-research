@@ -19,7 +19,7 @@ default:
     @echo "  test-rpc                     - Test Bitcoin RPC connectivity"
     @echo "  stage3-test <cmd> [opts...]  - Run tests (all, stamps, decoder, etc.)"
     @echo ""
-    @echo "Production (⚠️ CAUTION - full 30GB+ dataset):"
+    @echo "Production:"
     @echo "  production-pipeline          - Complete Stage 1→2→3 pipeline"
     @echo "  stage1-production            - Stage 1 only"
     @echo "  stage2-production            - Stage 2 only"
@@ -34,6 +34,8 @@ default:
     @echo "  analyse comprehensive-data-sizes - All data size analyses"
     @echo "  analyse multisig-configurations - Multisig config exhaustive analysis"
     @echo "  analyse dust-thresholds      - Bitcoin dust threshold analysis"
+    @echo "  analyse tx-sizes             - Transaction size distribution"
+    @echo "  analyse stamps-weekly-fees   - Bitcoin Stamps weekly fee analysis"
     @echo "  stats [db]                   - Quick statistics"
     @echo ""
     @echo "Visualisation (use: just viz <cmd> [db] [opts...]):"
@@ -295,7 +297,7 @@ stats-json db_path=default_db_path:
 # Usage: just analyse <command> [db_path] [options...]
 # Commands: burn-patterns, fees, value, value-distributions, classifications, signatures, spendability,
 #           content-types, full, protocol-data-sizes, spendability-data-sizes, content-type-spendability,
-#           comprehensive-data-sizes, multisig-configurations
+#           comprehensive-data-sizes, multisig-configurations, dust-thresholds, tx-sizes, stamps-weekly-fees
 # Examples:
 #   just analyse value                           # Uses default DB
 #   just analyse value ./custom.db --format json
@@ -305,6 +307,8 @@ stats-json db_path=default_db_path:
 #   just analyse comprehensive-data-sizes        # All data size analyses
 #   just analyse multisig-configurations         # Exhaustive multisig config analysis
 #   just analyse dust-thresholds                 # Bitcoin dust threshold analysis
+#   just analyse tx-sizes                        # Transaction size distribution
+#   just analyse stamps-weekly-fees --format plotly  # Weekly fee analysis for plotting
 analyse cmd db_path=default_db_path *args="":
     ./scripts/analyse.sh "{{cmd}}" "{{db_path}}" {{args}}
 

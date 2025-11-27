@@ -20,6 +20,9 @@ set -euo pipefail
 #   content-type-spendability  - Show content type spendability breakdown
 #   comprehensive-data-sizes   - Show all data size analyses
 #   multisig-configurations    - Show exhaustive multisig configuration breakdown
+#   dust-thresholds            - Show Bitcoin dust threshold analysis
+#   tx-sizes                   - Show transaction size distribution
+#   stamps-weekly-fees         - Show Bitcoin Stamps weekly fee analysis
 #   full                       - Show comprehensive analysis report
 #
 # Examples:
@@ -36,7 +39,8 @@ if [[ $# -eq 0 ]]; then
     echo "Commands: burn-patterns, fees, value, value-distributions, classifications,"
     echo "          signatures, spendability, content-types, protocol-data-sizes,"
     echo "          spendability-data-sizes, content-type-spendability,"
-    echo "          comprehensive-data-sizes, multisig-configurations, full"
+    echo "          comprehensive-data-sizes, multisig-configurations, dust-thresholds,"
+    echo "          tx-sizes, stamps-weekly-fees, full"
     echo ""
     echo "Examples:"
     echo "  $0 value                           # Uses default DB"
@@ -47,6 +51,7 @@ if [[ $# -eq 0 ]]; then
     echo "  $0 protocol-data-sizes             # Protocol data sizes"
     echo "  $0 comprehensive-data-sizes --format json"
     echo "  $0 multisig-configurations         # Exhaustive multisig config analysis"
+    echo "  $0 stamps-weekly-fees --format plotly # Weekly fee analysis for plotting"
     exit 1
 fi
 

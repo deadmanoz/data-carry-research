@@ -104,7 +104,7 @@ The decoder identifies protocol signatures, handles multiple encoding formats (A
     rpcpassword=your_password
     ```
 - UTXO dump from [`bitcoin-utxo-dump`](https://github.com/in3rsha/bitcoin-utxo-dump), this will be ~30GB
-- Around 10GB of disk space for the database this tool produces
+- Around 13GB of disk space for the database this tool produces
 
 ### Installation
 
