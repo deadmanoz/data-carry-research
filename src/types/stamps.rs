@@ -475,7 +475,10 @@ pub mod validation {
         };
 
         // Check if this looks like a data URI (starts with "data:" or has "base64,")
-        if !data_str.starts_with("data:") && !data_str.contains("base64,") && !data_str.contains(";base64") {
+        if !data_str.starts_with("data:")
+            && !data_str.contains("base64,")
+            && !data_str.contains(";base64")
+        {
             return data.to_vec(); // No data URI markers, return unchanged
         }
 

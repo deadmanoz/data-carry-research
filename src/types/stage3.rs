@@ -252,6 +252,28 @@ pub enum ProtocolType {
     Unknown,
 }
 
+impl ProtocolType {
+    /// Get human-readable display name with proper spacing
+    ///
+    /// This is the single source of truth for protocol display names used in
+    /// reports, charts, and user-facing output.
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            ProtocolType::BitcoinStamps => "Bitcoin Stamps",
+            ProtocolType::Counterparty => "Counterparty",
+            ProtocolType::AsciiIdentifierProtocols => "ASCII Identifier Protocols",
+            ProtocolType::OmniLayer => "Omni Layer",
+            ProtocolType::Chancecoin => "Chancecoin",
+            ProtocolType::PPk => "PPk",
+            ProtocolType::OpReturnSignalled => "OP_RETURN Signalled",
+            ProtocolType::DataStorage => "Data Storage",
+            ProtocolType::LikelyDataStorage => "Likely Data Storage",
+            ProtocolType::LikelyLegitimateMultisig => "Likely Legitimate Multisig",
+            ProtocolType::Unknown => "Unknown",
+        }
+    }
+}
+
 impl std::fmt::Display for ProtocolType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -305,13 +327,13 @@ pub enum ProtocolVariant {
     StampsUnknown,    // Unrecognizable content or burn-pattern-only
 
     // Counterparty variants (7 semantically coherent categories)
-    CounterpartyTransfer,     // Asset transfers: Send (0), EnhancedSend (2), Mpma (3), Sweep (4), Dividend (50)
-    CounterpartyIssuance,     // Asset creation: Issuance (20/21/22), FairMinter (90), FairMint (91)
-    CounterpartyDestruction,  // Asset destruction: Destroy (110), Burn (60)
-    CounterpartyDEX,          // DEX operations: Order (10), BtcPay (11), Dispenser (12), Cancel (70)
-    CounterpartyOracle,       // Oracle broadcasts: Broadcast (30)
-    CounterpartyGaming,       // Betting and gaming: Bet (40), Rps (80), RpsResolve (81)
-    CounterpartyUtility,      // UTXO operations: Utxo (100), Attach (101), Detach (102)
+    CounterpartyTransfer, // Asset transfers: Send (0), EnhancedSend (2), Mpma (3), Sweep (4), Dividend (50)
+    CounterpartyIssuance, // Asset creation: Issuance (20/21/22), FairMinter (90), FairMint (91)
+    CounterpartyDestruction, // Asset destruction: Destroy (110), Burn (60)
+    CounterpartyDEX,      // DEX operations: Order (10), BtcPay (11), Dispenser (12), Cancel (70)
+    CounterpartyOracle,   // Oracle broadcasts: Broadcast (30)
+    CounterpartyGaming,   // Betting and gaming: Bet (40), Rps (80), RpsResolve (81)
+    CounterpartyUtility,  // UTXO operations: Utxo (100), Attach (101), Detach (102)
 
     // ASCII Identifier Protocols (protocols with ASCII identifiers in P2MS data)
     AsciiIdentifierTB0001,     // TB0001 protocol (May 2015, ~150 txs)
@@ -711,17 +733,29 @@ mod tests {
         assert_eq!(ProtocolVariant::StampsClassic.to_string(), "Classic");
 
         // Counterparty
-        assert_eq!(ProtocolVariant::CounterpartyTransfer.to_string(), "Transfer");
+        assert_eq!(
+            ProtocolVariant::CounterpartyTransfer.to_string(),
+            "Transfer"
+        );
 
         // Omni Layer - Test all 8 variants
         assert_eq!(ProtocolVariant::OmniTransfer.to_string(), "Transfer");
-        assert_eq!(ProtocolVariant::OmniDistribution.to_string(), "Distribution");
+        assert_eq!(
+            ProtocolVariant::OmniDistribution.to_string(),
+            "Distribution"
+        );
         assert_eq!(ProtocolVariant::OmniIssuance.to_string(), "Issuance");
         assert_eq!(ProtocolVariant::OmniDestruction.to_string(), "Destruction");
         assert_eq!(ProtocolVariant::OmniDEX.to_string(), "DEX");
-        assert_eq!(ProtocolVariant::OmniAdministration.to_string(), "Administration");
+        assert_eq!(
+            ProtocolVariant::OmniAdministration.to_string(),
+            "Administration"
+        );
         assert_eq!(ProtocolVariant::OmniUtility.to_string(), "Utility");
-        assert_eq!(ProtocolVariant::OmniFailedDeobfuscation.to_string(), "Failed Deobfuscation");
+        assert_eq!(
+            ProtocolVariant::OmniFailedDeobfuscation.to_string(),
+            "Failed Deobfuscation"
+        );
 
         // DataStorage
         assert_eq!(

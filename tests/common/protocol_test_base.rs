@@ -185,7 +185,9 @@ pub fn verify_classification(
                     "High Output Count" => ProtocolVariant::HighOutputCount,
                     "Dust Amount" => ProtocolVariant::DustAmount,
                     // LikelyLegitimateMultisig variants (Display strings)
-                    "Legitimate Multisig" if !var_str.contains("Duplicate") && !var_str.contains("Null") => {
+                    "Legitimate Multisig"
+                        if !var_str.contains("Duplicate") && !var_str.contains("Null") =>
+                    {
                         ProtocolVariant::LegitimateMultisig
                     }
                     "Legitimate Multisig (Duplicate Keys)" => {
