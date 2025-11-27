@@ -8,6 +8,7 @@ use std::path::PathBuf;
 
 use super::burn_patterns;
 use super::common::{FeeAnalysis, TransactionInput, TransactionOutput};
+use crate::utils::math::safe_percentage_u64;
 
 /// Configuration for Stage 2 transaction enrichment
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -180,11 +181,7 @@ impl EnrichedTransaction {
 
     /// Calculate the percentage of transaction value stored in P2MS outputs
     pub fn p2ms_value_percentage(&self) -> f64 {
-        if self.total_output_value > 0 {
-            (self.total_p2ms_amount as f64 / self.total_output_value as f64) * 100.0
-        } else {
-            0.0
-        }
+        safe_percentage_u64(self.total_p2ms_amount, self.total_output_value)
     }
 
     /// Check if this transaction has significant P2MS usage (>10% of outputs)

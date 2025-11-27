@@ -1,4 +1,7 @@
 use crate::database::Database;
+use crate::shared::datastorage_helpers::{
+    detect_binary_signature, extract_key_data, is_burn_pattern,
+};
 use crate::types::content_detection::ContentType;
 use crate::types::{
     ClassificationResult, EnrichedTransaction, ProtocolType, ProtocolVariant, Stage3Config,
@@ -7,7 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::filter_p2ms_for_classification;
 use super::spendability::SpendabilityAnalyser;
-use super::{ProtocolSpecificClassifier, SignatureDetector};
+use super::ProtocolSpecificClassifier;
 
 /// DataStorage classifier - detects various data embedding patterns in P2MS outputs
 pub struct DataStorageClassifier {
@@ -18,67 +21,6 @@ impl DataStorageClassifier {
     pub fn new(config: &Stage3Config) -> Self {
         Self {
             _config: config.clone(),
-        }
-    }
-
-    /// Extract data from public key slots for DataStorage pattern detection
-    ///
-    /// Unlike protocol-specific classifiers, DataStorage accepts ANY data in pubkey slots
-    /// since we're looking for generic data embedding patterns, not valid EC points.
-    ///
-    /// This handles:
-    /// - Standard 33-byte compressed pubkeys (with or without valid prefix)
-    /// - Standard 65-byte uncompressed pubkeys (with or without 0x04 prefix)
-    /// - Raw 32-byte data chunks (no prefix)
-    /// - Non-standard length data (e.g., PDF chunks, custom encoding)
-    fn extract_key_data(pubkey_hex: &str) -> Option<Vec<u8>> {
-        let pubkey_bytes = hex::decode(pubkey_hex).ok()?;
-
-        match pubkey_bytes.len() {
-            33 => {
-                // 33-byte chunks: could be compressed pubkey OR raw data
-                // Extract all 33 bytes for analysis (don't filter by prefix)
-                Some(pubkey_bytes.to_vec())
-            }
-            65 => {
-                // 65-byte chunks: could be uncompressed pubkey OR raw data
-                // Extract all 65 bytes for analysis (don't filter by prefix)
-                Some(pubkey_bytes.to_vec())
-            }
-            32 => {
-                // 32-byte chunks (sometimes used without prefix)
-                Some(pubkey_bytes.to_vec())
-            }
-            _ if pubkey_bytes.len() >= 10 => {
-                // Accept any reasonable-length data (>=10 bytes)
-                // This handles non-standard push sizes (e.g., PDF chunks)
-                Some(pubkey_bytes.to_vec())
-            }
-            _ => None, // Too short to be meaningful data
-        }
-    }
-
-    /// Check if data is a proof-of-burn pattern (all 0xFF bytes)
-    ///
-    /// Handles both:
-    /// - Pure 32-byte 0xFF data (old extraction method)
-    /// - 33-byte compressed key with prefix (0x02/0x03) + 32 bytes of 0xFF
-    /// - 65-byte uncompressed key with prefix (0x04) + 64 bytes of 0xFF
-    fn is_proof_of_burn(data: &[u8]) -> bool {
-        match data.len() {
-            32 => {
-                // Pure 32-byte 0xFF pattern
-                data.iter().all(|&b| b == 0xFF)
-            }
-            33 => {
-                // Compressed pubkey: prefix (0x02 or 0x03) + 32 bytes of 0xFF
-                (data[0] == 0x02 || data[0] == 0x03) && data[1..].iter().all(|&b| b == 0xFF)
-            }
-            65 => {
-                // Uncompressed pubkey: prefix (0x04) + 64 bytes of 0xFF
-                data[0] == 0x04 && data[1..].iter().all(|&b| b == 0xFF)
-            }
-            _ => false,
         }
     }
 
@@ -126,123 +68,6 @@ impl DataStorageClassifier {
             || text_lower.contains("https://")
     }
 
-    /// Detect binary file signatures in raw data
-    ///
-    /// Checks for magic bytes of common file formats embedded in P2MS outputs.
-    /// Returns the file type if a signature is found.
-    fn detect_binary_signature(data: &[u8]) -> Option<&'static str> {
-        if data.len() < 4 {
-            return None;
-        }
-
-        // PDF: %PDF (0x25 0x50 0x44 0x46)
-        // Search in windows since PDF header might not be at start of chunk
-        if SignatureDetector::has_at_any_offset(data, b"%PDF") {
-            return Some("PDF");
-        }
-
-        // PNG: ‰PNG (0x89 0x50 0x4E 0x47)
-        if data.len() >= 8 && SignatureDetector::has_prefix(data, &[0x89, 0x50, 0x4E, 0x47]) {
-            return Some("PNG");
-        }
-
-        // JPEG: 0xFF 0xD8 0xFF
-        if SignatureDetector::has_prefix(data, &[0xFF, 0xD8, 0xFF]) {
-            return Some("JPEG");
-        }
-
-        // GIF: GIF8 (GIF87a or GIF89a)
-        if SignatureDetector::has_prefix(data, b"GIF8") {
-            return Some("GIF");
-        }
-
-        // ZIP/JAR/DOCX: PK (0x50 0x4B)
-        if SignatureDetector::has_prefix(data, &[0x50, 0x4B]) {
-            return Some("ZIP");
-        }
-
-        // RAR: Rar! (0x52 0x61 0x72 0x21)
-        if SignatureDetector::has_prefix(data, b"Rar!") {
-            return Some("RAR");
-        }
-
-        // 7-Zip: 7z (0x37 0x7A 0xBC 0xAF)
-        if data.len() >= 6 && SignatureDetector::has_prefix(data, &[0x37, 0x7A, 0xBC, 0xAF]) {
-            return Some("7Z");
-        }
-
-        // GZIP: 0x1f 0x8b 0x08 (most common)
-        // Note: Third byte is compression method (0x08 = DEFLATE)
-        // Search in windows since GZIP header might not be at start of chunk
-        if SignatureDetector::has_at_any_offset(data, &[0x1f, 0x8b, 0x08]) {
-            return Some("GZIP");
-        }
-
-        // BZIP2: BZh[1-9] (0x42 0x5a 0x68 followed by block size 1-9)
-        // Note: Fourth byte indicates block size (100KB-900KB)
-        if data.len() >= 4
-            && data[0] == 0x42
-            && data[1] == 0x5a
-            && data[2] == 0x68
-            && (0x31..=0x39).contains(&data[3])
-        // '1'-'9' in ASCII
-        {
-            return Some("BZIP2");
-        }
-
-        // ZLIB: 0x78 followed by FLG byte
-        // Common combinations:
-        //   0x78 0x9c - default compression
-        //   0x78 0x5e - moderate compression
-        //   0x78 0x01 - no compression
-        //   0x78 0xda - best compression
-        // Verify FLG byte checksum: (CMF * 256 + FLG) must be divisible by 31
-        // NOTE: Check offset 0 (standard), offset 5-6, and offset 7-8 (empirical patterns).
-        // GZIP is detected first (which searches entire buffer), so this won't conflict.
-        // Evidence: 10 Unknown outputs have ZLIB at offset 5, 10 at offset 7, all successfully decode.
-        // Conservative approach: Only check known offsets to avoid false positives on text data.
-        if data.len() >= 2 {
-            // Check offset 0 (standard position)
-            if data[0] == 0x78 {
-                let cmf_flg = (data[0] as u16) * 256 + (data[1] as u16);
-                if cmf_flg % 31 == 0 {
-                    return Some("ZLIB");
-                }
-            }
-        }
-
-        // Check offset 5 (empirical pattern from Unknown outputs)
-        if data.len() >= 7 && data[5] == 0x78 {
-            let cmf_flg = (data[5] as u16) * 256 + (data[6] as u16);
-            if cmf_flg % 31 == 0 {
-                return Some("ZLIB");
-            }
-        }
-
-        // Check offset 7 (empirical pattern from Unknown outputs)
-        if data.len() >= 9 && data[7] == 0x78 {
-            let cmf_flg = (data[7] as u16) * 256 + (data[8] as u16);
-            if cmf_flg % 31 == 0 {
-                return Some("ZLIB");
-            }
-        }
-
-        // TAR: ustar magic at offset 257
-        // POSIX standard: "ustar\0" or "ustar  " (with spaces)
-        // Check both variants to avoid false positives
-        if data.len() >= 263 && SignatureDetector::has_at_offset(data, 257, 262, b"ustar") {
-            // Verify next byte is either NUL or space to distinguish from random data
-            if data[262] == 0x00 || data[262] == b' ' {
-                return Some("TAR");
-            }
-        }
-
-        None
-    }
-
-    // Note: CHANCECO pattern detection removed - handled by dedicated
-    // Chancecoin classifier which runs at higher priority
-
     /// Analyse all extracted data and return the most specific classification
     fn classify_data_patterns(&self, all_data: &[Vec<u8>]) -> Option<(ProtocolVariant, String)> {
         let mut found_binary_file = false;
@@ -262,10 +87,10 @@ impl DataStorageClassifier {
 
             // Check patterns - most specific first, then allow multiple flags for priority later
             // Binary file signatures are most specific (definitive file types)
-            if let Some(sig) = Self::detect_binary_signature(data) {
+            if let Some(sig) = detect_binary_signature(data) {
                 found_binary_file = true;
                 file_type = Some(sig);
-            } else if Self::is_proof_of_burn(data) {
+            } else if is_burn_pattern(data, None) {
                 found_burn = true;
             } else {
                 // Allow both text and file metadata flags to be set for the same data
@@ -290,7 +115,7 @@ impl DataStorageClassifier {
                 .collect();
 
             // Check for TAR archive (requires offset 257, so needs concatenated data)
-            if let Some(sig) = Self::detect_binary_signature(&concatenated) {
+            if let Some(sig) = detect_binary_signature(&concatenated) {
                 found_binary_file = true;
                 file_type = Some(sig);
             }
@@ -371,7 +196,7 @@ impl ProtocolSpecificClassifier for DataStorageClassifier {
         for output in &p2ms_outputs {
             if let Some(info) = output.multisig_info() {
                 for pubkey in &info.pubkeys {
-                    if let Some(data) = Self::extract_key_data(pubkey) {
+                    if let Some(data) = extract_key_data(pubkey) {
                         extracted_data.push(data);
                     }
                 }

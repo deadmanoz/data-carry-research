@@ -10,6 +10,9 @@
 
 use crate::config::output_paths;
 use crate::decoder::protocol_detection::{DecodedProtocol, TransactionData};
+use crate::shared::datastorage_helpers::{
+    detect_binary_signature, extract_key_data, is_burn_pattern,
+};
 use crate::types::TransactionOutput;
 use bzip2::read::BzDecoder;
 use flate2::read::{GzDecoder, ZlibDecoder};
@@ -295,7 +298,7 @@ impl DataStorageDecoder {
                 for pubkey_hex in &info.pubkeys {
                     total_pubkeys += 1;
 
-                    if let Some(data) = self.extract_key_data(pubkey_hex) {
+                    if let Some(data) = extract_key_data(pubkey_hex) {
                         debug!(
                             "Extracted {} bytes from pubkey: {}",
                             data.len(),
@@ -303,7 +306,7 @@ impl DataStorageDecoder {
                         );
 
                         // Check for burn patterns
-                        if self.is_burn_pattern(&data, pubkey_hex) {
+                        if is_burn_pattern(&data, Some(pubkey_hex)) {
                             burn_patterns.push(format!(
                                 "Burn in vout {}: {}",
                                 output.vout,
@@ -337,97 +340,6 @@ impl DataStorageDecoder {
         };
 
         (all_data, metadata)
-    }
-
-    /// Extract data from a public key (compressed or uncompressed) or data segment
-    ///
-    /// NOTE: This is for GENERIC data extraction (DataStorage decoder).
-    /// Unlike protocol-specific decoders (Counterparty, Stamps, Omni), we accept
-    /// ANY data in pubkey slots since we're looking for generic data embedding patterns.
-    ///
-    /// This mirrors the Stage 3 DataStorage classifier logic to ensure consistency
-    /// between classification and decoding.
-    fn extract_key_data(&self, pubkey_hex: &str) -> Option<Vec<u8>> {
-        let pubkey_bytes = hex::decode(pubkey_hex).ok()?;
-
-        match pubkey_bytes.len() {
-            20 => {
-                // 20-byte data segment (like Chancecoin)
-                // These are raw data, not pubkeys, so return as-is
-                debug!(
-                    "Found 20-byte data segment: {}",
-                    hex::encode(&pubkey_bytes[..8])
-                );
-                Some(pubkey_bytes)
-            }
-            33 => {
-                // 33-byte chunks: could be compressed pubkey OR raw data
-                // For DataStorage, accept ALL 33 bytes regardless of prefix
-                // This handles:
-                // - Standard compressed pubkeys (0x02/0x03 prefix)
-                // - Raw data chunks (any prefix, e.g., PDF data)
-                debug!("Found 33-byte chunk (prefix: {:02x})", pubkey_bytes[0]);
-                Some(pubkey_bytes.to_vec())
-            }
-            65 => {
-                // 65-byte chunks: could be uncompressed pubkey OR raw data
-                // For DataStorage, accept ALL 65 bytes regardless of prefix
-                // This handles:
-                // - Standard uncompressed pubkeys (0x04 prefix)
-                // - Raw data chunks (any prefix, e.g., PDF data starting with 0x25 '%')
-                debug!("Found 65-byte chunk (prefix: {:02x})", pubkey_bytes[0]);
-                Some(pubkey_bytes.to_vec())
-            }
-            32 => {
-                // 32-byte chunks (sometimes used without prefix)
-                debug!("Found 32-byte chunk");
-                Some(pubkey_bytes.to_vec())
-            }
-            _ => {
-                // Other lengths: accept if reasonable size (>=10 bytes)
-                // This handles non-standard push sizes (e.g., PDF chunks, custom encoding)
-                if pubkey_bytes.len() >= 10 {
-                    debug!("Found {}-byte data segment", pubkey_bytes.len());
-                    Some(pubkey_bytes)
-                } else {
-                    None // Too short to be meaningful data
-                }
-            }
-        }
-    }
-
-    /// Check if data represents a burn pattern
-    ///
-    /// Synchronized with Stage 3 classifier to ensure consistent burn detection.
-    /// Handles both pure burn data and EC-prefixed burn patterns.
-    fn is_burn_pattern(&self, data: &[u8], pubkey_hex: &str) -> bool {
-        match data.len() {
-            32 => {
-                // Pure 32-byte 0xFF pattern
-                data.iter().all(|&b| b == 0xFF)
-            }
-            33 => {
-                // Compressed pubkey burn: prefix (0x02 or 0x03) + 32 bytes of 0xFF
-                (data[0] == 0x02 || data[0] == 0x03) && data[1..].iter().all(|&b| b == 0xFF)
-            }
-            65 => {
-                // Uncompressed pubkey burn: prefix (0x04) + 64 bytes of 0xFF
-                data[0] == 0x04 && data[1..].iter().all(|&b| b == 0xFF)
-            }
-            _ => {
-                // Structured burn patterns (protocol-specific)
-                if data.len() > 1
-                    && pubkey_hex.starts_with("0305")
-                    && data[1..].iter().all(|&b| b == 0x00)
-                {
-                    return true;
-                }
-                if pubkey_hex.starts_with("04cccccccd") {
-                    return true;
-                }
-                false
-            }
-        }
     }
 
     /// Display various interpretations of the data for visual inspection
@@ -758,8 +670,8 @@ impl DataStorageDecoder {
         }
 
         // Check for binary file signatures
-        if let Some(file_type) = self.detect_binary_file_type(data) {
-            return DataPattern::BinaryFile(file_type);
+        if let Some(file_type) = detect_binary_signature(data) {
+            return DataPattern::BinaryFile(file_type.to_string());
         }
 
         DataPattern::UnknownData
@@ -955,66 +867,6 @@ impl DataStorageDecoder {
         }
 
         data.iter().all(|&b| b.is_ascii_hexdigit())
-    }
-
-    /// Detect binary file type from magic numbers
-    fn detect_binary_file_type(&self, data: &[u8]) -> Option<String> {
-        if data.len() < 4 {
-            return None;
-        }
-
-        // PDF: %PDF (0x25 0x50 0x44 0x46)
-        // Search in windows since PDF header might not be at exact start
-        // This mirrors Stage 3 classifier logic for consistency
-        let search_len = data.len().min(1024);
-        if data[..search_len].windows(4).any(|w| w == b"%PDF") {
-            return Some("PDF".to_string());
-        }
-
-        // PNG: 89 50 4E 47
-        if data.len() >= 8 && &data[..8] == b"\x89PNG\r\n\x1a\n" {
-            return Some("PNG".to_string());
-        }
-
-        // JPEG: FF D8 FF
-        if data.len() >= 3 && data[0] == 0xff && data[1] == 0xd8 && data[2] == 0xff {
-            return Some("JPEG".to_string());
-        }
-
-        // GIF: GIF87a or GIF89a
-        if data.len() >= 6 && (data.starts_with(b"GIF87a") || data.starts_with(b"GIF89a")) {
-            return Some("GIF".to_string());
-        }
-
-        // ZIP/JAR/DOCX: PK (0x50 0x4b)
-        if data[0] == 0x50 && data[1] == 0x4b {
-            return Some("ZIP".to_string());
-        }
-
-        // RAR: Rar! (0x52 0x61 0x72 0x21)
-        if data.starts_with(b"Rar!") {
-            return Some("RAR".to_string());
-        }
-
-        // 7-Zip: 7z (0x37 0x7a 0xbc 0xaf 0x27 0x1c)
-        if data.len() >= 6 && data.starts_with(&[0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c]) {
-            return Some("7Z".to_string());
-        }
-
-        // TAR: ustar magic at offset 257
-        // POSIX standard: "ustar\0" or "ustar  " (with spaces)
-        // Check both variants to avoid false positives
-        if data.len() >= 263 {
-            let tar_magic = &data[257..262];
-            if tar_magic == b"ustar" {
-                // Verify next byte is either NUL or space to distinguish from random data
-                if data[262] == 0x00 || data[262] == b' ' {
-                    return Some("TAR".to_string());
-                }
-            }
-        }
-
-        None
     }
 
     /// Decode data based on detected pattern

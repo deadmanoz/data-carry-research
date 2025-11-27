@@ -5,7 +5,6 @@
 //! - Multi-row grouped queries with automatic percentage calculation
 //! - Optional value handling with defaults
 //! - Query collection with mapping
-//! - Percentage calculation utilities
 //!
 //! ## Design Goals
 //!
@@ -15,6 +14,7 @@
 //! - **Performance**: Zero-cost abstractions, no overhead vs manual queries
 
 use crate::errors::AppResult;
+use crate::utils::math::safe_percentage_i64;
 use rusqlite::{Connection, Row};
 
 /// Helper trait for common database query patterns
@@ -148,50 +148,6 @@ pub trait QueryHelper {
     /// // Returns: vec![("pattern1", 100, 50.0), ("pattern2", 100, 50.0)]
     /// ```
     fn query_grouped_percentages(&self, sql: &str) -> AppResult<Vec<(String, usize, f64)>>;
-
-    // ============================================================
-    // PATTERN 5: Percentage Calculation Utilities
-    // ============================================================
-
-    /// Calculate percentage safely (handles division by zero)
-    ///
-    /// # Arguments
-    /// * `count` - Numerator
-    /// * `total` - Denominator
-    ///
-    /// # Returns
-    /// * `f64` - Percentage (0.0 if total is 0)
-    ///
-    /// # Examples
-    /// ```ignore
-    /// let pct = conn.calculate_percentage(50i64, 200i64);  // 25.0
-    /// let pct = conn.calculate_percentage(10i64, 0i64);    // 0.0 (safe!)
-    /// ```
-    fn calculate_percentage(&self, count: i64, total: i64) -> f64 {
-        if total == 0 {
-            0.0
-        } else {
-            (count as f64 * 100.0) / total as f64
-        }
-    }
-
-    /// Calculate percentage for usize values
-    fn calculate_percentage_usize(&self, count: usize, total: usize) -> f64 {
-        if total == 0 {
-            0.0
-        } else {
-            (count as f64 * 100.0) / total as f64
-        }
-    }
-
-    /// Calculate percentage for u64 values
-    fn calculate_percentage_u64(&self, count: u64, total: u64) -> f64 {
-        if total == 0 {
-            0.0
-        } else {
-            (count as f64 * 100.0) / total as f64
-        }
-    }
 }
 
 /// Implementation of QueryHelper for rusqlite::Connection
@@ -241,7 +197,7 @@ impl QueryHelper for Connection {
         let results = rows
             .into_iter()
             .map(|(category, count)| {
-                let percentage = self.calculate_percentage(count, total);
+                let percentage = safe_percentage_i64(count, total);
                 (category, count as usize, percentage)
             })
             .collect();
@@ -394,39 +350,5 @@ mod tests {
         assert_eq!(results[2].0, "C");
         assert_eq!(results[2].1, 1);
         assert_eq!(results[2].2, 20.0); // percentage: 1/5 * 100
-    }
-
-    #[test]
-    fn test_calculate_percentage() {
-        let conn = Connection::open_in_memory().unwrap();
-
-        assert_eq!(conn.calculate_percentage(50, 200), 25.0);
-        assert_eq!(conn.calculate_percentage(100, 100), 100.0);
-        assert_eq!(conn.calculate_percentage(1, 3), 33.333333333333336);
-
-        // Division by zero safety
-        assert_eq!(conn.calculate_percentage(10, 0), 0.0);
-    }
-
-    #[test]
-    fn test_calculate_percentage_usize() {
-        let conn = Connection::open_in_memory().unwrap();
-
-        assert_eq!(conn.calculate_percentage_usize(50, 200), 25.0);
-        assert_eq!(conn.calculate_percentage_usize(100, 100), 100.0);
-
-        // Division by zero safety
-        assert_eq!(conn.calculate_percentage_usize(10, 0), 0.0);
-    }
-
-    #[test]
-    fn test_calculate_percentage_u64() {
-        let conn = Connection::open_in_memory().unwrap();
-
-        assert_eq!(conn.calculate_percentage_u64(50, 200), 25.0);
-        assert_eq!(conn.calculate_percentage_u64(100, 100), 100.0);
-
-        // Division by zero safety
-        assert_eq!(conn.calculate_percentage_u64(10, 0), 0.0);
     }
 }

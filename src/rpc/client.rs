@@ -135,6 +135,10 @@ impl BitcoinRpcClient {
     /// This replicates the database method used in Stage 3 processing, but via RPC.
     /// Groups all transaction inputs by source address and returns the address that
     /// contributed the most value (following Omni Layer specification).
+    ///
+    /// NOTE: This logic is duplicated in src/database/stage2/operations.rs::get_sender_address_from_largest_input()
+    /// for Stage 3 database-based processing. Both implementations follow the same algorithm.
+    /// Extraction into shared module was evaluated but skipped (different contexts: async RPC vs sync database).
     pub async fn get_sender_address_from_largest_input(
         &self,
         transaction: &Transaction,

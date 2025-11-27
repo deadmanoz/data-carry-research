@@ -345,8 +345,12 @@ impl Stage2Operations for DatabaseConnection {
     }
 
     fn get_sender_address_from_largest_input(&self, txid: &str) -> AppResult<Option<String>> {
-        // CORRECTED: Implement actual "largest input by sum" logic per Omnicore spec
-        // For Class B transactions, the sender is the address that contributed the most input value
+        // Implement actual "largest input by sum" logic per Omnicore spec.
+        // For Class B transactions, the sender is the address that contributed the most input value.
+        //
+        // NOTE: This logic is duplicated in src/rpc/client.rs::get_sender_address_from_largest_input()
+        // for Stage 4 RPC-based decoding. Both implementations follow the same algorithm.
+        // Extraction into shared module was evaluated but skipped (different contexts).
 
         let inputs = self.get_transaction_inputs(txid)?;
         if inputs.is_empty() {

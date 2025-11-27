@@ -39,12 +39,4 @@ impl DatabaseConnection {
 
         Ok(result)
     }
-
-    /// Execute a batch operation with prepared statements
-    pub fn execute_batch<F>(&mut self, f: F) -> AppResult<()>
-    where
-        F: FnOnce(&mut Connection) -> AppResult<()>,
-    {
-        f(&mut self.connection)
-    }
 }

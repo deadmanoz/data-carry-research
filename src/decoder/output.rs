@@ -164,23 +164,6 @@ impl OutputManager {
         Ok(filepath)
     }
 
-    /// Write Counterparty data to the counterparty subdirectory
-    /// Creates: <base_dir>/counterparty/<txid>.json
-    pub fn write_counterparty_data(
-        &self,
-        txid: &str,
-        counterparty_data: &[u8],
-    ) -> OutputResult<PathBuf> {
-        let counterparty_dir = self.base_dir.join(output_paths::PROTOCOL_COUNTERPARTY);
-        self.ensure_directory_exists(&counterparty_dir)?;
-
-        let filename = format!("{}.json", txid);
-        let filepath = counterparty_dir.join(filename);
-
-        fs::write(&filepath, counterparty_data)?;
-        Ok(filepath)
-    }
-
     /// Write structured Counterparty JSON data to the counterparty directory
     /// Creates: <base_dir>/counterparty/<txid>.json
     pub fn write_counterparty_json(
@@ -216,28 +199,6 @@ impl OutputManager {
 
         fs::write(&filepath, json_string)?;
         Ok(filepath)
-    }
-
-    /// Check if an image file already exists
-    pub fn image_file_exists(&self, txid: &str, format: ImageFormat) -> bool {
-        let image_dir = self
-            .base_dir
-            .join(output_paths::PROTOCOL_BITCOIN_STAMPS)
-            .join("images");
-        let filename = format!("{}.{}", txid, format.extension());
-        let filepath = image_dir.join(filename);
-        filepath.exists()
-    }
-
-    /// Check if a JSON file already exists
-    pub fn json_file_exists(&self, txid: &str) -> bool {
-        let json_dir = self
-            .base_dir
-            .join(output_paths::PROTOCOL_BITCOIN_STAMPS)
-            .join("json");
-        let filename = format!("{}.json", txid);
-        let filepath = json_dir.join(filename);
-        filepath.exists()
     }
 
     /// Write Omni Layer data to the omni subdirectory
@@ -511,26 +472,5 @@ mod tests {
 
         let written_data = std::fs::read(&filepath).unwrap();
         assert_eq!(written_data, test_json);
-    }
-
-    #[test]
-    fn test_file_exists_checks() {
-        let temp_dir = TempDir::new().unwrap();
-        let manager = OutputManager::new(temp_dir.path().to_path_buf()).unwrap();
-
-        // Test non-existent files
-        assert!(!manager.image_file_exists("nonexistent", ImageFormat::Png));
-        assert!(!manager.json_file_exists("nonexistent"));
-
-        // Create files and test existence
-        manager
-            .write_image("exists", b"data", ImageFormat::Png)
-            .unwrap();
-        manager
-            .write_json("exists", b"{}", JsonType::Generic)
-            .unwrap();
-
-        assert!(manager.image_file_exists("exists", ImageFormat::Png));
-        assert!(manager.json_file_exists("exists"));
     }
 }

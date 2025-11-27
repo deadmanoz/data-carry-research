@@ -3,6 +3,7 @@
 use crate::database::connection::DatabaseConnection;
 use crate::database::traits::StatisticsOperations;
 use crate::errors::{AppError, AppResult};
+use crate::utils::math::{safe_percentage, safe_ratio, safe_ratio_u64};
 
 /// Database statistics for reporting
 #[derive(Debug)]
@@ -27,28 +28,21 @@ pub struct EnrichedTransactionStats {
 
 impl EnrichedTransactionStats {
     pub fn burn_pattern_percentage(&self) -> f64 {
-        if self.total_enriched_transactions > 0 {
-            (self.transactions_with_burn_patterns as f64 / self.total_enriched_transactions as f64)
-                * 100.0
-        } else {
-            0.0
-        }
+        safe_percentage(
+            self.transactions_with_burn_patterns,
+            self.total_enriched_transactions,
+        )
     }
 
     pub fn average_patterns_per_transaction(&self) -> f64 {
-        if self.transactions_with_burn_patterns > 0 {
-            self.total_burn_patterns_detected as f64 / self.transactions_with_burn_patterns as f64
-        } else {
-            0.0
-        }
+        safe_ratio(
+            self.total_burn_patterns_detected,
+            self.transactions_with_burn_patterns,
+        )
     }
 
     pub fn average_fee_per_transaction(&self) -> f64 {
-        if self.regular_transactions > 0 {
-            self.total_fees_analysed as f64 / self.regular_transactions as f64
-        } else {
-            0.0
-        }
+        safe_ratio_u64(self.total_fees_analysed, self.regular_transactions as u64)
     }
 }
 
@@ -82,75 +76,8 @@ pub struct ClassificationStats {
 }
 
 impl ClassificationStats {
-    #[allow(dead_code)]
-    pub fn bitcoin_stamps_percentage(&self) -> f64 {
-        if self.total_classified > 0 {
-            (self.bitcoin_stamps as f64 / self.total_classified as f64) * 100.0
-        } else {
-            0.0
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn counterparty_percentage(&self) -> f64 {
-        if self.total_classified > 0 {
-            (self.counterparty as f64 / self.total_classified as f64) * 100.0
-        } else {
-            0.0
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn omni_layer_percentage(&self) -> f64 {
-        if self.total_classified > 0 {
-            (self.omni_layer as f64 / self.total_classified as f64) * 100.0
-        } else {
-            0.0
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn chancecoin_percentage(&self) -> f64 {
-        if self.total_classified > 0 {
-            (self.chancecoin as f64 / self.total_classified as f64) * 100.0
-        } else {
-            0.0
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn data_storage_percentage(&self) -> f64 {
-        if self.total_classified > 0 {
-            (self.data_storage as f64 / self.total_classified as f64) * 100.0
-        } else {
-            0.0
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn likely_legitimate_percentage(&self) -> f64 {
-        if self.total_classified > 0 {
-            (self.likely_legitimate as f64 / self.total_classified as f64) * 100.0
-        } else {
-            0.0
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn unknown_percentage(&self) -> f64 {
-        if self.total_classified > 0 {
-            (self.unknown as f64 / self.total_classified as f64) * 100.0
-        } else {
-            0.0
-        }
-    }
-
     pub fn definitive_signature_rate(&self) -> f64 {
-        if self.total_classified > 0 {
-            (self.definitive_signatures as f64 / self.total_classified as f64) * 100.0
-        } else {
-            0.0
-        }
+        safe_percentage(self.definitive_signatures, self.total_classified)
     }
 }
 
@@ -252,6 +179,17 @@ impl StatisticsOperations for DatabaseConnection {
     }
 
     fn get_classification_stats(&self) -> AppResult<ClassificationStats> {
+        // Helper to count classifications by protocol name
+        let count_by_protocol = |protocol: &str| -> AppResult<usize> {
+            self.connection()
+                .query_row(
+                    "SELECT COUNT(*) FROM transaction_classifications WHERE protocol = ?",
+                    rusqlite::params![protocol],
+                    |row| row.get(0),
+                )
+                .map_err(AppError::Database)
+        };
+
         let total_classified: usize = self
             .connection()
             .query_row(
@@ -261,104 +199,17 @@ impl StatisticsOperations for DatabaseConnection {
             )
             .map_err(AppError::Database)?;
 
-        let stamps_count: usize = self
-            .connection()
-            .query_row(
-                "SELECT COUNT(*) FROM transaction_classifications WHERE protocol = 'BitcoinStamps'",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(AppError::Database)?;
-
-        let counterparty_count: usize = self
-            .connection()
-            .query_row(
-                "SELECT COUNT(*) FROM transaction_classifications WHERE protocol = 'Counterparty'",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(AppError::Database)?;
-
-        let ascii_identifier_protocols_count: usize = self
-            .connection()
-            .query_row(
-                "SELECT COUNT(*) FROM transaction_classifications WHERE protocol = 'AsciiIdentifierProtocols'",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(AppError::Database)?;
-
-        let omni_count: usize = self
-            .connection()
-            .query_row(
-                "SELECT COUNT(*) FROM transaction_classifications WHERE protocol = 'OmniLayer'",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(AppError::Database)?;
-
-        let chancecoin_count: usize = self
-            .connection()
-            .query_row(
-                "SELECT COUNT(*) FROM transaction_classifications WHERE protocol = 'Chancecoin'",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(AppError::Database)?;
-
-        let ppk_count: usize = self
-            .connection()
-            .query_row(
-                "SELECT COUNT(*) FROM transaction_classifications WHERE protocol = 'PPk'",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(AppError::Database)?;
-
-        let opreturn_signalled_count: usize = self
-            .connection()
-            .query_row(
-                "SELECT COUNT(*) FROM transaction_classifications WHERE protocol = 'OpReturnSignalled'",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(AppError::Database)?;
-
-        let datastorage_count: usize = self
-            .connection()
-            .query_row(
-                "SELECT COUNT(*) FROM transaction_classifications WHERE protocol = 'DataStorage'",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(AppError::Database)?;
-
-        let likely_data_storage_count: usize = self
-            .connection()
-            .query_row(
-                "SELECT COUNT(*) FROM transaction_classifications WHERE protocol = 'LikelyDataStorage'",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(AppError::Database)?;
-
-        let likely_legitimate_count: usize = self
-            .connection()
-            .query_row(
-                "SELECT COUNT(*) FROM transaction_classifications WHERE protocol = 'LikelyLegitimateMultisig'",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(AppError::Database)?;
-
-        let unknown_count: usize = self
-            .connection()
-            .query_row(
-                "SELECT COUNT(*) FROM transaction_classifications WHERE protocol = 'Unknown'",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(AppError::Database)?;
+        let stamps_count = count_by_protocol("BitcoinStamps")?;
+        let counterparty_count = count_by_protocol("Counterparty")?;
+        let ascii_identifier_protocols_count = count_by_protocol("AsciiIdentifierProtocols")?;
+        let omni_count = count_by_protocol("OmniLayer")?;
+        let chancecoin_count = count_by_protocol("Chancecoin")?;
+        let ppk_count = count_by_protocol("PPk")?;
+        let opreturn_signalled_count = count_by_protocol("OpReturnSignalled")?;
+        let datastorage_count = count_by_protocol("DataStorage")?;
+        let likely_data_storage_count = count_by_protocol("LikelyDataStorage")?;
+        let likely_legitimate_count = count_by_protocol("LikelyLegitimateMultisig")?;
+        let unknown_count = count_by_protocol("Unknown")?;
 
         let signatures_found: usize = self
             .connection()

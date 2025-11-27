@@ -3,6 +3,7 @@
 //! This module provides a unified statistics collection system with common traits
 //! and implementations for all stages of the Bitcoin P2MS analysis pipeline.
 
+use crate::utils::math::{safe_percentage, safe_percentage_u64, safe_ratio, safe_ratio_u64};
 use std::time::{Duration, Instant};
 
 /// Common trait for all statistics collectors
@@ -91,27 +92,15 @@ impl ProcessingStats {
     }
 
     pub fn p2ms_rate(&self) -> f64 {
-        if self.total_records > 0 {
-            (self.p2ms_found as f64 / self.total_records as f64) * 100.0
-        } else {
-            0.0
-        }
+        safe_percentage(self.p2ms_found, self.total_records)
     }
 
     pub fn error_rate(&self) -> f64 {
-        if self.total_records > 0 {
-            (self.malformed_records as f64 / self.total_records as f64) * 100.0
-        } else {
-            0.0
-        }
+        safe_percentage(self.malformed_records, self.total_records)
     }
 
     pub fn records_per_batch(&self) -> f64 {
-        if self.batches_processed > 0 {
-            self.total_records as f64 / self.batches_processed as f64
-        } else {
-            0.0
-        }
+        safe_ratio(self.total_records, self.batches_processed)
     }
 }
 
@@ -191,36 +180,22 @@ impl Stage2Stats {
     }
 
     pub fn rpc_success_rate(&self) -> f64 {
-        if self.rpc_calls_made > 0 {
-            let success_calls = self.rpc_calls_made - self.rpc_errors_encountered;
-            (success_calls as f64 / self.rpc_calls_made as f64) * 100.0
-        } else {
-            0.0
-        }
+        let success_calls = self
+            .rpc_calls_made
+            .saturating_sub(self.rpc_errors_encountered);
+        safe_percentage_u64(success_calls, self.rpc_calls_made)
     }
 
     pub fn average_fee_per_transaction(&self) -> f64 {
-        if self.transactions_processed > 0 {
-            self.total_fees_analysed as f64 / self.transactions_processed as f64
-        } else {
-            0.0
-        }
+        safe_ratio_u64(self.total_fees_analysed, self.transactions_processed)
     }
 
     pub fn burn_pattern_rate(&self) -> f64 {
-        if self.transactions_processed > 0 {
-            (self.burn_patterns_found as f64 / self.transactions_processed as f64) * 100.0
-        } else {
-            0.0
-        }
+        safe_percentage_u64(self.burn_patterns_found, self.transactions_processed)
     }
 
     pub fn average_p2ms_value(&self) -> f64 {
-        if self.transactions_processed > 0 {
-            self.total_p2ms_value as f64 / self.transactions_processed as f64
-        } else {
-            0.0
-        }
+        safe_ratio_u64(self.total_p2ms_value, self.transactions_processed)
     }
 }
 
@@ -338,40 +313,28 @@ impl Stage3Results {
     pub fn classification_breakdown(
         &self,
     ) -> (f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64) {
-        let total = self.total_classified() as f64;
-        if total > 0.0 {
-            (
-                (self.stamps_classified as f64 / total) * 100.0,
-                (self.counterparty_classified as f64 / total) * 100.0,
-                (self.ascii_identifier_protocols_classified as f64 / total) * 100.0,
-                (self.omni_classified as f64 / total) * 100.0,
-                (self.chancecoin_classified as f64 / total) * 100.0,
-                (self.ppk_classified as f64 / total) * 100.0,
-                (self.opreturn_signalled_classified as f64 / total) * 100.0,
-                (self.datastorage_classified as f64 / total) * 100.0,
-                (self.likely_data_storage_classified as f64 / total) * 100.0,
-                (self.legitimate_classified as f64 / total) * 100.0,
-                (self.unknown_classified as f64 / total) * 100.0,
-            )
-        } else {
-            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-        }
+        let total = self.total_classified();
+        (
+            safe_percentage_u64(self.stamps_classified, total),
+            safe_percentage_u64(self.counterparty_classified, total),
+            safe_percentage_u64(self.ascii_identifier_protocols_classified, total),
+            safe_percentage_u64(self.omni_classified, total),
+            safe_percentage_u64(self.chancecoin_classified, total),
+            safe_percentage_u64(self.ppk_classified, total),
+            safe_percentage_u64(self.opreturn_signalled_classified, total),
+            safe_percentage_u64(self.datastorage_classified, total),
+            safe_percentage_u64(self.likely_data_storage_classified, total),
+            safe_percentage_u64(self.legitimate_classified, total),
+            safe_percentage_u64(self.unknown_classified, total),
+        )
     }
 
     pub fn error_rate(&self) -> f64 {
-        if self.transactions_processed > 0 {
-            (self.errors_encountered as f64 / self.transactions_processed as f64) * 100.0
-        } else {
-            0.0
-        }
+        safe_percentage_u64(self.errors_encountered, self.transactions_processed)
     }
 
     pub fn classification_rate(&self) -> f64 {
-        if self.transactions_processed > 0 {
-            (self.total_classified() as f64 / self.transactions_processed as f64) * 100.0
-        } else {
-            0.0
-        }
+        safe_percentage_u64(self.total_classified(), self.transactions_processed)
     }
 }
 

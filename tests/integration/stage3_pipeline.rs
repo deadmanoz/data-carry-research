@@ -8,6 +8,7 @@ use data_carry_research::types::{
     ClassificationDetails, ClassificationResult, EnrichedTransaction, OutputClassificationData,
     OutputClassificationDetails, ProtocolType, ProtocolVariant, Stage3Config, TransactionInput,
 };
+use data_carry_research::utils::math::safe_percentage;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // Import common test utilities
@@ -232,9 +233,18 @@ async fn test_stage3_batch_classification_insertion() {
     assert_eq!(stats.definitive_signatures, 2); // Stamps + Counterparty
 
     // Test percentage calculations (with reasonable tolerance for floating point)
-    assert!((stats.bitcoin_stamps_percentage() - 33.333333333333336).abs() < 0.000001);
-    assert!((stats.counterparty_percentage() - 33.333333333333336).abs() < 0.000001);
-    assert!((stats.unknown_percentage() - 33.333333333333336).abs() < 0.000001);
+    assert!(
+        (safe_percentage(stats.bitcoin_stamps, stats.total_classified) - 33.333333333333336).abs()
+            < 0.000001
+    );
+    assert!(
+        (safe_percentage(stats.counterparty, stats.total_classified) - 33.333333333333336).abs()
+            < 0.000001
+    );
+    assert!(
+        (safe_percentage(stats.unknown, stats.total_classified) - 33.333333333333336).abs()
+            < 0.000001
+    );
     assert!((stats.definitive_signature_rate() - 66.66666666666667).abs() < 0.000001);
 }
 
@@ -270,10 +280,19 @@ async fn test_stage3_classification_stats_calculations() {
         definitive_signatures: 75,
     };
 
-    assert_eq!(stats.bitcoin_stamps_percentage(), 25.0);
-    assert_eq!(stats.counterparty_percentage(), 35.0);
-    assert_eq!(stats.omni_layer_percentage(), 15.0);
-    assert_eq!(stats.unknown_percentage(), 25.0);
+    assert_eq!(
+        safe_percentage(stats.bitcoin_stamps, stats.total_classified),
+        25.0
+    );
+    assert_eq!(
+        safe_percentage(stats.counterparty, stats.total_classified),
+        35.0
+    );
+    assert_eq!(
+        safe_percentage(stats.omni_layer, stats.total_classified),
+        15.0
+    );
+    assert_eq!(safe_percentage(stats.unknown, stats.total_classified), 25.0);
     assert_eq!(stats.definitive_signature_rate(), 75.0);
 
     // Test with zero totals
@@ -293,10 +312,22 @@ async fn test_stage3_classification_stats_calculations() {
         definitive_signatures: 0,
     };
 
-    assert_eq!(empty_stats.bitcoin_stamps_percentage(), 0.0);
-    assert_eq!(empty_stats.counterparty_percentage(), 0.0);
-    assert_eq!(empty_stats.omni_layer_percentage(), 0.0);
-    assert_eq!(empty_stats.unknown_percentage(), 0.0);
+    assert_eq!(
+        safe_percentage(empty_stats.bitcoin_stamps, empty_stats.total_classified),
+        0.0
+    );
+    assert_eq!(
+        safe_percentage(empty_stats.counterparty, empty_stats.total_classified),
+        0.0
+    );
+    assert_eq!(
+        safe_percentage(empty_stats.omni_layer, empty_stats.total_classified),
+        0.0
+    );
+    assert_eq!(
+        safe_percentage(empty_stats.unknown, empty_stats.total_classified),
+        0.0
+    );
     assert_eq!(empty_stats.definitive_signature_rate(), 0.0);
 }
 
