@@ -335,91 +335,37 @@ impl ContentType {
         }
     }
 
-    /// Detect image formats
+    /// Detect image formats (delegates to standalone detect_image_format function)
     fn detect_image(data: &[u8]) -> Option<ImageFormat> {
-        if data.is_empty() {
-            return None;
-        }
-
-        // GIF: GIF87a or GIF89a (check early - only 6 bytes)
-        if data.len() >= 6 && (data.starts_with(b"GIF87a") || data.starts_with(b"GIF89a")) {
-            return Some(ImageFormat::Gif);
-        }
-
-        // BMP: BM (check early - only 2 bytes)
-        if data.len() >= 2 && data.starts_with(b"BM") {
-            return Some(ImageFormat::Bmp);
-        }
-
-        // TIFF: 49 49 2A 00 (little-endian) or 4D 4D 00 2A (big-endian) - 4 bytes
-        if data.len() >= 4
-            && (data.starts_with(&[0x49, 0x49, 0x2A, 0x00])
-                || data.starts_with(&[0x4D, 0x4D, 0x00, 0x2A]))
-        {
-            return Some(ImageFormat::Tiff);
-        }
-
-        // ICO: 00 00 01 00 - 4 bytes
-        if data.len() >= 4 && data.starts_with(&[0x00, 0x00, 0x01, 0x00]) {
-            return Some(ImageFormat::Ico);
-        }
-
-        // Minimum 8 bytes for most other formats
-        if data.len() < 8 {
-            return None;
-        }
-
-        // PNG: 89 50 4E 47 0D 0A 1A 0A
-        if data.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
-            return Some(ImageFormat::Png);
-        }
-
-        // JPEG: FF D8 FF
-        if data.starts_with(&[0xFF, 0xD8, 0xFF]) {
-            return Some(ImageFormat::Jpeg);
-        }
-
-        // WebP: RIFF....WEBP
-        if data.len() >= 12 && data.starts_with(b"RIFF") && &data[8..12] == b"WEBP" {
-            return Some(ImageFormat::WebP);
-        }
-
-        // SVG: <?xml or <svg (handle UTF-8 BOM and leading whitespace)
-        if let Ok(text) = std::str::from_utf8(data) {
-            // Strip UTF-8 BOM (0xEF 0xBB 0xBF) if present
-            let text = text.strip_prefix('\u{FEFF}').unwrap_or(text);
-            // Trim leading whitespace
-            let trimmed = text.trim_start();
-            if trimmed.starts_with("<?xml") || trimmed.starts_with("<svg") {
-                return Some(ImageFormat::Svg);
-            }
-        }
-
-        // AVIF: Check for ftyp with avif brand
-        if data.len() >= 12
-            && &data[4..8] == b"ftyp"
-            && (&data[8..12] == b"avif" || &data[8..12] == b"avis")
-        {
-            return Some(ImageFormat::Avif);
-        }
-
-        // JPEG XL: Require full 12-byte container header to avoid 0xFF 0x0A false positives
-        // Container: 00 00 00 0C 4A 58 4C 20 0D 0A 87 0A
-        if data.len() >= 12
-            && data[0..4] == [0x00, 0x00, 0x00, 0x0C]
-            && &data[4..8] == b"JXL "
-            && data[8..12] == [0x0D, 0x0A, 0x87, 0x0A]
-        {
-            return Some(ImageFormat::JpegXl);
-        }
-
-        None
+        detect_image_format(data)
     }
 
     /// Detect document formats
+    ///
+    /// Skips known archive signatures to prevent misclassification (e.g., ZIP with "%PDF" payload).
+    /// Uses window search in first 1024 bytes to match stamps.rs behaviour.
     fn detect_document(data: &[u8]) -> Option<DocumentFormat> {
-        // PDF: %PDF
-        if data.starts_with(b"%PDF") {
+        // Skip PDF detection for known archive formats
+        // This prevents ZIP files containing "%PDF" in their payload from misclassifying
+        const ARCHIVE_SIGNATURES: &[&[u8]] = &[
+            &[0x50, 0x4B],             // ZIP (PK)
+            &[0x52, 0x61, 0x72, 0x21], // RAR (Rar!)
+            &[0x37, 0x7A, 0xBC, 0xAF], // 7Z
+            &[0x1F, 0x8B],             // GZIP
+            &[0x42, 0x5A],             // BZIP2 (BZ)
+        ];
+
+        // Check archive signatures first - let detect_archive() handle these
+        for sig in ARCHIVE_SIGNATURES {
+            if data.starts_with(sig) {
+                return None;
+            }
+        }
+
+        // PDF: Search in first 1024 bytes for %PDF header
+        // This matches stamps.rs behaviour where PDF header might not be at exact start
+        let search_len = data.len().min(1024);
+        if search_len >= 4 && data[..search_len].windows(4).any(|w| w == b"%PDF") {
             return Some(DocumentFormat::Pdf);
         }
 
@@ -681,6 +627,25 @@ impl ContentType {
 // MIME type implementations for each format
 
 impl ImageFormat {
+    /// Get the file extension without leading dot (for decoder compatibility)
+    ///
+    /// This method returns extensions without a leading dot (e.g., "png" not ".png")
+    /// to maintain compatibility with decoder code that constructs filenames.
+    pub fn extension(&self) -> &'static str {
+        match self {
+            ImageFormat::Png => "png",
+            ImageFormat::Jpeg => "jpg",
+            ImageFormat::Gif => "gif",
+            ImageFormat::WebP => "webp",
+            ImageFormat::Svg => "svg",
+            ImageFormat::Bmp => "bmp",
+            ImageFormat::Tiff => "tiff",
+            ImageFormat::Ico => "ico",
+            ImageFormat::Avif => "avif",
+            ImageFormat::JpegXl => "jxl",
+        }
+    }
+
     pub fn mime_type(&self) -> &'static str {
         match self {
             ImageFormat::Png => "image/png",
@@ -695,6 +660,95 @@ impl ImageFormat {
             ImageFormat::JpegXl => "image/jxl",
         }
     }
+}
+
+/// Detect image format from binary data using magic bytes
+///
+/// This is a standalone public function for detecting image formats, used by both
+/// Stage 3 classification and the decoder to maintain consistent detection.
+///
+/// # Returns
+///
+/// - `Some(ImageFormat)` if a known image format is detected
+/// - `None` if no image format is detected
+pub fn detect_image_format(data: &[u8]) -> Option<ImageFormat> {
+    if data.is_empty() {
+        return None;
+    }
+
+    // GIF: GIF87a or GIF89a (check early - only 6 bytes)
+    if data.len() >= 6 && (data.starts_with(b"GIF87a") || data.starts_with(b"GIF89a")) {
+        return Some(ImageFormat::Gif);
+    }
+
+    // BMP: BM (check early - only 2 bytes)
+    if data.len() >= 2 && data.starts_with(b"BM") {
+        return Some(ImageFormat::Bmp);
+    }
+
+    // TIFF: 49 49 2A 00 (little-endian) or 4D 4D 00 2A (big-endian) - 4 bytes
+    if data.len() >= 4
+        && (data.starts_with(&[0x49, 0x49, 0x2A, 0x00])
+            || data.starts_with(&[0x4D, 0x4D, 0x00, 0x2A]))
+    {
+        return Some(ImageFormat::Tiff);
+    }
+
+    // ICO: 00 00 01 00 - 4 bytes
+    if data.len() >= 4 && data.starts_with(&[0x00, 0x00, 0x01, 0x00]) {
+        return Some(ImageFormat::Ico);
+    }
+
+    // Minimum 8 bytes for most other formats
+    if data.len() < 8 {
+        return None;
+    }
+
+    // PNG: 89 50 4E 47 0D 0A 1A 0A
+    if data.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
+        return Some(ImageFormat::Png);
+    }
+
+    // JPEG: FF D8 FF
+    if data.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        return Some(ImageFormat::Jpeg);
+    }
+
+    // WebP: RIFF....WEBP
+    if data.len() >= 12 && data.starts_with(b"RIFF") && &data[8..12] == b"WEBP" {
+        return Some(ImageFormat::WebP);
+    }
+
+    // SVG: <?xml or <svg (handle UTF-8 BOM and leading whitespace)
+    if let Ok(text) = std::str::from_utf8(data) {
+        // Strip UTF-8 BOM (0xEF 0xBB 0xBF) if present
+        let text = text.strip_prefix('\u{FEFF}').unwrap_or(text);
+        // Trim leading whitespace
+        let trimmed = text.trim_start();
+        if trimmed.starts_with("<?xml") || trimmed.starts_with("<svg") {
+            return Some(ImageFormat::Svg);
+        }
+    }
+
+    // AVIF: Check for ftyp with avif brand
+    if data.len() >= 12
+        && &data[4..8] == b"ftyp"
+        && (&data[8..12] == b"avif" || &data[8..12] == b"avis")
+    {
+        return Some(ImageFormat::Avif);
+    }
+
+    // JPEG XL: Require full 12-byte container header to avoid 0xFF 0x0A false positives
+    // Container: 00 00 00 0C 4A 58 4C 20 0D 0A 87 0A
+    if data.len() >= 12
+        && data[0..4] == [0x00, 0x00, 0x00, 0x0C]
+        && &data[4..8] == b"JXL "
+        && data[8..12] == [0x0D, 0x0A, 0x87, 0x0A]
+    {
+        return Some(ImageFormat::JpegXl);
+    }
+
+    None
 }
 
 impl AudioFormat {
@@ -994,5 +1048,111 @@ mod tests {
 
         // Unknown MIME types should return None
         assert!(ContentType::from_mime_type("application/unknown").is_none());
+    }
+
+    /// Test standalone detect_image_format() function
+    #[test]
+    fn test_detect_image_format_standalone() {
+        // PNG (8 bytes minimum)
+        let png = vec![0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        assert_eq!(detect_image_format(&png), Some(ImageFormat::Png));
+
+        // JPEG (needs 8 bytes minimum due to early-exit check in detect_image_format)
+        let jpeg = vec![0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46];
+        assert_eq!(detect_image_format(&jpeg), Some(ImageFormat::Jpeg));
+
+        // GIF (6 bytes minimum)
+        assert_eq!(detect_image_format(b"GIF89a"), Some(ImageFormat::Gif));
+        assert_eq!(detect_image_format(b"GIF87a"), Some(ImageFormat::Gif));
+
+        // WebP (12 bytes minimum)
+        let mut webp = b"RIFF".to_vec();
+        webp.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+        webp.extend_from_slice(b"WEBP");
+        assert_eq!(detect_image_format(&webp), Some(ImageFormat::WebP));
+
+        // SVG (text-based, parsed)
+        assert_eq!(
+            detect_image_format(b"<svg xmlns=\"test\">"),
+            Some(ImageFormat::Svg)
+        );
+
+        // BMP (2 bytes minimum)
+        assert_eq!(detect_image_format(b"BM\x00\x00"), Some(ImageFormat::Bmp));
+
+        // Empty/unknown returns None
+        assert_eq!(detect_image_format(&[]), None);
+        assert_eq!(detect_image_format(b"unknown data"), None);
+    }
+
+    /// Test ImageFormat::extension() returns extension WITHOUT leading dot (decoder compat)
+    #[test]
+    fn test_image_format_extension_no_dot() {
+        // Verify extension() returns WITHOUT leading dot (for decoder compatibility)
+        assert_eq!(ImageFormat::Png.extension(), "png");
+        assert_eq!(ImageFormat::Jpeg.extension(), "jpg");
+        assert_eq!(ImageFormat::Gif.extension(), "gif");
+        assert_eq!(ImageFormat::WebP.extension(), "webp");
+        assert_eq!(ImageFormat::Svg.extension(), "svg");
+        assert_eq!(ImageFormat::Bmp.extension(), "bmp");
+        assert_eq!(ImageFormat::Tiff.extension(), "tiff");
+        assert_eq!(ImageFormat::Ico.extension(), "ico");
+        assert_eq!(ImageFormat::Avif.extension(), "avif");
+        assert_eq!(ImageFormat::JpegXl.extension(), "jxl");
+
+        // Verify ContentType::file_extension() returns WITH leading dot (existing API)
+        let png_ct = ContentType::Image(ImageFormat::Png);
+        let jpeg_ct = ContentType::Image(ImageFormat::Jpeg);
+        assert_eq!(png_ct.file_extension(), Some(".png"));
+        assert_eq!(jpeg_ct.file_extension(), Some(".jpg"));
+    }
+
+    /// Test PDF detection uses window search in first 1024 bytes
+    #[test]
+    fn test_pdf_window_search_detection() {
+        // PDF at start
+        let pdf_start = b"%PDF-1.4\nsome content";
+        let ct = ContentType::detect(pdf_start).unwrap();
+        assert_eq!(ct, ContentType::Document(DocumentFormat::Pdf));
+
+        // PDF not at exact start (within 1024 bytes)
+        let mut pdf_offset = vec![0x00; 100];
+        pdf_offset.extend_from_slice(b"%PDF-1.7\ntest");
+        let ct = ContentType::detect(&pdf_offset).unwrap();
+        assert_eq!(ct, ContentType::Document(DocumentFormat::Pdf));
+    }
+
+    /// Regression test: ZIP file containing "%PDF" string should NOT be detected as PDF
+    #[test]
+    fn test_zip_with_pdf_string_not_misclassified() {
+        // ZIP signature (PK) followed by some data that happens to contain "%PDF"
+        let mut zip_with_pdf = vec![0x50, 0x4B, 0x03, 0x04]; // ZIP magic
+        zip_with_pdf.extend_from_slice(b"some ZIP content here");
+        zip_with_pdf.extend_from_slice(b"%PDF-1.4"); // %PDF string inside ZIP
+        zip_with_pdf.extend_from_slice(b"more content");
+
+        let ct = ContentType::detect(&zip_with_pdf).unwrap();
+        // Should detect as ZIP, NOT as PDF
+        assert_eq!(
+            ct,
+            ContentType::Archive(ArchiveFormat::Zip),
+            "ZIP file with '%PDF' payload should be detected as ZIP, not PDF"
+        );
+    }
+
+    /// Regression test: RAR file containing "%PDF" string should NOT be detected as PDF
+    #[test]
+    fn test_rar_with_pdf_string_not_misclassified() {
+        // RAR signature followed by data containing "%PDF"
+        let mut rar_with_pdf = b"Rar!\x1A\x07\x00".to_vec(); // RAR magic
+        rar_with_pdf.extend_from_slice(b"some RAR content");
+        rar_with_pdf.extend_from_slice(b"%PDF-1.5");
+
+        let ct = ContentType::detect(&rar_with_pdf).unwrap();
+        assert_eq!(
+            ct,
+            ContentType::Archive(ArchiveFormat::Rar),
+            "RAR file with '%PDF' payload should be detected as RAR, not PDF"
+        );
     }
 }

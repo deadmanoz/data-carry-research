@@ -20,21 +20,16 @@ pub mod datastorage;
 pub mod filters;
 pub mod likely_data_storage;
 pub mod likely_legitimate;
-pub mod multisig_patterns; // Shared multisig pattern matching utilities
 pub mod omni;
 pub mod opreturn_signalled;
 pub mod ppk; // PPk protocol classifier
-pub mod pubkey_extraction; // Shared pubkey extraction utilities
-pub mod signature_detection; // Shared signature detection utilities
 pub mod spendability;
 pub mod stamps;
 pub mod wikileaks_cablegate;
 
-// Re-export spendability analyser, filter helper, pubkey extractor, signature detector, and multisig pattern matcher for use in classifiers
+// Re-export spendability analyser and filter helper for use in classifiers
+// Note: MultisigPatternMatcher, PubkeyExtractor, SignatureDetector now in crate::shared
 pub use filters::filter_p2ms_for_classification;
-pub use multisig_patterns::MultisigPatternMatcher;
-pub use pubkey_extraction::PubkeyExtractor;
-pub use signature_detection::SignatureDetector;
 pub use spendability::SpendabilityAnalyser;
 
 /// Stage 3 processor for protocol classification

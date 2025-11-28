@@ -8,7 +8,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::trace;
 
 use super::filter_p2ms_for_classification;
-use super::{ProtocolSpecificClassifier, SignatureDetector, SpendabilityAnalyser};
+use super::{ProtocolSpecificClassifier, SpendabilityAnalyser};
+use crate::shared::SignatureDetector;
 
 /// Bitcoin Stamps classifier - detects keyburn P2MS and validates ARC4 'stamp:' payload
 pub struct BitcoinStampsClassifier {

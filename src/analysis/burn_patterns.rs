@@ -2,9 +2,9 @@
 //!
 //! This module provides comprehensive analysis of burn patterns detected in P2MS transactions.
 
-use crate::types::analysis_results::{BurnPatternAnalysis, BurnPatternSample, PatternTypeStats};
 use crate::database::{Database, QueryHelper};
 use crate::errors::AppResult;
+use crate::types::analysis_results::{BurnPatternAnalysis, BurnPatternSample, PatternTypeStats};
 
 /// Burn pattern analyser for comprehensive pattern insights
 pub struct BurnPatternAnalyser;

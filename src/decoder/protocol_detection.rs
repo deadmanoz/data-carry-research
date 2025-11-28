@@ -37,24 +37,24 @@ pub enum DecodedProtocol {
     BitcoinStamps {
         txid: String,
         decrypted_data: Vec<u8>,
-        debug_info: Option<crate::decoder::debug_display::TransactionDebugInfo>,
+        debug_info: Option<crate::types::debug::TransactionDebugInfo>,
     },
     Counterparty {
         txid: String,
         decrypted_data: Vec<u8>,
-        debug_info: Option<crate::decoder::debug_display::TransactionDebugInfo>,
+        debug_info: Option<crate::types::debug::TransactionDebugInfo>,
     },
     Omni {
         txid: String,
         decrypted_data: Vec<u8>,
         sender_address: String,
         packet_count: u8,
-        debug_info: Option<crate::decoder::debug_display::TransactionDebugInfo>,
+        debug_info: Option<crate::types::debug::TransactionDebugInfo>,
     },
     Chancecoin {
         txid: String,
         message: crate::types::chancecoin::ChancecoinMessage,
-        debug_info: Option<crate::decoder::debug_display::TransactionDebugInfo>,
+        debug_info: Option<crate::types::debug::TransactionDebugInfo>,
     },
     PPk {
         txid: String,
@@ -64,26 +64,26 @@ pub enum DecodedProtocol {
         parsed_data: Option<Vec<u8>>,
         content_type: String,
         odin_identifier: Option<crate::types::ppk::OdinIdentifier>,
-        debug_info: Option<crate::decoder::debug_display::TransactionDebugInfo>,
+        debug_info: Option<crate::types::debug::TransactionDebugInfo>,
     },
     LikelyLegitimateMultisig {
         txid: String,
         validation_summary: String,
         has_duplicates: bool,
-        debug_info: Option<crate::decoder::debug_display::TransactionDebugInfo>,
+        debug_info: Option<crate::types::debug::TransactionDebugInfo>,
     },
     LikelyDataStorage {
         txid: String,
         pattern_type: String, // "InvalidECPoint", "HighOutputCount", "DustAmount"
         details: String,
-        debug_info: Option<crate::decoder::debug_display::TransactionDebugInfo>,
+        debug_info: Option<crate::types::debug::TransactionDebugInfo>,
     },
     DataStorage {
         txid: String,
         pattern: String,
         decoded_data: Vec<u8>,
         metadata: serde_json::Value,
-        debug_info: Option<crate::decoder::debug_display::TransactionDebugInfo>,
+        debug_info: Option<crate::types::debug::TransactionDebugInfo>,
     },
 }
 

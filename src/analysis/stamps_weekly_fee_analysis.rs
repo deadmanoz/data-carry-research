@@ -17,10 +17,12 @@
 //! - **JSON**: Raw structured data with satoshi values
 //! - **Plotly**: Plotly-native trace format with `{data: [...], layout: {...}}`
 
-use super::plotly_types::{PlotlyChart, PlotlyLayout, PlotlyTrace};
-use crate::types::analysis_results::{StampsFeeSummary, StampsWeeklyFeeReport, WeeklyStampsFeeStats};
 use crate::database::Database;
 use crate::errors::AppResult;
+use crate::types::analysis_results::{
+    StampsFeeSummary, StampsWeeklyFeeReport, WeeklyStampsFeeStats,
+};
+use crate::types::visualisation::{PlotlyChart, PlotlyLayout, PlotlyTrace};
 use chrono::{TimeZone, Utc};
 
 /// Seconds in a week (7 × 24 × 60 × 60 = 604800)

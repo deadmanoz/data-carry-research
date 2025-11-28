@@ -3,15 +3,15 @@
 //! This module provides comprehensive data size (bytes) reporting for P2MS outputs,
 //! analysing blockchain storage footprint across protocols, spendability, and content types.
 
+use crate::database::stage3::operations::NO_MIME_TYPE_SENTINEL;
+use crate::database::Database;
+use crate::errors::AppResult;
 use crate::types::analysis_results::{
     CategoryDataMetrics, CategorySpendabilityData, ComprehensiveDataSizeReport, ContentTypeData,
     ContentTypeSpendabilityReport, OverallDataSummary, ProtocolDataSize, ProtocolDataSizeReport,
     ProtocolSpendabilityData, ReasonSpendabilityData, SpendabilityDataMetrics,
     SpendabilityDataSizeReport,
 };
-use crate::database::stage3::operations::NO_MIME_TYPE_SENTINEL;
-use crate::database::Database;
-use crate::errors::AppResult;
 use crate::types::content_detection::ContentType;
 use std::collections::{HashMap, HashSet};
 

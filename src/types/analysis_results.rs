@@ -3,8 +3,6 @@
 //! This module defines the comprehensive data structures returned by various
 //! analysis operations, replacing the raw SQL output with structured, type-safe results.
 
-use crate::analysis::stamps_signature_stats::StampsSignatureAnalysis;
-use crate::analysis::stamps_transport_stats::StampsTransportAnalysis;
 use crate::types::ProtocolType;
 use crate::utils::math::{safe_percentage, safe_percentage_u64};
 use serde::{Deserialize, Serialize};
@@ -936,4 +934,79 @@ pub struct TxSizeDistributionReport {
     pub global_distribution: GlobalTxSizeDistribution,
     /// Per-protocol distributions (sorted by canonical ProtocolType order)
     pub protocol_distributions: Vec<ProtocolTxSizeDistribution>,
+}
+
+// ============================================================================
+// Stamps-specific analysis types (moved from analysis modules to avoid cycle)
+// ============================================================================
+
+/// Statistics for a specific signature variant
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SignatureVariantStats {
+    pub variant: String,
+    pub count: usize,
+    pub percentage: f64,
+}
+
+/// Bitcoin Stamps signature variant distribution analysis
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StampsSignatureAnalysis {
+    pub total_stamps: usize,
+    pub signature_distribution: Vec<SignatureVariantStats>,
+    pub pure_stamps_signatures: Vec<SignatureVariantStats>,
+    pub counterparty_stamps_signatures: Vec<SignatureVariantStats>,
+}
+
+/// Bitcoin Stamps transport mechanism analysis
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StampsTransportAnalysis {
+    /// Total number of Bitcoin Stamps transactions
+    pub total_transactions: usize,
+
+    /// Total number of Bitcoin Stamps outputs
+    pub total_outputs: usize,
+
+    /// Pure Bitcoin Stamps statistics
+    #[serde(default)]
+    pub pure_stamps: TransportStats,
+
+    /// Counterparty-transported Bitcoin Stamps statistics
+    #[serde(default)]
+    pub counterparty_transport: TransportStats,
+}
+
+/// Statistics for a specific transport mechanism
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TransportStats {
+    /// Number of transactions using this transport
+    pub transaction_count: usize,
+
+    /// Percentage of total Bitcoin Stamps transactions
+    pub transaction_percentage: f64,
+
+    /// Breakdown by variant (StampsSRC20, StampsClassic, etc.)
+    #[serde(default)]
+    pub variant_breakdown: Vec<TransportVariantStats>,
+
+    /// Number of spendable outputs
+    pub spendable_outputs: usize,
+
+    /// Number of unspendable outputs
+    pub unspendable_outputs: usize,
+
+    /// Total outputs for this transport type
+    pub total_outputs: usize,
+}
+
+/// Variant statistics within a transport mechanism (Stamps-specific)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransportVariantStats {
+    /// Variant name (e.g., "StampsSRC20")
+    pub variant: String,
+
+    /// Number of transactions with this variant
+    pub count: usize,
+
+    /// Percentage within this transport type
+    pub percentage: f64,
 }

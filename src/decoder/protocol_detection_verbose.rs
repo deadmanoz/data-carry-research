@@ -3,11 +3,11 @@
 //! This module provides enhanced versions of protocol detection functions
 //! that capture detailed information about the decoding process.
 
-use crate::decoder::debug_display::{P2MSOutputDebugInfo, TransactionDebugInfo};
 use crate::decoder::protocol_detection::{
     has_counterparty_signature, DecodedProtocol, TransactionData,
 };
 use crate::types::counterparty::COUNTERPARTY_PREFIX;
+use crate::types::debug::{P2MSOutputDebugInfo, TransactionDebugInfo};
 use crate::types::stamps::validation;
 use tracing::{debug, info};
 

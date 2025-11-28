@@ -2,9 +2,9 @@
 //!
 //! This module provides comprehensive fee analysis for P2MS transactions.
 
-use crate::types::analysis_results::{FeeAnalysisReport, FeeStatistics, StorageCostAnalysis};
 use crate::database::{Database, QueryHelper};
 use crate::errors::AppResult;
+use crate::types::analysis_results::{FeeAnalysisReport, FeeStatistics, StorageCostAnalysis};
 
 /// Fee analysis engine for transaction cost calculations
 pub struct FeeAnalysisEngine;

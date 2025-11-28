@@ -9,12 +9,12 @@
 //! CRITICAL: All queries filter by `is_spent = 0 AND script_type = 'multisig'` to ensure
 //! statistics reflect only unspent P2MS outputs (the true UTXO set).
 
+use crate::database::Database;
+use crate::errors::AppResult;
 use crate::types::analysis_results::{
     ContentTypeAnalysisReport, ContentTypeCategoryStats, ContentTypeProtocolStats,
     ContentTypeStats, ValidNoneStats,
 };
-use crate::database::Database;
-use crate::errors::AppResult;
 
 /// Content type analyser for MIME type distribution insights
 pub struct ContentTypeAnalyser;

@@ -31,9 +31,7 @@
 //! ## Stage Population Strategy
 //!
 //! - **Stage 1**: Stub blocks + transaction_outputs + p2ms_outputs (P2MS only)
-//! - **Stage 2A**: Backfill blocks (hash, timestamp via RPC)
-//! - **Stage 2B**: Enrich transactions (all outputs, inputs, burn patterns)
-//! - **Stage 2C**: Analyse spending chain (mark outputs as spent)
+//! - **Stage 2**: Enrich transactions (all outputs, inputs, burn patterns) + backfill block info
 //! - **Stage 3**: Classify protocols + compute spendability
 
 use crate::errors::{AppError, AppResult};
@@ -58,11 +56,11 @@ pub fn setup_schema_v2(connection: &Connection) -> AppResult<()> {
 
         -- BLOCKS TABLE
         -- Stage 1: Inserts stub rows (height only, NULL hash/timestamp)
-        -- Stage 2A: Backfills hash/timestamp via RPC
+        -- Stage 2: Backfills hash/timestamp via RPC during batch processing
         CREATE TABLE IF NOT EXISTS blocks (
             height INTEGER PRIMARY KEY,
-            block_hash TEXT UNIQUE,           -- NULLABLE until Stage 2A backfill
-            timestamp INTEGER,                -- NULLABLE until Stage 2A backfill
+            block_hash TEXT UNIQUE,           -- NULLABLE until Stage 2 backfill
+            timestamp INTEGER,                -- NULLABLE until Stage 2 backfill
             fetched_at INTEGER DEFAULT (strftime('%s', 'now'))
         );
 

@@ -4,13 +4,13 @@
 //! fee patterns. Reports histogram distributions and percentiles for both
 //! global and per-protocol breakdowns.
 
-use super::plotly_types::{get_protocol_colour, PlotlyChart, PlotlyLayout, PlotlyTrace};
+use crate::database::Database;
+use crate::errors::AppResult;
 use crate::types::analysis_results::{
     GlobalTxSizeDistribution, ProtocolTxSizeDistribution, TxSizeBucket, TxSizeDistributionReport,
     TxSizePercentiles,
 };
-use crate::database::Database;
-use crate::errors::AppResult;
+use crate::types::visualisation::{get_protocol_colour, PlotlyChart, PlotlyLayout, PlotlyTrace};
 use crate::types::ProtocolType;
 use std::str::FromStr;
 

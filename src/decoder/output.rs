@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-use super::image_formats::ImageFormat;
 use crate::config::output_paths;
+use crate::types::content_detection::{DocumentFormat, ImageFormat};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -71,6 +71,33 @@ impl OutputManager {
         let filepath = image_dir.join(filename);
 
         fs::write(&filepath, image_data)?;
+        Ok(filepath)
+    }
+
+    /// Write document data (PDF, etc.) to the bitcoin_stamps/documents subdirectory
+    /// Creates: <base_dir>/bitcoin_stamps/documents/<txid>.<ext>
+    ///
+    /// Documents are semantically different from images - they are multi-page,
+    /// structured content rather than raster/vector graphics.
+    pub fn write_document(
+        &self,
+        txid: &str,
+        data: &[u8],
+        format: DocumentFormat,
+    ) -> OutputResult<PathBuf> {
+        let doc_dir = self
+            .base_dir
+            .join(output_paths::PROTOCOL_BITCOIN_STAMPS)
+            .join("documents");
+        self.ensure_directory_exists(&doc_dir)?;
+
+        let extension = match format {
+            DocumentFormat::Pdf => "pdf",
+        };
+        let filename = format!("{}.{}", txid, extension);
+        let filepath = doc_dir.join(filename);
+
+        fs::write(&filepath, data)?;
         Ok(filepath)
     }
 

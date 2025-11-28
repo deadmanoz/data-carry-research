@@ -3,6 +3,8 @@
 //! These functions are pure, decoder-agnostic utilities that eliminate duplication
 //! between `src/processor/stage3/datastorage.rs` and `src/decoder/datastorage.rs`.
 
+use crate::types::content_detection::{detect_image_format, ImageFormat};
+
 /// Extract data from a pubkey hex string.
 ///
 /// Handles various pubkey formats:
@@ -101,42 +103,42 @@ pub fn detect_binary_signature(data: &[u8]) -> Option<&'static str> {
         return None;
     }
 
+    // Archive detection FIRST - prevents ZIP/RAR with "%PDF" payload misclassification
+    // This mirrors the archive-first skip in content_detection::detect_document()
+    const ARCHIVE_SIGNATURES: &[(&[u8], &str)] = &[
+        (&[0x50, 0x4B], "ZIP"),                        // ZIP (PK)
+        (b"Rar!", "RAR"),                              // RAR
+        (&[0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C], "7Z"), // 7-Zip
+    ];
+
+    for (sig, name) in ARCHIVE_SIGNATURES {
+        if data.len() >= sig.len() && data.starts_with(sig) {
+            return Some(name);
+        }
+    }
+
     // PDF: %PDF (0x25 0x50 0x44 0x46)
     // Search in windows since PDF header might not be at start of chunk
+    // Safe to check now - archives already handled above
     let search_len = data.len().min(1024);
     if data[..search_len].windows(4).any(|w| w == b"%PDF") {
         return Some("PDF");
     }
 
-    // PNG: 89 50 4E 47 0D 0A 1A 0A
-    if data.len() >= 8 && data.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
-        return Some("PNG");
+    // Image detection via content_detection module
+    // ONLY map legacy formats that datastorage_helpers previously detected (PNG/JPEG/GIF)
+    // DO NOT expose new formats (TIFF, ICO, AVIF, JpegXl) to avoid classification changes
+    if let Some(image_format) = detect_image_format(data) {
+        match image_format {
+            ImageFormat::Png => return Some("PNG"),
+            ImageFormat::Jpeg => return Some("JPEG"),
+            ImageFormat::Gif => return Some("GIF"),
+            // New formats NOT mapped - fall through to continue with archive/compression detection
+            _ => {}
+        }
     }
 
-    // JPEG: FF D8 FF
-    if data.starts_with(&[0xFF, 0xD8, 0xFF]) {
-        return Some("JPEG");
-    }
-
-    // GIF: GIF87a or GIF89a
-    if data.starts_with(b"GIF8") {
-        return Some("GIF");
-    }
-
-    // ZIP/JAR/DOCX: PK (0x50 0x4B)
-    if data.starts_with(&[0x50, 0x4B]) {
-        return Some("ZIP");
-    }
-
-    // RAR: Rar! (0x52 0x61 0x72 0x21)
-    if data.starts_with(b"Rar!") {
-        return Some("RAR");
-    }
-
-    // 7-Zip: 7z (0x37 0x7A 0xBC 0xAF 0x27 0x1C)
-    if data.len() >= 6 && data.starts_with(&[0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C]) {
-        return Some("7Z");
-    }
+    // Note: ZIP/RAR/7Z detection moved to top of function (archive-first pattern)
 
     // GZIP: 0x1f 0x8b 0x08 (most common, third byte is compression method DEFLATE)
     // Search in windows since GZIP header might not be at start of chunk
@@ -270,7 +272,8 @@ mod tests {
 
     #[test]
     fn test_detect_binary_signature_jpeg() {
-        let data = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10];
+        // JPEG needs 8+ bytes due to detect_image_format early-exit check
+        let data = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46];
         assert_eq!(detect_binary_signature(&data), Some("JPEG"));
     }
 
@@ -297,5 +300,36 @@ mod tests {
     fn test_detect_binary_signature_none() {
         let data = b"random data without signature";
         assert_eq!(detect_binary_signature(data), None);
+    }
+
+    /// Regression test: ZIP file containing "%PDF" string should be detected as ZIP, not PDF
+    #[test]
+    fn test_detect_binary_signature_zip_with_pdf_payload() {
+        // ZIP signature followed by data containing "%PDF"
+        let mut zip_with_pdf = vec![0x50, 0x4B, 0x03, 0x04]; // ZIP magic
+        zip_with_pdf.extend_from_slice(b"some ZIP content");
+        zip_with_pdf.extend_from_slice(b"%PDF-1.4"); // %PDF string inside payload
+        zip_with_pdf.extend_from_slice(b"more content");
+
+        assert_eq!(
+            detect_binary_signature(&zip_with_pdf),
+            Some("ZIP"),
+            "ZIP file with '%PDF' payload should be detected as ZIP, not PDF"
+        );
+    }
+
+    /// Regression test: RAR file containing "%PDF" string should be detected as RAR, not PDF
+    #[test]
+    fn test_detect_binary_signature_rar_with_pdf_payload() {
+        // RAR signature followed by data containing "%PDF"
+        let mut rar_with_pdf = b"Rar!\x1A\x07\x00".to_vec(); // RAR magic
+        rar_with_pdf.extend_from_slice(b"some RAR content");
+        rar_with_pdf.extend_from_slice(b"%PDF-1.5"); // %PDF string inside payload
+
+        assert_eq!(
+            detect_binary_signature(&rar_with_pdf),
+            Some("RAR"),
+            "RAR file with '%PDF' payload should be detected as RAR, not PDF"
+        );
     }
 }

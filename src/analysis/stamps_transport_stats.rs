@@ -5,8 +5,15 @@
 
 use crate::database::Database;
 use crate::errors::AppResult;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+// Import types from canonical location (avoids types↔analysis cycle)
+pub use crate::types::analysis_results::{
+    StampsTransportAnalysis, TransportStats, TransportVariantStats,
+};
+
+// Re-export with original name for backward compatibility
+pub use TransportVariantStats as VariantStats;
 
 /// Analyser for Bitcoin Stamps transport statistics
 pub struct StampsTransportAnalyser;
@@ -180,60 +187,6 @@ impl StampsTransportAnalyser {
         variant_list.sort_by(|a, b| b.count.cmp(&a.count));
         variant_list
     }
-}
-
-/// Bitcoin Stamps transport mechanism analysis
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StampsTransportAnalysis {
-    /// Total number of Bitcoin Stamps transactions
-    pub total_transactions: usize,
-
-    /// Total number of Bitcoin Stamps outputs
-    pub total_outputs: usize,
-
-    /// Pure Bitcoin Stamps statistics
-    #[serde(default)]
-    pub pure_stamps: TransportStats,
-
-    /// Counterparty-transported Bitcoin Stamps statistics
-    #[serde(default)]
-    pub counterparty_transport: TransportStats,
-}
-
-/// Statistics for a specific transport mechanism
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct TransportStats {
-    /// Number of transactions using this transport
-    pub transaction_count: usize,
-
-    /// Percentage of total Bitcoin Stamps transactions
-    pub transaction_percentage: f64,
-
-    /// Breakdown by variant (StampsSRC20, StampsClassic, etc.)
-    #[serde(default)]
-    pub variant_breakdown: Vec<VariantStats>,
-
-    /// Number of spendable outputs
-    pub spendable_outputs: usize,
-
-    /// Number of unspendable outputs
-    pub unspendable_outputs: usize,
-
-    /// Total outputs for this transport type
-    pub total_outputs: usize,
-}
-
-/// Variant statistics within a transport mechanism
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VariantStats {
-    /// Variant name (e.g., "StampsSRC20")
-    pub variant: String,
-
-    /// Number of transactions with this variant
-    pub count: usize,
-
-    /// Percentage within this transport type
-    pub percentage: f64,
 }
 
 #[cfg(test)]

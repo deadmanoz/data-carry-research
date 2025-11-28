@@ -3,8 +3,8 @@
 //! This module provides formatting functionality for analysis results,
 //! replacing the echo statements in justfile commands with structured output.
 
-use super::plotly_types::{get_protocol_colour, PlotlyChart};
 use super::tx_size_analysis::TX_SIZE_BUCKET_RANGES;
+use crate::errors::AppResult;
 use crate::types::analysis_results::{
     BurnPatternAnalysis, ClassificationStatsReport, ComprehensiveDataSizeReport,
     ContentTypeSpendabilityReport, DustAnalysisReport, FeeAnalysisReport, FileExtensionReport,
@@ -12,7 +12,7 @@ use crate::types::analysis_results::{
     SpendabilityDataSizeReport, SpendabilityStatsReport, StampsWeeklyFeeReport,
     TxSizeDistributionReport, ValueAnalysisReport, ValueDistributionReport,
 };
-use crate::errors::AppResult;
+use crate::types::visualisation::{get_protocol_colour, PlotlyChart};
 use crate::utils::currency::{format_rate_as_btc, format_sats_as_btc, format_sats_as_btc_f64};
 use serde::Serialize;
 use std::str::FromStr;

@@ -384,6 +384,12 @@ async fn run_decode_txid(
                         crate::decoder::BitcoinStampsData::Data(decoded_data) => {
                             println!("TXID:{} TYPE:DATA SIZE:{}", txid, decoded_data.size_bytes);
                         }
+                        crate::decoder::BitcoinStampsData::Document(decoded_doc) => {
+                            println!(
+                                "TXID:{} TYPE:DOCUMENT FORMAT:{:?} SIZE:{}",
+                                txid, decoded_doc.format, decoded_doc.size_bytes
+                            );
+                        }
                     },
                     DecodedData::Counterparty { data } => {
                         println!(
@@ -458,6 +464,10 @@ async fn run_decode_txid(
                         crate::decoder::BitcoinStampsData::Data(decoded_data) => {
                             info!("✅ Successfully decoded Bitcoin Stamps raw data!");
                             info!("📄 {}", decoded_data.summary());
+                        }
+                        crate::decoder::BitcoinStampsData::Document(decoded_doc) => {
+                            info!("✅ Successfully decoded Bitcoin Stamps document!");
+                            info!("📄 {}", decoded_doc.summary());
                         }
                     },
                     DecodedData::Counterparty { data } => {

@@ -206,6 +206,12 @@ async fn test_decode_bitcoin_stamps_image_54fdeda9() -> anyhow::Result<()> {
         }) => {
             panic!("❌ Expected image data, got generic data");
         }
+        Some(DecodedData::BitcoinStamps {
+            data: BitcoinStampsData::Document(_),
+            ..
+        }) => {
+            panic!("❌ Expected image data, got document");
+        }
         Some(DecodedData::Counterparty { .. }) => {
             panic!("❌ Expected Bitcoin Stamps image data, got Counterparty");
         }
@@ -320,6 +326,12 @@ async fn test_decode_bitcoin_stamps_src101_77fb147b() -> anyhow::Result<()> {
             ..
         }) => {
             panic!("❌ Expected JSON data, got generic data");
+        }
+        Some(DecodedData::BitcoinStamps {
+            data: BitcoinStampsData::Document(_),
+            ..
+        }) => {
+            panic!("❌ Expected JSON data, got document");
         }
         Some(DecodedData::Counterparty { .. }) => {
             panic!("❌ Expected Bitcoin Stamps JSON data, got Counterparty");
@@ -439,6 +451,12 @@ async fn test_decode_bitcoin_stamps_src20_eb96a65e() -> anyhow::Result<()> {
             ..
         }) => {
             panic!("❌ Expected JSON data, got generic data");
+        }
+        Some(DecodedData::BitcoinStamps {
+            data: BitcoinStampsData::Document(_),
+            ..
+        }) => {
+            panic!("❌ Expected JSON data, got document");
         }
         Some(DecodedData::Counterparty { .. }) => {
             panic!("❌ Expected Bitcoin Stamps JSON data, got Counterparty");
@@ -564,6 +582,12 @@ async fn test_decode_bitcoin_stamps_image_c129cc() -> anyhow::Result<()> {
             ..
         }) => {
             panic!("❌ Expected JSON data, got generic data");
+        }
+        Some(DecodedData::BitcoinStamps {
+            data: BitcoinStampsData::Document(_),
+            ..
+        }) => {
+            panic!("❌ Expected JSON data, got document");
         }
         Some(DecodedData::Counterparty { .. }) => {
             panic!("❌ Expected Bitcoin Stamps JSON data, got Counterparty");
@@ -692,6 +716,12 @@ async fn test_decode_bitcoin_stamps_multi_output_95dca4() -> anyhow::Result<()> 
                 decoded_data.size_bytes,
                 content_preview
             );
+        }
+        Some(DecodedData::BitcoinStamps {
+            data: BitcoinStampsData::Document(_),
+            ..
+        }) => {
+            panic!("❌ Expected HTML data, got Document");
         }
         Some(DecodedData::Counterparty { .. }) => {
             panic!("❌ Expected Bitcoin Stamps data, got Counterparty");
@@ -1260,6 +1290,12 @@ async fn test_decode_stamps_counterparty_transport_31a96a3b() -> anyhow::Result<
             ..
         }) => {
             panic!("❌ Expected image data, got generic data");
+        }
+        Some(DecodedData::BitcoinStamps {
+            data: BitcoinStampsData::Document(_),
+            ..
+        }) => {
+            panic!("❌ Expected image data, got document");
         }
         Some(DecodedData::Counterparty { .. }) => {
             panic!("❌ This should be Bitcoin Stamps - has 'STAMP:' in description field");
@@ -1988,6 +2024,12 @@ async fn test_decode_stamps_original_image() -> anyhow::Result<()> {
                 let expected_dir = temp_dir.path().join("bitcoin_stamps").join("data");
                 assert!(data.file_path.starts_with(&expected_dir));
             }
+            BitcoinStampsData::Document(doc) => {
+                assert_eq!(doc.txid, STAMPS_ORIGINAL_IMAGE_TXID);
+                assert!(doc.file_path.exists());
+                let expected_dir = temp_dir.path().join("bitcoin_stamps").join("documents");
+                assert!(doc.file_path.starts_with(&expected_dir));
+            }
         },
         Some(DecodedData::Counterparty { .. }) => panic!("Expected Stamps, got Counterparty"),
         Some(DecodedData::Omni { .. }) => panic!("Expected Stamps, got Omni"),
@@ -2043,6 +2085,12 @@ async fn test_decode_stamps_classic_4d89d7() -> anyhow::Result<()> {
                 assert!(data.file_path.exists());
                 let expected_dir = temp_dir.path().join("bitcoin_stamps").join("data");
                 assert!(data.file_path.starts_with(&expected_dir));
+            }
+            BitcoinStampsData::Document(doc) => {
+                assert_eq!(doc.txid, STAMPS_CLASSIC_4D89D7_TXID);
+                assert!(doc.file_path.exists());
+                let expected_dir = temp_dir.path().join("bitcoin_stamps").join("documents");
+                assert!(doc.file_path.starts_with(&expected_dir));
             }
         },
         Some(DecodedData::Counterparty { .. }) => panic!("Expected Stamps, got Counterparty"),
@@ -2100,6 +2148,12 @@ async fn test_decode_stamps_classic_f35382() -> anyhow::Result<()> {
                 let expected_dir = temp_dir.path().join("bitcoin_stamps").join("data");
                 assert!(data.file_path.starts_with(&expected_dir));
             }
+            BitcoinStampsData::Document(doc) => {
+                assert_eq!(doc.txid, STAMPS_CLASSIC_F35382_TXID);
+                assert!(doc.file_path.exists());
+                let expected_dir = temp_dir.path().join("bitcoin_stamps").join("documents");
+                assert!(doc.file_path.starts_with(&expected_dir));
+            }
         },
         Some(DecodedData::Counterparty { .. }) => panic!("Expected Stamps, got Counterparty"),
         Some(DecodedData::Omni { .. }) => panic!("Expected Stamps, got Omni"),
@@ -2155,6 +2209,12 @@ async fn test_decode_stamps_recent_c8c383() -> anyhow::Result<()> {
                 assert!(data.file_path.exists());
                 let expected_dir = temp_dir.path().join("bitcoin_stamps").join("data");
                 assert!(data.file_path.starts_with(&expected_dir));
+            }
+            BitcoinStampsData::Document(doc) => {
+                assert_eq!(doc.txid, STAMPS_RECENT_C8C383_TXID);
+                assert!(doc.file_path.exists());
+                let expected_dir = temp_dir.path().join("bitcoin_stamps").join("documents");
+                assert!(doc.file_path.starts_with(&expected_dir));
             }
         },
         Some(DecodedData::Counterparty { .. }) => panic!("Expected Stamps, got Counterparty"),
@@ -2212,6 +2272,12 @@ async fn test_decode_stamps_image_359aef() -> anyhow::Result<()> {
                 let expected_dir = temp_dir.path().join("bitcoin_stamps").join("data");
                 assert!(data.file_path.starts_with(&expected_dir));
             }
+            BitcoinStampsData::Document(doc) => {
+                assert_eq!(doc.txid, STAMPS_IMAGE_359AEF_TXID);
+                assert!(doc.file_path.exists());
+                let expected_dir = temp_dir.path().join("bitcoin_stamps").join("documents");
+                assert!(doc.file_path.starts_with(&expected_dir));
+            }
         },
         Some(DecodedData::Counterparty { .. }) => panic!("Expected Stamps, got Counterparty"),
         Some(DecodedData::Omni { .. }) => panic!("Expected Stamps, got Omni"),
@@ -2267,6 +2333,12 @@ async fn test_decode_stamps_image_50aeb7() -> anyhow::Result<()> {
                 assert!(data.file_path.exists());
                 let expected_dir = temp_dir.path().join("bitcoin_stamps").join("data");
                 assert!(data.file_path.starts_with(&expected_dir));
+            }
+            BitcoinStampsData::Document(doc) => {
+                assert_eq!(doc.txid, STAMPS_IMAGE_50AEB7_TXID);
+                assert!(doc.file_path.exists());
+                let expected_dir = temp_dir.path().join("bitcoin_stamps").join("documents");
+                assert!(doc.file_path.starts_with(&expected_dir));
             }
         },
         Some(DecodedData::Counterparty { .. }) => panic!("Expected Stamps, got Counterparty"),
@@ -2324,6 +2396,12 @@ async fn test_decode_stamps_image_582a46() -> anyhow::Result<()> {
                 let expected_dir = temp_dir.path().join("bitcoin_stamps").join("data");
                 assert!(data.file_path.starts_with(&expected_dir));
             }
+            BitcoinStampsData::Document(doc) => {
+                assert_eq!(doc.txid, STAMPS_IMAGE_582A46_TXID);
+                assert!(doc.file_path.exists());
+                let expected_dir = temp_dir.path().join("bitcoin_stamps").join("documents");
+                assert!(doc.file_path.starts_with(&expected_dir));
+            }
         },
         Some(DecodedData::Counterparty { .. }) => panic!("Expected Stamps, got Counterparty"),
         Some(DecodedData::Omni { .. }) => panic!("Expected Stamps, got Omni"),
@@ -2379,6 +2457,12 @@ async fn test_decode_stamps_image_5e7d66() -> anyhow::Result<()> {
                 assert!(data.file_path.exists());
                 let expected_dir = temp_dir.path().join("bitcoin_stamps").join("data");
                 assert!(data.file_path.starts_with(&expected_dir));
+            }
+            BitcoinStampsData::Document(doc) => {
+                assert_eq!(doc.txid, STAMPS_IMAGE_5E7D66_TXID);
+                assert!(doc.file_path.exists());
+                let expected_dir = temp_dir.path().join("bitcoin_stamps").join("documents");
+                assert!(doc.file_path.starts_with(&expected_dir));
             }
         },
         Some(DecodedData::Counterparty { .. }) => panic!("Expected Stamps, got Counterparty"),

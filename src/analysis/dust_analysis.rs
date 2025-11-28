@@ -8,12 +8,12 @@
 //! These are *spending* thresholds (determined by destination output type), NOT creation-time
 //! P2MS dust limits (which vary with m-of-n configuration).
 
+use crate::database::Database;
+use crate::errors::AppResult;
 use crate::types::analysis_results::{
     DustAnalysisReport, DustBucket, DustThresholds, GlobalDustStats, ProtocolDustStats,
     UNCLASSIFIED_SENTINEL,
 };
-use crate::database::Database;
-use crate::errors::AppResult;
 use crate::types::ProtocolType;
 use std::collections::HashSet;
 use std::str::FromStr;

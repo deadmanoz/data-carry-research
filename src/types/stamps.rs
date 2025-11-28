@@ -1,7 +1,8 @@
 use super::burn_patterns::STAMPS_BURN_KEYS;
+use super::content_detection::{detect_image_format, ImageFormat};
 use super::ProtocolVariant;
 use crate::crypto::arc4;
-use crate::processor::stage3::PubkeyExtractor;
+use crate::shared::PubkeyExtractor;
 use base64::{
     alphabet,
     engine::{self, general_purpose::GeneralPurpose, GeneralPurposeConfig},
@@ -262,73 +263,6 @@ pub fn classify_json_data(json_bytes: &[u8]) -> JsonType {
     } else {
         JsonType::Generic
     }
-}
-
-/// Image format classification for Bitcoin Stamps
-///
-/// Used for variant detection to identify image-based Classic stamps
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ImageFormat {
-    Png,
-    Jpeg,
-    Gif,
-    WebP,
-    Svg,
-    Bmp,
-    Pdf,
-}
-
-/// Detect image format from binary data using magic bytes
-///
-/// This is a pure helper function with no decoder dependencies, used by both
-/// Stage 3 classification and the decoder to maintain consistent variant detection.
-pub fn detect_image_format(data: &[u8]) -> Option<ImageFormat> {
-    if data.is_empty() {
-        return None;
-    }
-
-    // PNG: 89 50 4E 47 0D 0A 1A 0A (‰PNG\r\n\x1a\n)
-    if data.len() >= 8 && data.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
-        return Some(ImageFormat::Png);
-    }
-
-    // JPEG: FF D8 FF
-    if data.len() >= 3 && data.starts_with(&[0xFF, 0xD8, 0xFF]) {
-        return Some(ImageFormat::Jpeg);
-    }
-
-    // GIF: "GIF87a" or "GIF89a"
-    if data.len() >= 6 && (data.starts_with(b"GIF87a") || data.starts_with(b"GIF89a")) {
-        return Some(ImageFormat::Gif);
-    }
-
-    // WebP: "RIFF" + 4 bytes + "WEBP"
-    if data.len() >= 12 && data.starts_with(b"RIFF") && &data[8..12] == b"WEBP" {
-        return Some(ImageFormat::WebP);
-    }
-
-    // SVG: Look for XML declaration or SVG tag (text-based)
-    if data.len() >= 5 {
-        let data_str = String::from_utf8_lossy(data);
-        let lower = data_str.to_lowercase();
-        if lower.starts_with("<?xml") || lower.starts_with("<svg") {
-            return Some(ImageFormat::Svg);
-        }
-    }
-
-    // BMP: "BM" signature
-    if data.len() >= 2 && data.starts_with(b"BM") {
-        return Some(ImageFormat::Bmp);
-    }
-
-    // PDF: %PDF (0x25 0x50 0x44 0x46)
-    // Search in first 1024 bytes since PDF header might not be at exact start
-    let search_len = data.len().min(1024);
-    if data[..search_len].windows(4).any(|w| w == b"%PDF") {
-        return Some(ImageFormat::Pdf);
-    }
-
-    None
 }
 
 /// Detect compression format (ZLIB or GZIP only)
@@ -943,7 +877,8 @@ pub mod validation {
     /// # Invariant Enforcement
     /// This function ENFORCES (via debug_assert!) these guarantees:
     /// - `Compressed` → MUST return (Some(Compressed), Some(content_type), None)
-    /// - `Classic` → MUST return (Some(Classic), Some(content_type), Some(image_format))
+    /// - `Classic` (image) → MUST return (Some(Classic), Some(content_type), Some(image_format))
+    /// - `Classic` (PDF) → MUST return (Some(Classic), Some("application/pdf"), None)
     /// - `SRC20/721/101` → MUST return (Some(variant), Some("application/json"), None)
     /// - `HTML` → MUST return (Some(HTML), Some("text/html"), None)
     /// - `Data` → MUST return (Some(Data), Some(content_type), None)
@@ -977,25 +912,29 @@ pub mod validation {
             return result;
         }
 
-        // IMAGE CHECK (Classic variant) - includes binary image formats
+        // PDF CHECK (Classic variant, but PDF is a document, not an image)
+        // Search in first 1024 bytes since PDF header might not be at exact start
+        let search_len = payload.len().min(1024);
+        if search_len >= 4 && payload[..search_len].windows(4).any(|w| w == b"%PDF") {
+            // PDF returns None for image_format - semantically correct (PDF is document, not image)
+            let result = (Some(StampsVariant::Classic), Some("application/pdf"), None);
+            debug_assert!(
+                result.1.is_some() && result.2.is_none(),
+                "Classic (PDF) must have content_type, no image_format"
+            );
+            return result;
+        }
+
+        // IMAGE CHECK (Classic variant) - binary image formats
         if let Some(image_format) = detect_image_format(payload) {
-            let content_type = match image_format {
-                ImageFormat::Png => "image/png",
-                ImageFormat::Jpeg => "image/jpeg",
-                ImageFormat::Gif => "image/gif",
-                ImageFormat::WebP => "image/webp",
-                ImageFormat::Svg => "image/svg+xml",
-                ImageFormat::Bmp => "image/bmp",
-                ImageFormat::Pdf => "application/pdf",
-            };
             let result = (
                 Some(StampsVariant::Classic),
-                Some(content_type),
+                Some(image_format.mime_type()),
                 Some(image_format),
             );
             debug_assert!(
                 result.1.is_some() && result.2.is_some(),
-                "Classic must have BOTH content_type and image_format"
+                "Classic (image) must have BOTH content_type and image_format"
             );
             return result;
         }
@@ -1420,5 +1359,131 @@ mod tests {
 
         let variant = validation::detect_stamps_variant(payload.as_bytes());
         assert_eq!(variant, Some(StampsVariant::SRC20));
+    }
+
+    // =========================================================================
+    // Image Format Detection Tests
+    // =========================================================================
+
+    #[test]
+    fn test_detect_image_format_png() {
+        // PNG magic bytes: 89 50 4E 47 0D 0A 1A 0A
+        let png_header = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        assert_eq!(detect_image_format(&png_header), Some(ImageFormat::Png));
+
+        // With additional data
+        let mut png_with_data = png_header.to_vec();
+        png_with_data.extend_from_slice(&[0x00, 0x00, 0x00, 0x0D]); // IHDR chunk
+        assert_eq!(detect_image_format(&png_with_data), Some(ImageFormat::Png));
+    }
+
+    #[test]
+    fn test_detect_image_format_jpeg() {
+        // JPEG magic bytes: FF D8 FF (needs 8+ bytes due to detect_image_format early-exit)
+        let jpeg_header = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46]; // JFIF marker
+        assert_eq!(detect_image_format(&jpeg_header), Some(ImageFormat::Jpeg));
+
+        // JPEG with EXIF marker
+        let jpeg_exif = [0xFF, 0xD8, 0xFF, 0xE1, 0x00, 0x00, 0x45, 0x78]; // EXIF marker
+        assert_eq!(detect_image_format(&jpeg_exif), Some(ImageFormat::Jpeg));
+    }
+
+    #[test]
+    fn test_detect_image_format_gif() {
+        // GIF87a
+        let gif87a = b"GIF87atest";
+        assert_eq!(detect_image_format(gif87a), Some(ImageFormat::Gif));
+
+        // GIF89a
+        let gif89a = b"GIF89atest";
+        assert_eq!(detect_image_format(gif89a), Some(ImageFormat::Gif));
+    }
+
+    #[test]
+    fn test_detect_image_format_webp() {
+        // WebP: RIFF + 4 bytes size + WEBP
+        let webp_header = b"RIFF\x00\x00\x00\x00WEBP";
+        assert_eq!(detect_image_format(webp_header), Some(ImageFormat::WebP));
+    }
+
+    #[test]
+    fn test_detect_image_format_svg() {
+        // SVG with XML declaration (needs valid UTF-8 for text-based parsing)
+        let svg_xml = b"<?xml version=\"1.0\"?><svg>";
+        assert_eq!(detect_image_format(svg_xml), Some(ImageFormat::Svg));
+
+        // SVG without XML declaration
+        let svg_tag = b"<svg xmlns=\"http://www.w3.org/2000/svg\">";
+        assert_eq!(detect_image_format(svg_tag), Some(ImageFormat::Svg));
+
+        // Note: content_detection::detect_image_format uses lowercase matching
+        // for <?xml and <svg, so uppercase SVG is not detected
+    }
+
+    #[test]
+    fn test_detect_image_format_bmp() {
+        // BMP magic bytes: BM
+        let bmp_header = b"BM\x00\x00\x00\x00";
+        assert_eq!(detect_image_format(bmp_header), Some(ImageFormat::Bmp));
+    }
+
+    // NOTE: test_detect_image_format_pdf was removed during ImageFormat consolidation.
+    // PDF is now in DocumentFormat (content_detection.rs), not ImageFormat.
+    // See content_detection.rs tests for PDF detection tests.
+
+    #[test]
+    fn test_detect_image_format_unknown() {
+        // Random binary data - not a known format
+        let unknown = [0x00, 0x01, 0x02, 0x03];
+        assert_eq!(detect_image_format(&unknown), None);
+
+        // Empty data
+        assert_eq!(detect_image_format(&[]), None);
+
+        // Text data that's not SVG
+        let text = b"Hello, world!";
+        assert_eq!(detect_image_format(text), None);
+    }
+
+    #[test]
+    fn test_detect_image_format_too_short() {
+        // PNG needs 8 bytes minimum
+        let short_png = [0x89, 0x50, 0x4E, 0x47];
+        assert_eq!(detect_image_format(&short_png), None);
+
+        // JPEG needs 3 bytes minimum
+        let short_jpeg = [0xFF, 0xD8];
+        assert_eq!(detect_image_format(&short_jpeg), None);
+
+        // Single byte
+        assert_eq!(detect_image_format(&[0xFF]), None);
+    }
+
+    // =========================================================================
+    // ImageFormat Method Tests
+    // =========================================================================
+
+    #[test]
+    fn test_image_format_extension() {
+        // Tests use ImageFormat from content_detection (PDF is in DocumentFormat)
+        assert_eq!(ImageFormat::Png.extension(), "png");
+        assert_eq!(ImageFormat::Jpeg.extension(), "jpg");
+        assert_eq!(ImageFormat::Gif.extension(), "gif");
+        assert_eq!(ImageFormat::WebP.extension(), "webp");
+        assert_eq!(ImageFormat::Svg.extension(), "svg");
+        assert_eq!(ImageFormat::Bmp.extension(), "bmp");
+        // Note: PDF removed - now in DocumentFormat, not ImageFormat
+    }
+
+    #[test]
+    fn test_image_format_mime_type() {
+        // Tests use ImageFormat from content_detection (PDF is in DocumentFormat)
+        assert_eq!(ImageFormat::Png.mime_type(), "image/png");
+        assert_eq!(ImageFormat::Jpeg.mime_type(), "image/jpeg");
+        assert_eq!(ImageFormat::Gif.mime_type(), "image/gif");
+        assert_eq!(ImageFormat::WebP.mime_type(), "image/webp");
+        assert_eq!(ImageFormat::Svg.mime_type(), "image/svg+xml");
+        assert_eq!(ImageFormat::Bmp.mime_type(), "image/bmp");
+        // Note: PDF removed - now in DocumentFormat, not ImageFormat
     }
 }

@@ -12,7 +12,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::debug;
 
 use super::filter_p2ms_for_classification;
-use super::{ProtocolSpecificClassifier, PubkeyExtractor, SpendabilityAnalyser};
+use super::{ProtocolSpecificClassifier, SpendabilityAnalyser};
+use crate::shared::PubkeyExtractor;
 
 /// Counterparty classifier with comprehensive P2MS data extraction and ARC4 decryption
 pub struct CounterpartyClassifier {

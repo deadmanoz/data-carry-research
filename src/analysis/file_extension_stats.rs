@@ -5,9 +5,11 @@
 //! count- and size-based metrics so reports can highlight which payload formats
 //! dominate the dataset.
 
-use crate::types::analysis_results::{CategoryBreakdown, CategoryTotals, ExtensionStats, FileExtensionReport};
 use crate::database::Database;
 use crate::errors::{AppError, AppResult};
+use crate::types::analysis_results::{
+    CategoryBreakdown, CategoryTotals, ExtensionStats, FileExtensionReport,
+};
 use crate::types::content_detection::ContentType;
 use crate::utils::math::{safe_percentage, safe_percentage_u64};
 use std::collections::BTreeMap;

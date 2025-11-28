@@ -32,6 +32,12 @@ pub mod stamps;
 // Analysis result types
 pub mod analysis_results;
 
+// Visualisation types
+pub mod visualisation;
+
+// Debug display types
+pub mod debug;
+
 // Re-export everything for backward compatibility
 pub use common::*;
 pub use stage1::*;

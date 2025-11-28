@@ -2,9 +2,11 @@
 //!
 //! This module provides comprehensive analysis of protocol classifications.
 
-use crate::types::analysis_results::{ClassificationStatsReport, ProtocolBreakdown, SignatureDetectionStats};
 use crate::database::Database;
 use crate::errors::AppResult;
+use crate::types::analysis_results::{
+    ClassificationStatsReport, ProtocolBreakdown, SignatureDetectionStats,
+};
 
 /// Protocol statistics analyser for classification insights
 pub struct ProtocolStatsAnalyser;
@@ -71,39 +73,40 @@ impl ProtocolStatsAnalyser {
         }
 
         // Helper function to get protocol stats
-        let get_protocol_stats = |protocol: &str| -> AppResult<crate::types::analysis_results::ProtocolStats> {
-            let count: i64 = conn.query_row(
-                "SELECT COUNT(*) FROM transaction_classifications WHERE protocol = ?",
-                [protocol],
-                |row| row.get(0),
-            )?;
+        let get_protocol_stats =
+            |protocol: &str| -> AppResult<crate::types::analysis_results::ProtocolStats> {
+                let count: i64 = conn.query_row(
+                    "SELECT COUNT(*) FROM transaction_classifications WHERE protocol = ?",
+                    [protocol],
+                    |row| row.get(0),
+                )?;
 
-            let percentage = (count as f64 * 100.0) / total_count as f64;
+                let percentage = (count as f64 * 100.0) / total_count as f64;
 
-            // Get variants for this protocol
-            let mut stmt = conn.prepare(
+                // Get variants for this protocol
+                let mut stmt = conn.prepare(
                 "SELECT COALESCE(variant, '') as variant, classification_method, COUNT(*) as count
                  FROM transaction_classifications
                  WHERE protocol = ?
                  GROUP BY variant, classification_method",
             )?;
 
-            let variants = stmt
-                .query_map([protocol], |row| {
-                    Ok(crate::types::analysis_results::VariantStats {
-                        variant: row.get(0)?,
-                        classification_method: row.get(1)?,
-                        count: row.get::<_, i64>(2)? as usize,
-                    })
-                })?
-                .collect::<Result<Vec<_>, _>>()?;
+                let variants = stmt
+                    .query_map([protocol], |row| {
+                        Ok(crate::types::analysis_results::VariantStats {
+                            variant: row.get(0)?,
+                            classification_method: row.get(1)?,
+                            count: row.get::<_, i64>(2)? as usize,
+                        })
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
 
-            Ok(crate::types::analysis_results::ProtocolStats {
-                count: count as usize,
-                percentage,
-                variants,
-            })
-        };
+                Ok(crate::types::analysis_results::ProtocolStats {
+                    count: count as usize,
+                    percentage,
+                    variants,
+                })
+            };
 
         Ok(ProtocolBreakdown {
             bitcoin_stamps: get_protocol_stats("BitcoinStamps")?,

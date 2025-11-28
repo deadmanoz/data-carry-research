@@ -6,28 +6,15 @@
 
 use crate::database::Database;
 use crate::errors::AppResult;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+// Import types from canonical location (avoids types↔analysis cycle)
+pub use crate::types::analysis_results::{SignatureVariantStats, StampsSignatureAnalysis};
 
 /// Transport protocol constant for Pure Bitcoin Stamps
 const PURE_STAMPS_TRANSPORT: &str = "Pure Bitcoin Stamps";
 
 pub struct StampsSignatureAnalyser;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SignatureVariantStats {
-    pub variant: String,
-    pub count: usize,
-    pub percentage: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StampsSignatureAnalysis {
-    pub total_stamps: usize,
-    pub signature_distribution: Vec<SignatureVariantStats>,
-    pub pure_stamps_signatures: Vec<SignatureVariantStats>,
-    pub counterparty_stamps_signatures: Vec<SignatureVariantStats>,
-}
 
 impl StampsSignatureAnalyser {
     /// Analyse signature variant distribution across all Bitcoin Stamps transactions

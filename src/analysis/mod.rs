@@ -45,7 +45,6 @@ pub mod fee_analyser;
 pub mod fee_analysis;
 pub mod file_extension_stats;
 pub mod multisig_config_stats;
-pub mod plotly_types;
 pub mod protocol_stats;
 pub mod pubkey_validator;
 pub mod reports;
@@ -58,28 +57,6 @@ pub mod tx_size_analysis;
 pub mod value_analysis;
 
 // Re-export main types and interfaces
-pub use burn_detector::BurnPatternDetector;
-pub use burn_patterns::BurnPatternAnalyser;
-pub use content_type_analysis::ContentTypeAnalyser;
-pub use data_size_stats::DataSizeAnalyser;
-pub use dust_analysis::DustAnalyser;
-pub use fee_analyser::FeeAnalyser;
-pub use fee_analysis::FeeAnalysisEngine;
-pub use file_extension_stats::FileExtensionAnalyser;
-pub use multisig_config_stats::MultisigConfigAnalyser;
-pub use plotly_types::PlotlyChart;
-pub use protocol_stats::ProtocolStatsAnalyser;
-pub use pubkey_validator::{
-    aggregate_validation_for_outputs, validate_from_metadata, validate_pubkeys,
-    PubkeyValidationResult,
-};
-pub use reports::{OutputFormat, ReportFormatter};
-pub use signature_analysis::SignatureAnalyser;
-pub use spendability_stats::SpendabilityStatsAnalyser;
-pub use stamps_signature_stats::{StampsSignatureAnalyser, StampsSignatureAnalysis};
-pub use stamps_transport_stats::{StampsTransportAnalyser, StampsTransportAnalysis};
-pub use stamps_weekly_fee_analysis::StampsWeeklyFeeAnalyser;
-pub use tx_size_analysis::TxSizeAnalyser;
 pub use crate::types::analysis_results::{
     BurnPatternAnalysis, ClassificationStatsReport, ComprehensiveDataSizeReport,
     ContentTypeAnalysisReport, ContentTypeCategoryStats, ContentTypeProtocolStats,
@@ -92,6 +69,28 @@ pub use crate::types::analysis_results::{
     TxSizeDistributionReport, TxSizePercentiles, ValidNoneStats, ValueAnalysisReport, ValueBucket,
     ValueDistributionReport, ValuePercentiles, WeeklyStampsFeeStats, UNCLASSIFIED_SENTINEL,
 };
+pub use crate::types::visualisation::PlotlyChart;
+pub use burn_detector::BurnPatternDetector;
+pub use burn_patterns::BurnPatternAnalyser;
+pub use content_type_analysis::ContentTypeAnalyser;
+pub use data_size_stats::DataSizeAnalyser;
+pub use dust_analysis::DustAnalyser;
+pub use fee_analyser::FeeAnalyser;
+pub use fee_analysis::FeeAnalysisEngine;
+pub use file_extension_stats::FileExtensionAnalyser;
+pub use multisig_config_stats::MultisigConfigAnalyser;
+pub use protocol_stats::ProtocolStatsAnalyser;
+pub use pubkey_validator::{
+    aggregate_validation_for_outputs, validate_from_metadata, validate_pubkeys,
+    PubkeyValidationResult,
+};
+pub use reports::{OutputFormat, ReportFormatter};
+pub use signature_analysis::SignatureAnalyser;
+pub use spendability_stats::SpendabilityStatsAnalyser;
+pub use stamps_signature_stats::{StampsSignatureAnalyser, StampsSignatureAnalysis};
+pub use stamps_transport_stats::{StampsTransportAnalyser, StampsTransportAnalysis};
+pub use stamps_weekly_fee_analysis::StampsWeeklyFeeAnalyser;
+pub use tx_size_analysis::TxSizeAnalyser;
 pub use value_analysis::ValueAnalysisEngine;
 
 use crate::database::Database;

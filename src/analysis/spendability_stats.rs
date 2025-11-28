@@ -17,12 +17,12 @@
 //! - **Data Keys**: Invalid EC points used for data embedding
 //! - **Real Keys**: Valid secp256k1 EC points that could be signing keys
 
+use crate::database::Database;
+use crate::errors::AppResult;
 use crate::types::analysis_results::{
     KeyCountDistribution, KeyCountStats, OverallSpendability, ProtocolSpendabilityStats,
     ReasonStats, SpendabilityStatsReport, TransactionSpendabilityStats,
 };
-use crate::database::Database;
-use crate::errors::AppResult;
 
 // SQL constants for reusability in tests
 // CRITICAL: Only count UTXO outputs (is_spent = 0), not spent outputs

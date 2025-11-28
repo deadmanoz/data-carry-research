@@ -19,7 +19,8 @@ use tracing::debug;
 
 use super::filter_p2ms_for_classification;
 use super::spendability::SpendabilityAnalyser;
-use super::{ProtocolSpecificClassifier, PubkeyExtractor};
+use super::ProtocolSpecificClassifier;
+use crate::shared::PubkeyExtractor;
 
 /// Chancecoin protocol classifier
 pub struct ChancecoinClassifier {

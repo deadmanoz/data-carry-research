@@ -4,13 +4,13 @@
 //! showing economic metrics by protocol including BTC value distribution, output counts,
 //! and fee context.
 
+use crate::database::Database;
+use crate::errors::AppResult;
 use crate::types::analysis_results::{
     FeeAnalysisReport, GlobalValueDistribution, OverallValueStats, ProtocolFeeStats,
     ProtocolValueDistribution, ProtocolValueStats, ValueAnalysisReport, ValueBucket,
     ValueDistributionReport, ValuePercentiles,
 };
-use crate::database::Database;
-use crate::errors::AppResult;
 
 /// Maximum number of values to load into memory for percentile calculation
 /// Protects against memory exhaustion on very large datasets (100M values ≈ 800MB)

@@ -8,7 +8,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::debug;
 
 use super::filter_p2ms_for_classification;
-use super::{ProtocolSpecificClassifier, PubkeyExtractor, SpendabilityAnalyser};
+use super::{ProtocolSpecificClassifier, SpendabilityAnalyser};
+use crate::shared::PubkeyExtractor;
 
 /// Omni Layer classifier focused on Class B (P2MS) transactions
 pub struct OmniClassifier {

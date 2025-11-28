@@ -611,10 +611,11 @@ mod edge_cases {
 
 #[cfg(test)]
 mod variant_classification {
+    use data_carry_research::types::content_detection::ImageFormat;
     use data_carry_research::types::stamps::validation::{
         check_zlib_at_offsets, detect_stamps_variant_with_content,
     };
-    use data_carry_research::types::stamps::{ImageFormat, StampsVariant};
+    use data_carry_research::types::stamps::StampsVariant;
 
     /// Helper function that mirrors real signature structure
     fn add_stamp_signature(data: &[u8]) -> Vec<u8> {

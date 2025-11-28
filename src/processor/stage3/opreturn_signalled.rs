@@ -6,7 +6,8 @@ use crate::types::{
     ProtocolType, ProtocolVariant,
 };
 
-use super::{MultisigPatternMatcher, ProtocolSpecificClassifier, SignatureDetector};
+use super::ProtocolSpecificClassifier;
+use crate::shared::{MultisigPatternMatcher, SignatureDetector};
 
 /// Detector for OP_RETURN-signalled protocols (Protocol47930, CLIPPERZ, GenericASCII).
 ///

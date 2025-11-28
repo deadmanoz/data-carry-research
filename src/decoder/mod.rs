@@ -19,13 +19,14 @@ use std::path::PathBuf;
 use tracing::{debug, info, warn};
 
 use self::chancecoin::try_chancecoin;
-use self::image_formats::{is_base64_data, ImageFormat};
 use self::output::{JsonType, OutputManager};
 use self::ppk::try_ppk;
 use self::protocol_detection::{
     fetch_transaction, try_bitcoin_stamps, try_counterparty, try_likely_data_storage,
     try_likely_legitimate_p2ms, try_omni, DecodedProtocol,
 };
+use crate::shared::is_base64_data;
+use crate::types::content_detection::{detect_image_format, DocumentFormat, ImageFormat};
 use crate::types::stamps::validation::{
     detect_content_type_from_payload, extract_stamps_payload, find_stamp_signature,
 };
@@ -40,7 +41,6 @@ pub mod arc4_tool;
 pub mod chancecoin;
 pub mod datastorage;
 pub mod debug_display;
-pub mod image_formats;
 pub mod omni_parser;
 pub mod output;
 pub mod ppk;
@@ -88,6 +88,7 @@ pub enum DecodedData {
 #[derive(Debug, Clone)]
 pub enum BitcoinStampsData {
     Image(DecodedImage),
+    Document(DecodedDocument),
     Json(DecodedJson),
     Html(DecodedHtml),
     Compressed(DecodedCompressed),
@@ -158,6 +159,7 @@ impl DecodedData {
         match self {
             DecodedData::BitcoinStamps { data } => match data {
                 BitcoinStampsData::Image(img) => img.summary(),
+                BitcoinStampsData::Document(doc) => doc.summary(),
                 BitcoinStampsData::Json(json) => json.summary(),
                 BitcoinStampsData::Html(html) => html.summary(),
                 BitcoinStampsData::Compressed(comp) => comp.summary(),
@@ -215,6 +217,7 @@ impl DecodedData {
         match self {
             DecodedData::BitcoinStamps { data, .. } => match data {
                 BitcoinStampsData::Image(img) => &img.txid,
+                BitcoinStampsData::Document(doc) => &doc.txid,
                 BitcoinStampsData::Json(json) => &json.txid,
                 BitcoinStampsData::Html(html) => &html.txid,
                 BitcoinStampsData::Compressed(comp) => &comp.txid,
@@ -234,6 +237,7 @@ impl DecodedData {
         match self {
             DecodedData::BitcoinStamps { data, .. } => match data {
                 BitcoinStampsData::Image(img) => Some(&img.file_path),
+                BitcoinStampsData::Document(doc) => Some(&doc.file_path),
                 BitcoinStampsData::Json(json) => Some(&json.file_path),
                 BitcoinStampsData::Html(html) => Some(&html.file_path),
                 BitcoinStampsData::Compressed(comp) => Some(&comp.file_path),
@@ -253,6 +257,7 @@ impl DecodedData {
         match self {
             DecodedData::BitcoinStamps { data, .. } => match data {
                 BitcoinStampsData::Image(img) => img.size_bytes,
+                BitcoinStampsData::Document(doc) => doc.size_bytes,
                 BitcoinStampsData::Json(json) => json.size_bytes,
                 BitcoinStampsData::Html(html) => html.size_bytes,
                 BitcoinStampsData::Compressed(comp) => comp.size_bytes,
@@ -336,6 +341,32 @@ pub struct DecodedGenericData {
     pub file_path: PathBuf,
     pub size_bytes: usize,
     pub bytes: Vec<u8>,
+}
+
+/// Information about a successfully decoded document (PDF, etc.)
+#[derive(Debug, Clone)]
+pub struct DecodedDocument {
+    pub txid: String,
+    pub format: DocumentFormat,
+    pub file_path: PathBuf,
+    pub size_bytes: usize,
+    pub bytes: Vec<u8>,
+}
+
+impl DecodedDocument {
+    /// Get a human-readable summary of the decoded document
+    pub fn summary(&self) -> String {
+        let format_name = match self.format {
+            DocumentFormat::Pdf => "PDF",
+        };
+        format!(
+            "Transaction {}: {} document ({} bytes) -> {}",
+            &self.txid[..16.min(self.txid.len())],
+            format_name,
+            self.size_bytes,
+            self.file_path.display()
+        )
+    }
 }
 
 impl DecodedImage {
@@ -647,14 +678,78 @@ impl ProtocolDecoder {
                     );
                     Ok(Some(decoded_data))
                 }
-                (Some(StampsVariant::Classic), Some(_), Some(fmt), bytes) => {
+                // Handle PDF documents separately (semantically correct - PDF is a document, not an image)
+                (Some(StampsVariant::Classic), Some("application/pdf"), _, bytes) => {
+                    info!(
+                        "Detected PDF document payload for transaction {}",
+                        txid
+                    );
+                    let output_path = self
+                        .output_manager
+                        .write_document(&txid, &bytes, DocumentFormat::Pdf)
+                        .map_err(|e| {
+                            DecoderError::Io(std::io::Error::new(
+                                std::io::ErrorKind::Other,
+                                e,
+                            ))
+                        })?;
+
+                    let decoded_data = DecodedData::BitcoinStamps {
+                        data: BitcoinStampsData::Document(DecodedDocument {
+                            txid: txid.clone(),
+                            format: DocumentFormat::Pdf,
+                            file_path: output_path,
+                            size_bytes: bytes.len(),
+                            bytes,
+                        }),
+                    };
+
+                    info!(
+                        "Successfully decoded Bitcoin Stamps document: {}",
+                        decoded_data.summary()
+                    );
+                    Ok(Some(decoded_data))
+                }
+                // Handle image formats using content_detection::detect_image_format
+                (Some(StampsVariant::Classic), Some(_), _, bytes) => {
+                    // Re-detect using canonical content_detection::ImageFormat
+                    let fmt = match detect_image_format(&bytes) {
+                        Some(f) => f,
+                        None => {
+                            warn!(
+                                "Could not detect image format for transaction {} - falling back to generic data",
+                                txid
+                            );
+                            // Fall through to generic data handling
+                            let output_path = self
+                                .output_manager
+                                .write_data(&txid, &bytes, Some("application/octet-stream"))
+                                .map_err(|e| {
+                                    DecoderError::Io(std::io::Error::new(
+                                        std::io::ErrorKind::Other,
+                                        e,
+                                    ))
+                                })?;
+
+                            return Ok(Some(DecodedData::BitcoinStamps {
+                                data: BitcoinStampsData::Data(DecodedGenericData {
+                                    txid: txid.clone(),
+                                    content_type: "application/octet-stream".to_string(),
+                                    file_path: output_path,
+                                    size_bytes: bytes.len(),
+                                    bytes,
+                                }),
+                            }));
+                        }
+                    };
+
                     info!(
                         "Detected image payload for transaction {} (format: {:?})",
                         txid, fmt
                     );
                     let output_path = self
                         .output_manager
-                        .write_image(&txid, &bytes, fmt.clone())
+                        .write_image(&txid, &bytes, fmt)
                         .map_err(|e| {
                             DecoderError::Io(std::io::Error::new(
                                 std::io::ErrorKind::Other,

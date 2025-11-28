@@ -7,7 +7,8 @@ use tracing::debug;
 
 use super::filter_p2ms_for_classification;
 use super::spendability::SpendabilityAnalyser;
-use super::{MultisigPatternMatcher, ProtocolSpecificClassifier, SignatureDetector};
+use super::ProtocolSpecificClassifier;
+use crate::shared::{MultisigPatternMatcher, SignatureDetector};
 
 // Protocol signatures
 const TB0001_SIGNATURE: &[u8] = b"TB0001"; // hex: 544230303031
