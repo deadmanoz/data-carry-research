@@ -356,6 +356,30 @@ pub enum AnalysisCommands {
         #[arg(long, short = 'o')]
         output: Option<PathBuf>,
     },
+
+    /// Analyse P2MS output count distribution per transaction
+    ///
+    /// Provides histogram distribution of P2MS output counts per transaction with:
+    /// - Global distribution across all transactions with unspent P2MS outputs
+    /// - Per-protocol breakdown sorted by canonical protocol order
+    /// - Percentiles (p25, p50, p75, p90, p95, p99)
+    /// - Total satoshi value per bucket (USER DIRECTIVE: track P2MS output value)
+    ///
+    /// Bucket ranges: 1, 2, 3, 4-5, 6-10, 11-20, 21-50, 51-100, 101+
+    /// Requires Stage 3 for per-protocol breakdown (works without, shows unclassified).
+    OutputCounts {
+        /// Database path (overrides config.toml)
+        #[arg(long)]
+        database_path: Option<PathBuf>,
+
+        /// Output format (console, json, or plotly)
+        #[arg(long, default_value = "console")]
+        format: String,
+
+        /// Output file path
+        #[arg(long, short = 'o')]
+        output: Option<PathBuf>,
+    },
 }
 
 pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
@@ -717,6 +741,21 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
             &app_config,
             |e| e.analyse_stamps_weekly_fees(),
             ReportFormatter::format_stamps_weekly_fees,
+        ),
+
+        AnalysisCommands::OutputCounts {
+            database_path,
+            format,
+            output,
+        } => run_analysis_with_file_output(
+            database_path,
+            format,
+            output,
+            "output_counts.json",
+            "P2MS output count distribution",
+            &app_config,
+            |e| e.analyse_output_counts(),
+            ReportFormatter::format_output_count_distribution,
         ),
     }
 }

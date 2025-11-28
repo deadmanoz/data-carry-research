@@ -495,3 +495,52 @@ fn test_cli_error_handling_empty_db() {
         "Spendability analysis should handle empty DB"
     );
 }
+
+#[test]
+fn test_cli_output_counts_analysis() {
+    let (db, db_path) = create_populated_test_db();
+
+    let engine = AnalysisEngine::new(&db_path).unwrap();
+    let analysis = engine.analyse_output_counts();
+
+    // Verify analysis runs without error
+    assert!(
+        analysis.is_ok(),
+        "Output counts analysis should not crash"
+    );
+    let analysis = analysis.unwrap();
+
+    // Test console output formatting
+    let console_output =
+        ReportFormatter::format_output_count_distribution(&analysis, &OutputFormat::Console);
+    assert!(
+        console_output.is_ok(),
+        "Console formatting should not crash"
+    );
+
+    // Test JSON output formatting
+    let json_output =
+        ReportFormatter::format_output_count_distribution(&analysis, &OutputFormat::Json);
+    assert!(json_output.is_ok(), "JSON formatting should not crash");
+    let json_output = json_output.unwrap();
+    assert!(
+        json_output.contains("global_distribution"),
+        "JSON output should contain global_distribution"
+    );
+    assert!(
+        json_output.contains("protocol_distributions"),
+        "JSON output should contain protocol_distributions"
+    );
+
+    // Test Plotly output formatting
+    let plotly_output =
+        ReportFormatter::format_output_count_distribution(&analysis, &OutputFormat::Plotly);
+    assert!(plotly_output.is_ok(), "Plotly formatting should not crash");
+    let plotly_output = plotly_output.unwrap();
+    assert!(
+        plotly_output.contains("data"),
+        "Plotly output should contain data"
+    );
+
+    drop(db);
+}

@@ -45,6 +45,7 @@ pub mod fee_analyser;
 pub mod fee_analysis;
 pub mod file_extension_stats;
 pub mod multisig_config_stats;
+pub mod p2ms_output_count_analysis;
 pub mod protocol_stats;
 pub mod pubkey_validator;
 pub mod reports;
@@ -62,12 +63,15 @@ pub use crate::types::analysis_results::{
     ContentTypeAnalysisReport, ContentTypeCategoryStats, ContentTypeProtocolStats,
     ContentTypeSpendabilityReport, ContentTypeStats, DistributionBucket, DustAnalysisReport,
     DustBucket, DustThresholds, FeeAnalysisReport, FileExtensionReport, FullAnalysisReport,
-    GlobalDustStats, GlobalTxSizeDistribution, GlobalValueDistribution, MultisigConfigReport,
-    MultisigConfiguration, ProtocolDataSizeReport, ProtocolDustStats, ProtocolTxSizeDistribution,
-    ProtocolValueDistribution, SignatureAnalysisReport, SpendabilityDataSizeReport,
-    SpendabilityStatsReport, StampsFeeSummary, StampsWeeklyFeeReport, TxSizeBucket,
-    TxSizeDistributionReport, TxSizePercentiles, ValidNoneStats, ValueAnalysisReport, ValueBucket,
-    ValueDistributionReport, ValuePercentiles, WeeklyStampsFeeStats, UNCLASSIFIED_SENTINEL,
+    GlobalDustStats, GlobalOutputCountDistribution, GlobalTxSizeDistribution,
+    GlobalValueDistribution, MultisigConfigReport, MultisigConfiguration,
+    OutputCountBucket, OutputCountDistributionReport, OutputCountPercentiles,
+    ProtocolDataSizeReport, ProtocolDustStats, ProtocolOutputCountDistribution,
+    ProtocolTxSizeDistribution, ProtocolValueDistribution, SignatureAnalysisReport,
+    SpendabilityDataSizeReport, SpendabilityStatsReport, StampsFeeSummary, StampsWeeklyFeeReport,
+    TxSizeBucket, TxSizeDistributionReport, TxSizePercentiles, ValidNoneStats, ValueAnalysisReport,
+    ValueBucket, ValueDistributionReport, ValuePercentiles, WeeklyStampsFeeStats,
+    UNCLASSIFIED_SENTINEL,
 };
 pub use crate::types::visualisation::PlotlyChart;
 pub use burn_detector::BurnPatternDetector;
@@ -79,6 +83,7 @@ pub use fee_analyser::FeeAnalyser;
 pub use fee_analysis::FeeAnalysisEngine;
 pub use file_extension_stats::FileExtensionAnalyser;
 pub use multisig_config_stats::MultisigConfigAnalyser;
+pub use p2ms_output_count_analysis::P2msOutputCountAnalyser;
 pub use protocol_stats::ProtocolStatsAnalyser;
 pub use pubkey_validator::{
     aggregate_validation_for_outputs, validate_from_metadata, validate_pubkeys,
@@ -407,6 +412,20 @@ impl AnalysisEngine {
     /// * `AppResult<TxSizeDistributionReport>` - Comprehensive size distribution
     pub fn analyse_tx_sizes(&self) -> AppResult<TxSizeDistributionReport> {
         TxSizeAnalyser::analyse_tx_sizes(&self.database)
+    }
+
+    /// Analyse P2MS output count distribution across all transactions
+    ///
+    /// Returns histogram data showing how many transactions have 1, 2, 3, etc.
+    /// P2MS outputs. Useful for understanding data embedding patterns.
+    ///
+    /// **Scope**: Analyses current UTXO state (outputs with `is_spent = 0`),
+    /// not historical transaction structure.
+    ///
+    /// # Returns
+    /// * `AppResult<OutputCountDistributionReport>` - Comprehensive output count distribution
+    pub fn analyse_output_counts(&self) -> AppResult<OutputCountDistributionReport> {
+        P2msOutputCountAnalyser::analyse_output_counts(&self.database)
     }
 
     /// Generate a comprehensive analysis report including all analysis types

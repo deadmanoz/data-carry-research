@@ -8,9 +8,9 @@ use crate::errors::AppResult;
 use crate::types::analysis_results::{
     BurnPatternAnalysis, ClassificationStatsReport, ComprehensiveDataSizeReport,
     ContentTypeSpendabilityReport, DustAnalysisReport, FeeAnalysisReport, FileExtensionReport,
-    FullAnalysisReport, MultisigConfigReport, ProtocolDataSizeReport, SignatureAnalysisReport,
-    SpendabilityDataSizeReport, SpendabilityStatsReport, StampsWeeklyFeeReport,
-    TxSizeDistributionReport, ValueAnalysisReport, ValueDistributionReport,
+    FullAnalysisReport, MultisigConfigReport, OutputCountDistributionReport, ProtocolDataSizeReport,
+    SignatureAnalysisReport, SpendabilityDataSizeReport, SpendabilityStatsReport,
+    StampsWeeklyFeeReport, TxSizeDistributionReport, ValueAnalysisReport, ValueDistributionReport,
 };
 use crate::types::visualisation::{get_protocol_colour, PlotlyChart};
 use crate::utils::currency::{format_rate_as_btc, format_sats_as_btc, format_sats_as_btc_f64};
@@ -1756,6 +1756,150 @@ impl ReportFormatter {
                         ));
                     }
                     output.push('\n');
+                }
+
+                Ok(output)
+            }
+        }
+    }
+
+    /// Format P2MS output count distribution report
+    ///
+    /// Displays analysis of how many P2MS outputs each transaction has:
+    /// - Global distribution with histogram buckets
+    /// - Per-protocol breakdown with output count statistics
+    /// - Percentile analysis for understanding output patterns
+    pub fn format_output_count_distribution(
+        report: &OutputCountDistributionReport,
+        format: &OutputFormat,
+    ) -> AppResult<String> {
+        match format {
+            OutputFormat::Json => Self::export_json(report),
+            OutputFormat::Plotly => {
+                let chart = report.to_plotly_chart();
+                Self::export_json(&chart)
+            }
+            OutputFormat::Console => {
+                let mut output = String::new();
+                let global = &report.global_distribution;
+
+                // Header
+                output.push_str("\n=== P2MS OUTPUT COUNT DISTRIBUTION ===\n\n");
+
+                // Global distribution
+                output.push_str(&format!(
+                    "GLOBAL DISTRIBUTION ({} transactions)\n",
+                    Self::format_number(global.total_transactions)
+                ));
+                output.push_str(&format!(
+                    "Total P2MS Outputs: {}\n",
+                    Self::format_number(global.total_p2ms_outputs)
+                ));
+                output.push_str(&format!(
+                    "Total Value: {}\n",
+                    format_sats_as_btc(global.total_value_sats)
+                ));
+
+                // Output count range
+                if let (Some(min), Some(max)) =
+                    (global.min_output_count, global.max_output_count)
+                {
+                    output.push_str(&format!(
+                        "Output Count Range: {} - {} outputs per tx\n",
+                        Self::format_number(min as usize),
+                        Self::format_number(max as usize)
+                    ));
+                }
+                output.push_str(&format!(
+                    "Average: {:.2} outputs per tx\n\n",
+                    global.avg_output_count
+                ));
+
+                // Percentiles
+                if let Some(p) = &global.percentiles {
+                    output.push_str("PERCENTILES (Output Counts):\n");
+                    output.push_str(&format!(
+                        "  25th:  {} outputs\n",
+                        Self::format_number(p.p25 as usize)
+                    ));
+                    output.push_str(&format!(
+                        "  50th:  {} outputs (median)\n",
+                        Self::format_number(p.p50 as usize)
+                    ));
+                    output.push_str(&format!(
+                        "  75th:  {} outputs\n",
+                        Self::format_number(p.p75 as usize)
+                    ));
+                    output.push_str(&format!(
+                        "  90th:  {} outputs\n",
+                        Self::format_number(p.p90 as usize)
+                    ));
+                    output.push_str(&format!(
+                        "  95th:  {} outputs\n",
+                        Self::format_number(p.p95 as usize)
+                    ));
+                    output.push_str(&format!(
+                        "  99th:  {} outputs\n\n",
+                        Self::format_number(p.p99 as usize)
+                    ));
+                }
+
+                // Bucket distribution
+                output.push_str("BUCKET DISTRIBUTION:\n");
+                output.push_str(&format!(
+                    "  {:<15} │ {:>12} │ {:>7} │ {:>14} │ {:>7} │\n",
+                    "Outputs/Tx", "Transactions", "Tx %", "Total Value", "Value %"
+                ));
+                output.push_str(
+                    "  ────────────────┼──────────────┼─────────┼────────────────┼─────────┤\n",
+                );
+
+                for bucket in global.buckets.iter() {
+                    let range_str =
+                        OutputCountDistributionReport::bucket_label(bucket.range_min, bucket.range_max);
+
+                    output.push_str(&format!(
+                        "  {:<15} │ {:>12} │ {:>6.1}% │ {:>14} │ {:>6.1}% │\n",
+                        range_str,
+                        Self::format_number(bucket.count),
+                        bucket.pct_count,
+                        format_sats_as_btc(bucket.value),
+                        bucket.pct_value
+                    ));
+                }
+                output.push('\n');
+
+                // Per-protocol breakdown
+                if !report.protocol_distributions.is_empty() {
+                    output.push_str("=== PER-PROTOCOL BREAKDOWN ===\n");
+                    output.push_str(
+                        "(NOTE: Transactions with multiple protocols counted in each)\n\n",
+                    );
+                    output.push_str(&format!(
+                        "{:<28} │ {:>12} │ {:>10} │ {:>10} │ {:>14} │\n",
+                        "Protocol", "Transactions", "Outputs", "Avg/Tx", "Total Value"
+                    ));
+                    output.push_str("─────────────────────────────┼──────────────┼────────────┼────────────┼────────────────┤\n");
+
+                    for dist in &report.protocol_distributions {
+                        output.push_str(&format!(
+                            "{:<28} │ {:>12} │ {:>10} │ {:>10.2} │ {:>14} │\n",
+                            Self::format_protocol_name(&dist.protocol.to_string()),
+                            Self::format_number(dist.total_transactions),
+                            Self::format_number(dist.total_p2ms_outputs),
+                            dist.avg_output_count,
+                            format_sats_as_btc(dist.total_value_sats)
+                        ));
+                    }
+                    output.push('\n');
+                }
+
+                // Unclassified count
+                if report.unclassified_transaction_count > 0 {
+                    output.push_str(&format!(
+                        "Unclassified Transactions: {}\n",
+                        Self::format_number(report.unclassified_transaction_count)
+                    ));
                 }
 
                 Ok(output)
