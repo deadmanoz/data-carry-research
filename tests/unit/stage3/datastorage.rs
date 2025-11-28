@@ -1558,3 +1558,185 @@ mod real_transactions {
         Ok(())
     }
 }
+
+/// Bitcoin Whitepaper detection tests (TXID-based artifact detection)
+mod bitcoin_whitepaper {
+    use super::*;
+    use anyhow::Result;
+
+    /// The Bitcoin Whitepaper TXID (must match the constant in datastorage.rs)
+    const BITCOIN_WHITEPAPER_TXID: &str =
+        "54e48e5f5c656b26c3bca14a8c95aa583d07ebe84dde3b7dd4a78f4e4186e713";
+
+    #[test]
+    #[serial]
+    fn test_bitcoin_whitepaper_txid_detection() -> Result<()> {
+        let test_name = "bitcoin_whitepaper";
+        let (mut test_db, config) = setup_protocol_test(test_name)?;
+        let classifier = DataStorageClassifier::new(&config);
+
+        print!(
+            "{}",
+            test_data::create_test_header(
+                test_name,
+                "Bitcoin Whitepaper PDF (TXID-based detection)"
+            )
+        );
+
+        // Create a minimal transaction with the whitepaper TXID
+        // The classifier detects by TXID alone, so we only need basic structure
+        let mut tx = fixtures::create_test_enriched_transaction(BITCOIN_WHITEPAPER_TXID);
+        tx.height = 230_009; // Historical height of the whitepaper
+
+        // Add a synthetic P2MS output (classifier requires at least one for output classifications)
+        tx.outputs = vec![{
+            use data_carry_research::types::script_metadata::MultisigInfo;
+            let info = MultisigInfo {
+                pubkeys: vec![
+                    "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+                        .to_string(),
+                ],
+                required_sigs: 1,
+                total_pubkeys: 1,
+            };
+            TransactionOutput {
+                txid: BITCOIN_WHITEPAPER_TXID.to_string(),
+                vout: 0,
+                height: 230_009,
+                amount: 1000,
+                script_hex: "mock_script".to_string(),
+                script_type: "multisig".to_string(),
+                is_coinbase: false,
+                script_size: 100,
+                metadata: serde_json::to_value(info).unwrap(),
+                address: None,
+            }
+        }];
+        tx.p2ms_outputs_count = 1;
+
+        println!("║ TXID: {}", BITCOIN_WHITEPAPER_TXID);
+        println!("║ Block Height: 230,009");
+        println!("║ Detection Method: Hardcoded TXID match");
+        println!("║");
+
+        println!("║ Running DataStorage Classification...");
+        println!("║");
+
+        let result = classifier.classify(&tx, test_db.database_mut());
+        assert!(
+            result.is_some(),
+            "Bitcoin Whitepaper TXID should be detected"
+        );
+
+        let (classification, output_classifications) = result.unwrap();
+
+        // Verify transaction-level classification
+        assert_eq!(
+            classification.protocol,
+            ProtocolType::DataStorage,
+            "Protocol should be DataStorage"
+        );
+        assert_eq!(
+            classification.variant,
+            Some(ProtocolVariant::DataStorageBitcoinWhitepaper),
+            "Variant should be DataStorageBitcoinWhitepaper"
+        );
+
+        // Verify content type is PDF
+        assert_eq!(
+            classification.classification_details.content_type,
+            Some("application/pdf".to_string()),
+            "Content type should be application/pdf for the Bitcoin Whitepaper"
+        );
+
+        // Verify classification method mentions known artifact
+        assert!(
+            classification
+                .classification_details
+                .classification_method
+                .contains("Known historical artifact"),
+            "Classification method should mention known artifact detection"
+        );
+
+        // Verify output-level classification also has correct content type
+        assert!(!output_classifications.is_empty());
+        for output_class in &output_classifications {
+            assert_eq!(
+                output_class.details.content_type,
+                Some("application/pdf".to_string()),
+                "Output content type should also be application/pdf"
+            );
+        }
+
+        println!("║ ✅ Protocol: DataStorage");
+        println!("║ ✅ Variant: Bitcoin Whitepaper");
+        println!("║ ✅ Content-Type: application/pdf");
+        println!("║ ✅ Detection: Known historical artifact (TXID match)");
+        println!(
+            "╚══════════════════════════════════════════════════════════════╝\n"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    #[serial]
+    fn test_non_whitepaper_txid_not_matched() -> Result<()> {
+        let test_name = "non_whitepaper";
+        let (mut test_db, config) = setup_protocol_test(test_name)?;
+        let classifier = DataStorageClassifier::new(&config);
+
+        print!(
+            "{}",
+            test_data::create_test_header(
+                test_name,
+                "Non-Whitepaper TXID (should NOT match artifact detection)"
+            )
+        );
+
+        // Create a transaction with a different TXID that has PDF-like content
+        // This should NOT be classified as Bitcoin Whitepaper (TXID doesn't match)
+        let fake_txid = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+        // PDF magic bytes: %PDF
+        let pdf_header = hex::encode(b"%PDF-1.4");
+        let pdf_pubkey = format!("{}{}", pdf_header, "00".repeat(25));
+
+        let tx = test_data::create_transaction_with_pubkeys(fake_txid, vec![pdf_pubkey]);
+
+        println!("║ TXID: {} (NOT whitepaper)", fake_txid);
+        println!("║ Content: PDF magic bytes in pubkey");
+        println!("║ Expected: Should be DataStorageEmbeddedData (NOT BitcoinWhitepaper)");
+        println!("║");
+
+        println!("║ Running DataStorage Classification...");
+        println!("║");
+
+        let result = classifier.classify(&tx, test_db.database_mut());
+        assert!(
+            result.is_some(),
+            "PDF content should still be detected as DataStorage"
+        );
+
+        let (classification, _) = result.unwrap();
+
+        // Should be detected as EmbeddedData, NOT BitcoinWhitepaper
+        assert_eq!(classification.protocol, ProtocolType::DataStorage);
+        assert_eq!(
+            classification.variant,
+            Some(ProtocolVariant::DataStorageEmbeddedData),
+            "Non-whitepaper TXID should be classified as EmbeddedData, not BitcoinWhitepaper"
+        );
+
+        // Should NOT be application/pdf (generic PDF detection uses different logic)
+        // The generic PDF detection uses ContentType::detect which may or may not return PDF
+
+        println!("║ ✅ Protocol: DataStorage");
+        println!("║ ✅ Variant: EmbeddedData (NOT BitcoinWhitepaper)");
+        println!(
+            "╚══════════════════════════════════════════════════════════════╝\n"
+        );
+
+        Ok(())
+    }
+}

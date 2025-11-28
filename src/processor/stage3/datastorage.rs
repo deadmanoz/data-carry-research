@@ -12,6 +12,9 @@ use super::filter_p2ms_for_classification;
 use super::spendability::SpendabilityAnalyser;
 use super::ProtocolSpecificClassifier;
 
+/// Known historical artifact: The Bitcoin Whitepaper PDF (height 230,009)
+const BITCOIN_WHITEPAPER_TXID: &str = "54e48e5f5c656b26c3bca14a8c95aa583d07ebe84dde3b7dd4a78f4e4186e713";
+
 /// DataStorage classifier - detects various data embedding patterns in P2MS outputs
 pub struct DataStorageClassifier {
     _config: Stage3Config, // For future use if needed
@@ -22,6 +25,75 @@ impl DataStorageClassifier {
         Self {
             _config: config.clone(),
         }
+    }
+
+    /// Check for known historical artifacts by TXID
+    fn check_known_artifacts(txid: &str) -> Option<(ProtocolVariant, &'static str, &'static str)> {
+        if txid == BITCOIN_WHITEPAPER_TXID {
+            return Some((
+                ProtocolVariant::DataStorageBitcoinWhitepaper,
+                "application/pdf",
+                "Bitcoin Whitepaper PDF (Satoshi Nakamoto, 2008)",
+            ));
+        }
+        None
+    }
+
+    /// Build classification for a known historical artifact
+    fn build_artifact_classification(
+        tx: &EnrichedTransaction,
+        variant: ProtocolVariant,
+        content_type: &str,
+        description: &str,
+    ) -> (ClassificationResult, Vec<crate::types::OutputClassificationData>) {
+        let p2ms_outputs = filter_p2ms_for_classification(&tx.outputs);
+
+        let additional_metadata = format!(
+            "{} | Height: {} | P2MS outputs: {}",
+            description, tx.height, p2ms_outputs.len()
+        );
+
+        let mut output_classifications = Vec::new();
+        for output in p2ms_outputs.iter() {
+            let spendability_result = SpendabilityAnalyser::analyse_generic_output(output);
+
+            let details = crate::types::OutputClassificationDetails::new(
+                Vec::new(),
+                true,
+                true,
+                "Known historical artifact (TXID match)".to_string(),
+                spendability_result,
+            )
+            .with_metadata(additional_metadata.clone())
+            .with_content_type(content_type);
+
+            output_classifications.push(crate::types::OutputClassificationData::new(
+                output.vout,
+                ProtocolType::DataStorage,
+                Some(variant.clone()),
+                details,
+            ));
+        }
+
+        let tx_classification = ClassificationResult {
+            txid: tx.txid.clone(),
+            protocol: ProtocolType::DataStorage,
+            variant: Some(variant),
+            classification_details: crate::types::ClassificationDetails {
+                burn_patterns_detected: Vec::new(),
+                height_check_passed: true,
+                protocol_signature_found: true,
+                classification_method: "Known historical artifact (TXID match)".to_string(),
+                additional_metadata: Some(additional_metadata),
+                content_type: Some(content_type.to_string()),
+            },
+            classification_timestamp: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+        };
+
+        (tx_classification, output_classifications)
     }
 
     /// Check if data contains valid UTF-8/ASCII text
@@ -185,6 +257,16 @@ impl ProtocolSpecificClassifier for DataStorageClassifier {
         ClassificationResult,
         Vec<crate::types::OutputClassificationData>,
     )> {
+        // Check for known historical artifacts FIRST (short-circuit before generic detection)
+        if let Some((variant, content_type, description)) = Self::check_known_artifacts(&tx.txid) {
+            return Some(Self::build_artifact_classification(
+                tx,
+                variant,
+                content_type,
+                description,
+            ));
+        }
+
         // No height restrictions - active at all heights
 
         // Filter to P2MS outputs ONLY

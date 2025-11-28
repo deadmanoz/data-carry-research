@@ -9,6 +9,16 @@ use super::filter_p2ms_for_classification;
 use super::spendability::SpendabilityAnalyser;
 use super::ProtocolSpecificClassifier;
 
+/// WikiLeaks Cablegate Tool TXIDs (hardcoded - these don't have the donation address)
+const CABLEGATE_DOWNLOADER_TXID: &str =
+    "6c53cd987119ef797d5adccd76241247988a0a5ef783572a9972e7371c5fb0cc";
+const CABLEGATE_UPLOADER_TXID: &str =
+    "4b72a223007eab8a951d43edc171befeabc7b5dca4213770c88e09ba5b936e17";
+
+/// WikiLeaks Cablegate height range
+const CABLEGATE_MIN_HEIGHT: u32 = 229_991;
+const CABLEGATE_MAX_HEIGHT: u32 = 230_256;
+
 /// WikiLeaks Cablegate classifier - detects the historic WikiLeaks Cablegate archive upload
 ///
 /// Historical Context:
@@ -22,15 +32,13 @@ use super::ProtocolSpecificClassifier;
 /// - Heights: 229,991-230,256
 /// - Downloader tool: 6c53cd987119ef797d5adccd76241247988a0a5ef783572a9972e7371c5fb0cc (height 229,991)
 /// - Uploader tool: 4b72a223007eab8a951d43edc171befeabc7b5dca4213770c88e09ba5b936e17
-/// - Data transactions: 130 txs, each with 100+ P2MS outputs
+/// - Data transactions: 130 txs with varying P2MS output counts (final chunk may have fewer)
 /// - Each transaction: outputs 0-101 are data, output 102 is footer, output 103 is WikiLeaks donation, output 104 is change
 /// - Total archive size: ~2.8 MB (corrupted during upload due to CRC32 bug)
 ///
-/// Detection Criteria:
-/// 1. WikiLeaks donation address in outputs (primary detection method)
-/// 2. Massive P2MS output pattern (100+ outputs for data transactions)
-///
-///    Historical range: 229,991-230,256 (documented for reference only - not enforced)
+/// Detection Criteria (all 132 transactions):
+/// 1. Tool transactions: Hardcoded TXIDs (downloader + uploader don't have donation address)
+/// 2. Data transactions: WikiLeaks donation address + height range 229,991-230,256
 pub struct WikiLeaksCablegateClassifier {
     _config: Stage3Config,
     /// WikiLeaks donation address
@@ -45,28 +53,50 @@ impl WikiLeaksCablegateClassifier {
         }
     }
 
+    /// Check if transaction is a tool transaction (downloader or uploader)
+    fn is_tool_transaction(txid: &str) -> Option<&'static str> {
+        if txid == CABLEGATE_DOWNLOADER_TXID {
+            Some("downloader_tool")
+        } else if txid == CABLEGATE_UPLOADER_TXID {
+            Some("uploader_tool")
+        } else {
+            None
+        }
+    }
+
+    /// Check if transaction is in the Cablegate height range
+    fn is_in_cablegate_height_range(height: u32) -> bool {
+        height >= CABLEGATE_MIN_HEIGHT && height <= CABLEGATE_MAX_HEIGHT
+    }
+
     /// Check if transaction is part of WikiLeaks Cablegate upload
     ///
-    /// Uses the wikileaks_outputs table (populated during Stage 2) to detect
-    /// transactions with outputs to the WikiLeaks donation address.
-    ///
-    /// Fallback: If the table lookup returns Ok(false) (table exists but empty,
-    /// e.g., before Stage 2 runs), use pattern matching as a heuristic.
+    /// Detection criteria:
+    /// 1. Tool transactions: Match hardcoded TXIDs (don't have donation address)
+    /// 2. Data transactions: WikiLeaks donation address + height range 229,991-230,256
     fn is_cablegate_transaction(&self, tx: &EnrichedTransaction, db: &Database) -> bool {
+        // First check: Tool transactions by TXID (don't have donation address)
+        if Self::is_tool_transaction(&tx.txid).is_some() {
+            return true;
+        }
+
+        // Second check: Data transactions must have WikiLeaks address + be in height range
+        // Height range check excludes later donations (e.g., height 339,898)
+        if !Self::is_in_cablegate_height_range(tx.height) {
+            return false;
+        }
+
         // Check for WikiLeaks donation address in transaction outputs (populated during Stage 2)
         match db.has_output_to_address(&tx.txid, &self.wikileaks_address) {
-            Ok(true) => {
-                // Positive match - definitely Cablegate
-                true
-            }
-            Ok(false) | Err(_) => {
-                // No address match OR lookup error
-                // Fallback to pattern matching heuristic:
-                // Most Cablegate transactions have 100+ P2MS outputs (data transactions)
-                // Downloader (6 outputs) and uploader are exceptions (4-10 outputs)
-                let is_data_tx = tx.p2ms_outputs_count >= 100;
-                let is_tool_tx = tx.p2ms_outputs_count >= 4 && tx.p2ms_outputs_count <= 10;
-                is_data_tx || is_tool_tx
+            Ok(true) => true,
+            Ok(false) => false,
+            Err(e) => {
+                tracing::warn!(
+                    "DB error checking WikiLeaks address for {}: {}",
+                    tx.txid,
+                    e
+                );
+                false
             }
         }
     }
@@ -85,14 +115,8 @@ impl ProtocolSpecificClassifier for WikiLeaksCablegateClassifier {
             return None;
         }
 
-        // Determine transaction type
-        let tx_type = if tx.height == 229_991 {
-            "downloader_tool"
-        } else if tx.height <= 229_993 {
-            "uploader_tool"
-        } else {
-            "data_transaction"
-        };
+        // Determine transaction type using TXID-based detection for tools
+        let tx_type = Self::is_tool_transaction(&tx.txid).unwrap_or("data_transaction");
 
         let additional_metadata = format!(
             "WikiLeaks Cablegate {} | Donation address: {} | Height: {} | P2MS outputs: {} | Historical note: April 2013 upload, corrupted during blockchain storage",
@@ -166,5 +190,78 @@ mod tests {
             classifier.wikileaks_address,
             "1HB5XMLmzFVj8ALj6mfBsbifRoD4miY36v"
         );
+    }
+
+    #[test]
+    fn test_tool_transaction_detection() {
+        // Downloader tool
+        assert_eq!(
+            WikiLeaksCablegateClassifier::is_tool_transaction(CABLEGATE_DOWNLOADER_TXID),
+            Some("downloader_tool")
+        );
+
+        // Uploader tool
+        assert_eq!(
+            WikiLeaksCablegateClassifier::is_tool_transaction(CABLEGATE_UPLOADER_TXID),
+            Some("uploader_tool")
+        );
+
+        // Non-tool transaction
+        assert_eq!(
+            WikiLeaksCablegateClassifier::is_tool_transaction(
+                "0000000000000000000000000000000000000000000000000000000000000000"
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn test_height_range_check() {
+        // Below range
+        assert!(!WikiLeaksCablegateClassifier::is_in_cablegate_height_range(
+            229_990
+        ));
+
+        // At minimum
+        assert!(WikiLeaksCablegateClassifier::is_in_cablegate_height_range(
+            229_991
+        ));
+
+        // In middle
+        assert!(WikiLeaksCablegateClassifier::is_in_cablegate_height_range(
+            230_000
+        ));
+
+        // At maximum
+        assert!(WikiLeaksCablegateClassifier::is_in_cablegate_height_range(
+            230_256
+        ));
+
+        // Above range
+        assert!(!WikiLeaksCablegateClassifier::is_in_cablegate_height_range(
+            230_257
+        ));
+
+        // Much later (donation at 339,898)
+        assert!(!WikiLeaksCablegateClassifier::is_in_cablegate_height_range(
+            339_898
+        ));
+    }
+
+    #[test]
+    fn test_constants() {
+        // Verify hardcoded TXIDs
+        assert_eq!(
+            CABLEGATE_DOWNLOADER_TXID,
+            "6c53cd987119ef797d5adccd76241247988a0a5ef783572a9972e7371c5fb0cc"
+        );
+        assert_eq!(
+            CABLEGATE_UPLOADER_TXID,
+            "4b72a223007eab8a951d43edc171befeabc7b5dca4213770c88e09ba5b936e17"
+        );
+
+        // Verify height range
+        assert_eq!(CABLEGATE_MIN_HEIGHT, 229_991);
+        assert_eq!(CABLEGATE_MAX_HEIGHT, 230_256);
     }
 }

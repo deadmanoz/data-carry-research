@@ -125,7 +125,7 @@ pub fn detect_binary_signature(data: &[u8]) -> Option<&'static str> {
         return Some("PDF");
     }
 
-    // Image detection via content_detection module
+    // Image detection via content_detection module (offset 0 - standard case)
     // ONLY map legacy formats that datastorage_helpers previously detected (PNG/JPEG/GIF)
     // DO NOT expose new formats (TIFF, ICO, AVIF, JpegXl) to avoid classification changes
     if let Some(image_format) = detect_image_format(data) {
@@ -135,6 +135,25 @@ pub fn detect_binary_signature(data: &[u8]) -> Option<&'static str> {
             ImageFormat::Gif => return Some("GIF"),
             // New formats NOT mapped - fall through to continue with archive/compression detection
             _ => {}
+        }
+    }
+
+    // Image detection at offset 1: After EC point prefix (02/03/04)
+    // P2MS outputs store data in pubkey slots where byte 0 is the EC point marker.
+    // Similar pattern to ZLIB multi-offset detection below.
+    // Example: height 690497 has JPEG magic at offset 1 after 0x04 prefix.
+    if data.len() >= 4 && matches!(data[0], 0x02 | 0x03 | 0x04) {
+        // JPEG: FF D8 FF at offset 1
+        if data[1..4] == [0xFF, 0xD8, 0xFF] {
+            return Some("JPEG");
+        }
+        // PNG: 89 50 4E 47 0D 0A 1A 0A at offset 1
+        if data.len() >= 9 && data[1..9] == [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A] {
+            return Some("PNG");
+        }
+        // GIF: GIF87a or GIF89a at offset 1
+        if data.len() >= 7 && (&data[1..7] == b"GIF87a" || &data[1..7] == b"GIF89a") {
+            return Some("GIF");
         }
     }
 
@@ -300,6 +319,60 @@ mod tests {
     fn test_detect_binary_signature_none() {
         let data = b"random data without signature";
         assert_eq!(detect_binary_signature(data), None);
+    }
+
+    #[test]
+    fn test_detect_binary_signature_jpeg_offset_1_uncompressed() {
+        // JPEG after 0x04 uncompressed pubkey prefix (e.g., height 690497)
+        let data = [0x04, 0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46];
+        assert_eq!(
+            detect_binary_signature(&data),
+            Some("JPEG"),
+            "JPEG at offset 1 after 0x04 prefix should be detected"
+        );
+    }
+
+    #[test]
+    fn test_detect_binary_signature_jpeg_offset_1_compressed() {
+        // JPEG after 0x02 compressed pubkey prefix
+        let data = [0x02, 0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46];
+        assert_eq!(
+            detect_binary_signature(&data),
+            Some("JPEG"),
+            "JPEG at offset 1 after 0x02 prefix should be detected"
+        );
+
+        // JPEG after 0x03 compressed pubkey prefix
+        let data = [0x03, 0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46];
+        assert_eq!(
+            detect_binary_signature(&data),
+            Some("JPEG"),
+            "JPEG at offset 1 after 0x03 prefix should be detected"
+        );
+    }
+
+    #[test]
+    fn test_detect_binary_signature_png_offset_1() {
+        // PNG after 0x04 uncompressed pubkey prefix
+        let data = [0x04, 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00];
+        assert_eq!(
+            detect_binary_signature(&data),
+            Some("PNG"),
+            "PNG at offset 1 after 0x04 prefix should be detected"
+        );
+    }
+
+    #[test]
+    fn test_detect_binary_signature_gif_offset_1() {
+        // GIF89a after 0x04 uncompressed pubkey prefix
+        let mut data = vec![0x04];
+        data.extend_from_slice(b"GIF89a");
+        data.extend_from_slice(b"more data");
+        assert_eq!(
+            detect_binary_signature(&data),
+            Some("GIF"),
+            "GIF at offset 1 after 0x04 prefix should be detected"
+        );
     }
 
     /// Regression test: ZIP file containing "%PDF" string should be detected as ZIP, not PDF

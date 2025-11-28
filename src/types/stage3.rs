@@ -387,6 +387,7 @@ pub enum ProtocolVariant {
     DataStorageFileMetadata,       // File sharing metadata (WikiLeaks, etc.)
     DataStorageEmbeddedData,       // Data embedded in pubkey coordinates
     DataStorageWikiLeaksCablegate, // WikiLeaks Cablegate archive (April 2013, 132 txs, heights 229991-230256)
+    DataStorageBitcoinWhitepaper,  // The Bitcoin Whitepaper PDF (height 230009, tx 54e48e5f...)
     DataStorageNullData,           // Null/zero byte padding (empty data)
     DataStorageGeneric,            // Other data storage patterns
 }
@@ -446,6 +447,7 @@ impl std::fmt::Display for ProtocolVariant {
             ProtocolVariant::DataStorageFileMetadata => "File Metadata",
             ProtocolVariant::DataStorageEmbeddedData => "Embedded Data",
             ProtocolVariant::DataStorageWikiLeaksCablegate => "WikiLeaks Cablegate",
+            ProtocolVariant::DataStorageBitcoinWhitepaper => "Bitcoin Whitepaper",
             ProtocolVariant::DataStorageNullData => "Null Data",
             ProtocolVariant::DataStorageGeneric => "Generic",
         };
