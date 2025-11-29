@@ -91,11 +91,7 @@ impl WikiLeaksCablegateClassifier {
             Ok(true) => true,
             Ok(false) => false,
             Err(e) => {
-                tracing::warn!(
-                    "DB error checking WikiLeaks address for {}: {}",
-                    tx.txid,
-                    e
-                );
+                tracing::warn!("DB error checking WikiLeaks address for {}: {}", tx.txid, e);
                 false
             }
         }

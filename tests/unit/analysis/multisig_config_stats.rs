@@ -133,9 +133,15 @@ fn test_overall_efficiency_calculation() -> AppResult<()> {
     // Add test data with known values
     seed_analysis_blocks(&db, &[100])?;
     // 1-of-3 CCC: 105 bytes script, 64 bytes data
-    insert_test_output(&db, &create_test_multisig_params("tx1", 0, 100, 1000, 105, 1, 3))?;
+    insert_test_output(
+        &db,
+        &create_test_multisig_params("tx1", 0, 100, 1000, 105, 1, 3),
+    )?;
     // Another 1-of-3 CCC
-    insert_test_output(&db, &create_test_multisig_params("tx2", 0, 100, 2000, 105, 1, 3))?;
+    insert_test_output(
+        &db,
+        &create_test_multisig_params("tx2", 0, 100, 2000, 105, 1, 3),
+    )?;
 
     let report = MultisigConfigAnalyser::analyse_multisig_configurations(&db)?;
 
@@ -156,14 +162,32 @@ fn test_type_summary_grouping() -> AppResult<()> {
 
     seed_analysis_blocks(&db, &[100])?;
     // Three 1-of-3 outputs
-    insert_test_output(&db, &create_test_multisig_params("tx1", 0, 100, 1000, 105, 1, 3))?;
-    insert_test_output(&db, &create_test_multisig_params("tx2", 0, 100, 2000, 105, 1, 3))?;
-    insert_test_output(&db, &create_test_multisig_params("tx3", 0, 100, 3000, 105, 1, 3))?;
+    insert_test_output(
+        &db,
+        &create_test_multisig_params("tx1", 0, 100, 1000, 105, 1, 3),
+    )?;
+    insert_test_output(
+        &db,
+        &create_test_multisig_params("tx2", 0, 100, 2000, 105, 1, 3),
+    )?;
+    insert_test_output(
+        &db,
+        &create_test_multisig_params("tx3", 0, 100, 3000, 105, 1, 3),
+    )?;
     // Two 1-of-2 outputs
-    insert_test_output(&db, &create_test_multisig_params("tx4", 0, 100, 4000, 71, 1, 2))?;
-    insert_test_output(&db, &create_test_multisig_params("tx5", 0, 100, 5000, 71, 1, 2))?;
+    insert_test_output(
+        &db,
+        &create_test_multisig_params("tx4", 0, 100, 4000, 71, 1, 2),
+    )?;
+    insert_test_output(
+        &db,
+        &create_test_multisig_params("tx5", 0, 100, 5000, 71, 1, 2),
+    )?;
     // One 2-of-3 output
-    insert_test_output(&db, &create_test_multisig_params("tx6", 0, 100, 6000, 105, 2, 3))?;
+    insert_test_output(
+        &db,
+        &create_test_multisig_params("tx6", 0, 100, 6000, 105, 2, 3),
+    )?;
 
     let report = MultisigConfigAnalyser::analyse_multisig_configurations(&db)?;
 
@@ -182,7 +206,10 @@ fn test_zero_data_capacity_efficiency() -> AppResult<()> {
 
     seed_analysis_blocks(&db, &[100])?;
     // 2-of-2 CC: 71 bytes script, 0 bytes data
-    insert_test_output(&db, &create_test_multisig_params("tx1", 0, 100, 1000, 71, 2, 2))?;
+    insert_test_output(
+        &db,
+        &create_test_multisig_params("tx1", 0, 100, 1000, 71, 2, 2),
+    )?;
 
     let report = MultisigConfigAnalyser::analyse_multisig_configurations(&db)?;
 

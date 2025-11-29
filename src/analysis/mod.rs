@@ -64,14 +64,13 @@ pub use crate::types::analysis_results::{
     ContentTypeSpendabilityReport, ContentTypeStats, DistributionBucket, DustAnalysisReport,
     DustBucket, DustThresholds, FeeAnalysisReport, FileExtensionReport, FullAnalysisReport,
     GlobalDustStats, GlobalOutputCountDistribution, GlobalTxSizeDistribution,
-    GlobalValueDistribution, MultisigConfigReport, MultisigConfiguration,
-    OutputCountBucket, OutputCountDistributionReport, OutputCountPercentiles,
-    ProtocolDataSizeReport, ProtocolDustStats, ProtocolOutputCountDistribution,
-    ProtocolTxSizeDistribution, ProtocolValueDistribution, SignatureAnalysisReport,
-    SpendabilityDataSizeReport, SpendabilityStatsReport, StampsFeeSummary, StampsWeeklyFeeReport,
-    TxSizeBucket, TxSizeDistributionReport, TxSizePercentiles, ValidNoneStats, ValueAnalysisReport,
-    ValueBucket, ValueDistributionReport, ValuePercentiles, WeeklyStampsFeeStats,
-    UNCLASSIFIED_SENTINEL,
+    GlobalValueDistribution, MultisigConfigReport, MultisigConfiguration, OutputCountBucket,
+    OutputCountDistributionReport, OutputCountPercentiles, ProtocolDataSizeReport,
+    ProtocolDustStats, ProtocolOutputCountDistribution, ProtocolTxSizeDistribution,
+    ProtocolValueDistribution, SignatureAnalysisReport, SpendabilityDataSizeReport,
+    SpendabilityStatsReport, StampsFeeSummary, StampsWeeklyFeeReport, TxSizeBucket,
+    TxSizeDistributionReport, TxSizePercentiles, ValidNoneStats, ValueAnalysisReport, ValueBucket,
+    ValueDistributionReport, ValuePercentiles, WeeklyStampsFeeStats, UNCLASSIFIED_SENTINEL,
 };
 pub use crate::types::visualisation::PlotlyChart;
 pub use burn_detector::BurnPatternDetector;

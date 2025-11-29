@@ -36,7 +36,10 @@ fn seed_boundary_test_data(db: &Database) -> AppResult<()> {
             db,
             &TestOutputParams::multisig("stamps_tx1", vout as i64, 100000, *amount, 100),
         )?;
-        insert_test_p2ms_output(db, &TestP2msOutputParams::standard("stamps_tx1", vout as i64))?;
+        insert_test_p2ms_output(
+            db,
+            &TestP2msOutputParams::standard("stamps_tx1", vout as i64),
+        )?;
     }
 
     // Counterparty - outputs at 546, 547, 1000 sats (all at or above 546)

@@ -1672,9 +1672,7 @@ mod bitcoin_whitepaper {
         println!("║ ✅ Variant: Bitcoin Whitepaper");
         println!("║ ✅ Content-Type: application/pdf");
         println!("║ ✅ Detection: Known historical artifact (TXID match)");
-        println!(
-            "╚══════════════════════════════════════════════════════════════╝\n"
-        );
+        println!("╚══════════════════════════════════════════════════════════════╝\n");
 
         Ok(())
     }
@@ -1733,9 +1731,7 @@ mod bitcoin_whitepaper {
 
         println!("║ ✅ Protocol: DataStorage");
         println!("║ ✅ Variant: EmbeddedData (NOT BitcoinWhitepaper)");
-        println!(
-            "╚══════════════════════════════════════════════════════════════╝\n"
-        );
+        println!("╚══════════════════════════════════════════════════════════════╝\n");
 
         Ok(())
     }

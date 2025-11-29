@@ -13,7 +13,8 @@ use super::spendability::SpendabilityAnalyser;
 use super::ProtocolSpecificClassifier;
 
 /// Known historical artifact: The Bitcoin Whitepaper PDF (height 230,009)
-const BITCOIN_WHITEPAPER_TXID: &str = "54e48e5f5c656b26c3bca14a8c95aa583d07ebe84dde3b7dd4a78f4e4186e713";
+const BITCOIN_WHITEPAPER_TXID: &str =
+    "54e48e5f5c656b26c3bca14a8c95aa583d07ebe84dde3b7dd4a78f4e4186e713";
 
 /// DataStorage classifier - detects various data embedding patterns in P2MS outputs
 pub struct DataStorageClassifier {
@@ -45,12 +46,17 @@ impl DataStorageClassifier {
         variant: ProtocolVariant,
         content_type: &str,
         description: &str,
-    ) -> (ClassificationResult, Vec<crate::types::OutputClassificationData>) {
+    ) -> (
+        ClassificationResult,
+        Vec<crate::types::OutputClassificationData>,
+    ) {
         let p2ms_outputs = filter_p2ms_for_classification(&tx.outputs);
 
         let additional_metadata = format!(
             "{} | Height: {} | P2MS outputs: {}",
-            description, tx.height, p2ms_outputs.len()
+            description,
+            tx.height,
+            p2ms_outputs.len()
         );
 
         let mut output_classifications = Vec::new();

@@ -504,10 +504,7 @@ fn test_cli_output_counts_analysis() {
     let analysis = engine.analyse_output_counts();
 
     // Verify analysis runs without error
-    assert!(
-        analysis.is_ok(),
-        "Output counts analysis should not crash"
-    );
+    assert!(analysis.is_ok(), "Output counts analysis should not crash");
     let analysis = analysis.unwrap();
 
     // Test console output formatting

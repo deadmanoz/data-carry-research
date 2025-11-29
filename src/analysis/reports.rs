@@ -8,9 +8,10 @@ use crate::errors::AppResult;
 use crate::types::analysis_results::{
     BurnPatternAnalysis, ClassificationStatsReport, ComprehensiveDataSizeReport,
     ContentTypeSpendabilityReport, DustAnalysisReport, FeeAnalysisReport, FileExtensionReport,
-    FullAnalysisReport, MultisigConfigReport, OutputCountDistributionReport, ProtocolDataSizeReport,
-    SignatureAnalysisReport, SpendabilityDataSizeReport, SpendabilityStatsReport,
-    StampsWeeklyFeeReport, TxSizeDistributionReport, ValueAnalysisReport, ValueDistributionReport,
+    FullAnalysisReport, MultisigConfigReport, OutputCountDistributionReport,
+    ProtocolDataSizeReport, SignatureAnalysisReport, SpendabilityDataSizeReport,
+    SpendabilityStatsReport, StampsWeeklyFeeReport, TxSizeDistributionReport, ValueAnalysisReport,
+    ValueDistributionReport,
 };
 use crate::types::visualisation::{get_protocol_colour, PlotlyChart};
 use crate::utils::currency::{format_rate_as_btc, format_sats_as_btc, format_sats_as_btc_f64};
@@ -1801,9 +1802,7 @@ impl ReportFormatter {
                 ));
 
                 // Output count range
-                if let (Some(min), Some(max)) =
-                    (global.min_output_count, global.max_output_count)
-                {
+                if let (Some(min), Some(max)) = (global.min_output_count, global.max_output_count) {
                     output.push_str(&format!(
                         "Output Count Range: {} - {} outputs per tx\n",
                         Self::format_number(min as usize),
@@ -1855,8 +1854,10 @@ impl ReportFormatter {
                 );
 
                 for bucket in global.buckets.iter() {
-                    let range_str =
-                        OutputCountDistributionReport::bucket_label(bucket.range_min, bucket.range_max);
+                    let range_str = OutputCountDistributionReport::bucket_label(
+                        bucket.range_min,
+                        bucket.range_max,
+                    );
 
                     output.push_str(&format!(
                         "  {:<15} │ {:>12} │ {:>6.1}% │ {:>14} │ {:>6.1}% │\n",
