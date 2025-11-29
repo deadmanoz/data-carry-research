@@ -28,71 +28,7 @@ impl Default for Stage3Config {
     }
 }
 
-/// Builder for Stage3Config with validation
-#[derive(Debug, Default)]
-pub struct Stage3ConfigBuilder {
-    database_path: Option<PathBuf>,
-    batch_size: Option<usize>,
-    progress_interval: Option<usize>,
-    tier2_patterns_config: Option<Tier2PatternsConfig>,
-}
-
-impl Stage3ConfigBuilder {
-    /// Create a new builder
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Set the database file path
-    pub fn database_path<P: Into<PathBuf>>(mut self, path: P) -> Self {
-        self.database_path = Some(path.into());
-        self
-    }
-
-    /// Set the batch size for processing
-    pub fn batch_size(mut self, size: usize) -> Self {
-        self.batch_size = Some(size);
-        self
-    }
-
-    /// Set the progress reporting interval
-    pub fn progress_interval(mut self, interval: usize) -> Self {
-        self.progress_interval = Some(interval);
-        self
-    }
-
-    /// Set the tier 2 patterns configuration
-    pub fn tier2_patterns_config(mut self, config: Tier2PatternsConfig) -> Self {
-        self.tier2_patterns_config = Some(config);
-        self
-    }
-
-    /// Build the configuration with validation
-    pub fn build(self) -> Result<Stage3Config, String> {
-        let config = Stage3Config {
-            database_path: self
-                .database_path
-                .unwrap_or_else(|| "./test_output/testing.db".into()),
-            batch_size: self.batch_size.unwrap_or(100),
-            progress_interval: self.progress_interval.unwrap_or(1000),
-            tier2_patterns_config: self.tier2_patterns_config.unwrap_or_default(),
-        };
-
-        // Validate configuration
-        if config.batch_size == 0 {
-            return Err("Batch size cannot be zero".to_string());
-        }
-
-        Ok(config)
-    }
-}
-
 impl Stage3Config {
-    /// Create a new builder
-    pub fn builder() -> Stage3ConfigBuilder {
-        Stage3ConfigBuilder::new()
-    }
-
     /// Validate the current configuration
     pub fn validate(&self) -> Result<(), String> {
         if self.batch_size == 0 {
@@ -122,8 +58,6 @@ pub struct Tier2PatternsConfig {
     pub enable_2_of_3: bool,
     /// Enable detection of 3-of-3 multisig patterns
     pub enable_3_of_3: bool,
-    /// Enable detection of 3-of-2 multisig patterns (unusual but valid)
-    pub enable_3_of_2: bool,
     /// Enable Tier 2 patterns in multi-output combinations
     pub enable_multi_output_tier2: bool,
 }
@@ -135,7 +69,6 @@ impl Default for Tier2PatternsConfig {
             enable_2_of_2: true,
             enable_2_of_3: true,
             enable_3_of_3: true,
-            enable_3_of_2: true,
             enable_multi_output_tier2: true,
         }
     }
@@ -148,7 +81,6 @@ impl Tier2PatternsConfig {
             enable_2_of_2: false,
             enable_2_of_3: false,
             enable_3_of_3: false,
-            enable_3_of_2: false,
             enable_multi_output_tier2: false,
         }
     }
@@ -159,7 +91,6 @@ impl Tier2PatternsConfig {
             enable_2_of_2: true,
             enable_2_of_3: true,
             enable_3_of_3: false,
-            enable_3_of_2: false,
             enable_multi_output_tier2: false,
         }
     }
@@ -169,7 +100,6 @@ impl Tier2PatternsConfig {
         self.enable_2_of_2
             || self.enable_2_of_3
             || self.enable_3_of_3
-            || self.enable_3_of_2
             || self.enable_multi_output_tier2
     }
 }
@@ -632,7 +562,6 @@ mod tests {
         assert!(config.tier2_patterns_config.enable_2_of_2);
         assert!(config.tier2_patterns_config.enable_2_of_3);
         assert!(config.tier2_patterns_config.enable_3_of_3);
-        assert!(config.tier2_patterns_config.enable_3_of_2);
         assert!(config.tier2_patterns_config.enable_multi_output_tier2);
     }
 
@@ -652,26 +581,42 @@ mod tests {
     }
 
     #[test]
-    fn test_stage3_config_builder() {
-        let config = Stage3Config::builder()
-            .database_path("/path/to/db.sqlite")
-            .batch_size(200)
-            .tier2_patterns_config(Tier2PatternsConfig::essential_only())
-            .build()
-            .unwrap();
+    fn test_stage3_config_custom() {
+        let config = Stage3Config {
+            database_path: "/path/to/db.sqlite".into(),
+            batch_size: 200,
+            progress_interval: 500,
+            tier2_patterns_config: Tier2PatternsConfig::essential_only(),
+        };
 
         assert_eq!(config.database_path, PathBuf::from("/path/to/db.sqlite"));
         assert_eq!(config.batch_size, 200);
         assert!(config.tier2_patterns_config.enable_2_of_2);
         assert!(!config.tier2_patterns_config.enable_3_of_3);
+        assert!(config.validate().is_ok());
     }
 
     #[test]
     fn test_stage3_config_validation() {
         // Test invalid batch size
-        let result = Stage3Config::builder().batch_size(0).build();
+        let config = Stage3Config {
+            batch_size: 0,
+            ..Default::default()
+        };
+        let result = config.validate();
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Batch size cannot be zero"));
+
+        // Test invalid progress interval
+        let config = Stage3Config {
+            progress_interval: 0,
+            ..Default::default()
+        };
+        let result = config.validate();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .contains("Progress interval cannot be zero"));
     }
 
     #[test]

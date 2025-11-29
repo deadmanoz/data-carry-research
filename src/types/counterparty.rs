@@ -136,10 +136,6 @@ pub enum MultisigPattern {
         // 3-of-3: 3 <data1> <data2> <source> 3 OP_CHECKMULTISIG
         data_capacity: usize,
     },
-    ThreeOfTwo {
-        // 3-of-2: 3 <source> <data> 2 OP_CHECKMULTISIG
-        data_capacity: usize,
-    },
 
     // Multi-output data combination
     MultiOutput {

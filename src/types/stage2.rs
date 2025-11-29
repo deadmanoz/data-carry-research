@@ -30,75 +30,7 @@ impl Default for Stage2Config {
     }
 }
 
-/// Builder for Stage2Config with validation
-#[derive(Debug, Default)]
-pub struct Stage2ConfigBuilder {
-    database_path: Option<PathBuf>,
-    bitcoin_rpc: Option<crate::config::BitcoinRpcConfig>,
-    batch_size: Option<usize>,
-    progress_interval: Option<usize>,
-}
-
-impl Stage2ConfigBuilder {
-    /// Create a new builder
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Set the database file path
-    pub fn database_path<P: Into<PathBuf>>(mut self, path: P) -> Self {
-        self.database_path = Some(path.into());
-        self
-    }
-
-    /// Set the Bitcoin RPC configuration
-    pub fn bitcoin_rpc(mut self, config: crate::config::BitcoinRpcConfig) -> Self {
-        self.bitcoin_rpc = Some(config);
-        self
-    }
-
-    /// Set the batch size for processing
-    pub fn batch_size(mut self, size: usize) -> Self {
-        self.batch_size = Some(size);
-        self
-    }
-
-    /// Set the progress reporting interval
-    pub fn progress_interval(mut self, interval: usize) -> Self {
-        self.progress_interval = Some(interval);
-        self
-    }
-
-    /// Build the configuration with validation
-    pub fn build(self) -> Result<Stage2Config, String> {
-        let config = Stage2Config {
-            database_path: self
-                .database_path
-                .unwrap_or_else(|| "./test_output/testing.db".into()),
-            bitcoin_rpc: self.bitcoin_rpc.unwrap_or_default(),
-            batch_size: self.batch_size.unwrap_or(50),
-            progress_interval: self.progress_interval.unwrap_or(100),
-        };
-
-        // Validate configuration
-        if config.batch_size == 0 {
-            return Err("Batch size cannot be zero".to_string());
-        }
-
-        if config.progress_interval == 0 {
-            return Err("Progress interval cannot be zero".to_string());
-        }
-
-        Ok(config)
-    }
-}
-
 impl Stage2Config {
-    /// Create a new builder
-    pub fn builder() -> Stage2ConfigBuilder {
-        Stage2ConfigBuilder::new()
-    }
-
     /// Validate the current configuration
     pub fn validate(&self) -> Result<(), String> {
         if self.batch_size == 0 {
@@ -222,7 +154,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stage2_config_builder() {
+    fn test_stage2_config_custom() {
         let rpc_config = BitcoinRpcConfig {
             url: "http://localhost:8332".to_string(),
             username: "test".to_string(),
@@ -235,29 +167,37 @@ mod tests {
             concurrent_requests: 5,
         };
 
-        let config = Stage2Config::builder()
-            .database_path("/path/to/db.sqlite")
-            .bitcoin_rpc(rpc_config.clone())
-            .batch_size(100)
-            .progress_interval(50)
-            .build()
-            .unwrap();
+        let config = Stage2Config {
+            database_path: "/path/to/db.sqlite".into(),
+            bitcoin_rpc: rpc_config.clone(),
+            batch_size: 100,
+            progress_interval: 50,
+        };
 
         assert_eq!(config.database_path, PathBuf::from("/path/to/db.sqlite"));
         assert_eq!(config.bitcoin_rpc.url, rpc_config.url);
         assert_eq!(config.batch_size, 100);
         assert_eq!(config.progress_interval, 50);
+        assert!(config.validate().is_ok());
     }
 
     #[test]
     fn test_stage2_config_validation() {
         // Test invalid batch size
-        let result = Stage2Config::builder().batch_size(0).build();
+        let config = Stage2Config {
+            batch_size: 0,
+            ..Default::default()
+        };
+        let result = config.validate();
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Batch size cannot be zero"));
 
         // Test invalid progress interval
-        let result = Stage2Config::builder().progress_interval(0).build();
+        let config = Stage2Config {
+            progress_interval: 0,
+            ..Default::default()
+        };
+        let result = config.validate();
         assert!(result.is_err());
         assert!(result
             .unwrap_err()

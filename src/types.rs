@@ -196,7 +196,6 @@ mod tests {
         assert!(config.tier2_patterns_config.enable_2_of_2);
         assert!(config.tier2_patterns_config.enable_2_of_3);
         assert!(config.tier2_patterns_config.enable_3_of_3);
-        assert!(config.tier2_patterns_config.enable_3_of_2);
         assert!(config.tier2_patterns_config.enable_multi_output_tier2);
     }
 
@@ -266,30 +265,36 @@ mod tests {
         assert!(result.classification_details.protocol_signature_found);
     }
 
-    /// Test that the new builder patterns work correctly
+    /// Test that config creation with struct update syntax works correctly
     #[test]
-    fn test_config_builders() {
-        // Test Stage1Config builder
-        let stage1_config = Stage1Config::builder()
-            .batch_size(5000)
-            .progress_interval(50000)
-            .build()
-            .unwrap();
+    fn test_config_creation() {
+        // Test Stage1Config with custom values
+        let stage1_config = Stage1Config {
+            batch_size: 5000,
+            progress_interval: 50000,
+            ..Default::default()
+        };
         assert_eq!(stage1_config.batch_size, 5000);
         assert_eq!(stage1_config.progress_interval, 50000);
+        assert!(stage1_config.validate().is_ok());
 
-        // Test Stage2Config builder
-        let stage2_config = Stage2Config::builder()
-            .batch_size(25)
-            .progress_interval(50)
-            .build()
-            .unwrap();
+        // Test Stage2Config with custom values
+        let stage2_config = Stage2Config {
+            batch_size: 25,
+            progress_interval: 50,
+            ..Default::default()
+        };
         assert_eq!(stage2_config.batch_size, 25);
         assert_eq!(stage2_config.progress_interval, 50);
+        assert!(stage2_config.validate().is_ok());
 
-        // Test Stage3Config builder
-        let stage3_config = Stage3Config::builder().batch_size(150).build().unwrap();
+        // Test Stage3Config with custom values
+        let stage3_config = Stage3Config {
+            batch_size: 150,
+            ..Default::default()
+        };
         assert_eq!(stage3_config.batch_size, 150);
+        assert!(stage3_config.validate().is_ok());
     }
 
     /// Test that the statistics framework works with the StatisticsCollector trait

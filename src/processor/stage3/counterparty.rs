@@ -288,17 +288,6 @@ impl CounterpartyClassifier {
                     }
                 }
             }
-            if self.tier2_config.enable_3_of_2 {
-                if let Some(info) = output.multisig_info() {
-                    if info.required_sigs == 3 && info.total_pubkeys == 2 && info.pubkeys.len() == 2
-                    {
-                        if let Some(data) = self.extract_3_of_2_multisig_data(tx, output, database)
-                        {
-                            return Some(data);
-                        }
-                    }
-                }
-            }
         }
         None
     }
@@ -608,15 +597,6 @@ impl CounterpartyClassifier {
             }
         }
         None
-    }
-
-    pub fn extract_3_of_2_multisig_data(
-        &self,
-        tx: &EnrichedTransaction,
-        output: &crate::types::TransactionOutput,
-        database: &Database,
-    ) -> Option<CounterpartyP2msData> {
-        self.extract_1_of_2_multisig_data(tx, output, database)
     }
 
     pub fn decrypt_and_validate_counterparty(

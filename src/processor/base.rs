@@ -299,13 +299,6 @@ impl CheckpointManager {
     }
 }
 
-/// Common processor configuration trait
-pub trait ProcessorConfig {
-    fn validate(&self) -> Result<(), String>;
-    fn batch_size(&self) -> usize;
-    fn progress_interval(&self) -> usize;
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
