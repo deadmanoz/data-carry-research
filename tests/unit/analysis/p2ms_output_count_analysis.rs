@@ -4,15 +4,11 @@
 //! counts per transaction, with global and per-protocol breakdowns plus percentiles.
 //! Tracks total satoshi value per bucket (USER DIRECTIVE).
 
+use crate::common::analysis_test_setup::create_analysis_test_db;
 use data_carry_research::analysis::P2msOutputCountAnalyser;
 use data_carry_research::database::Database;
 use data_carry_research::errors::AppResult;
 use data_carry_research::types::ProtocolType;
-
-/// Helper to create test database with Schema V2
-fn create_test_db() -> AppResult<Database> {
-    Database::new_v2(":memory:")
-}
 
 /// Seed test data with transactions having various P2MS output counts
 ///
@@ -244,7 +240,7 @@ fn seed_classified_test_data(db: &Database) -> AppResult<()> {
 
 #[test]
 fn test_global_distribution_bucket_assignment() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_output_count_test_data(&db)?;
 
     let report = P2msOutputCountAnalyser::analyse_output_counts(&db)?;
@@ -309,7 +305,7 @@ fn test_global_distribution_bucket_assignment() -> AppResult<()> {
 
 #[test]
 fn test_total_value_in_buckets() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_output_count_test_data(&db)?;
 
     let report = P2msOutputCountAnalyser::analyse_output_counts(&db)?;
@@ -337,7 +333,7 @@ fn test_total_value_in_buckets() -> AppResult<()> {
 
 #[test]
 fn test_percentiles_calculation() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_output_count_test_data(&db)?;
 
     let report = P2msOutputCountAnalyser::analyse_output_counts(&db)?;
@@ -368,7 +364,7 @@ fn test_percentiles_calculation() -> AppResult<()> {
 
 #[test]
 fn test_per_protocol_distribution() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_classified_test_data(&db)?;
 
     let report = P2msOutputCountAnalyser::analyse_output_counts(&db)?;
@@ -423,7 +419,7 @@ fn test_per_protocol_distribution() -> AppResult<()> {
 
 #[test]
 fn test_protocol_ordering() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_classified_test_data(&db)?;
 
     let report = P2msOutputCountAnalyser::analyse_output_counts(&db)?;
@@ -445,7 +441,7 @@ fn test_protocol_ordering() -> AppResult<()> {
 
 #[test]
 fn test_empty_database() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     // Don't seed any data
 
     let report = P2msOutputCountAnalyser::analyse_output_counts(&db)?;
@@ -473,7 +469,7 @@ fn test_empty_database() -> AppResult<()> {
 
 #[test]
 fn test_min_max_avg_output_counts() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_output_count_test_data(&db)?;
 
     let report = P2msOutputCountAnalyser::analyse_output_counts(&db)?;
@@ -505,7 +501,7 @@ fn test_min_max_avg_output_counts() -> AppResult<()> {
 
 #[test]
 fn test_unclassified_count() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_output_count_test_data(&db)?;
 
     let report = P2msOutputCountAnalyser::analyse_output_counts(&db)?;
@@ -521,7 +517,7 @@ fn test_unclassified_count() -> AppResult<()> {
 
 #[test]
 fn test_bucket_ranges_consistency() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_output_count_test_data(&db)?;
 
     let report = P2msOutputCountAnalyser::analyse_output_counts(&db)?;
@@ -560,7 +556,7 @@ fn test_bucket_ranges_consistency() -> AppResult<()> {
 
 #[test]
 fn test_bucket_count_consistency() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_output_count_test_data(&db)?;
 
     let report = P2msOutputCountAnalyser::analyse_output_counts(&db)?;
@@ -594,7 +590,7 @@ fn test_bucket_count_consistency() -> AppResult<()> {
 
 #[test]
 fn test_spent_outputs_excluded() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     let conn = db.connection();
 
     // Insert stub block
@@ -643,7 +639,7 @@ fn test_spent_outputs_excluded() -> AppResult<()> {
 
 #[test]
 fn test_non_multisig_excluded() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     let conn = db.connection();
 
     // Insert stub block

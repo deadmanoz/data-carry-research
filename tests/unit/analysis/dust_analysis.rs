@@ -3,15 +3,17 @@
 //! Tests the DustAnalyser which reports on P2MS outputs relative to Bitcoin Core's
 //! dust thresholds (546 sats for non-segwit, 294 sats for segwit destinations).
 
+use crate::common::analysis_test_setup::{
+    create_analysis_test_db, insert_complete_p2ms_output, insert_test_enriched_transaction,
+    insert_test_output, insert_test_output_classification, insert_test_p2ms_output,
+    insert_test_tx_classification, seed_analysis_blocks, TestClassificationParams,
+    TestOutputClassificationParams, TestOutputParams, TestP2msOutputParams,
+};
 use data_carry_research::analysis::DustAnalyser;
-use data_carry_research::database::Database;
 use data_carry_research::errors::AppResult;
 use data_carry_research::types::ProtocolType;
 
-/// Helper to create test database with Schema V2
-fn create_test_db() -> AppResult<Database> {
-    Database::new_v2(":memory:")
-}
+use data_carry_research::database::Database;
 
 /// Seed test data with outputs at various dust threshold boundaries
 ///
@@ -24,132 +26,60 @@ fn create_test_db() -> AppResult<Database> {
 /// - 547 sats (above both thresholds)
 /// - 1000 sats (well above dust)
 fn seed_boundary_test_data(db: &Database) -> AppResult<()> {
-    let conn = db.connection();
-
     // Insert stub blocks
-    conn.execute("INSERT INTO blocks (height) VALUES (100000)", [])?;
-    conn.execute("INSERT INTO blocks (height) VALUES (100001)", [])?;
+    seed_analysis_blocks(db, &[100000, 100001])?;
 
-    // Insert outputs at boundary values
     // BitcoinStamps - outputs at 0, 293, 294, 545 sats (all below 546)
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('stamps_tx1', 0, 100000, 0, 'aabbcc', 'multisig', 0, 100, '{}', 0)",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('stamps_tx1', 1, 100000, 293, 'aabbcc', 'multisig', 0, 100, '{}', 0)",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('stamps_tx1', 2, 100000, 294, 'aabbcc', 'multisig', 0, 100, '{}', 0)",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('stamps_tx1', 3, 100000, 545, 'aabbcc', 'multisig', 0, 100, '{}', 0)",
-        [],
-    )?;
+    let stamps_amounts = [0, 293, 294, 545];
+    for (vout, amount) in stamps_amounts.iter().enumerate() {
+        insert_test_output(
+            db,
+            &TestOutputParams::multisig("stamps_tx1", vout as i64, 100000, *amount, 100),
+        )?;
+        insert_test_p2ms_output(db, &TestP2msOutputParams::standard("stamps_tx1", vout as i64))?;
+    }
 
     // Counterparty - outputs at 546, 547, 1000 sats (all at or above 546)
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('cp_tx1', 0, 100001, 546, 'aabbcc', 'multisig', 0, 100, '{}', 0)",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('cp_tx1', 1, 100001, 547, 'aabbcc', 'multisig', 0, 100, '{}', 0)",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('cp_tx1', 2, 100001, 1000, 'aabbcc', 'multisig', 0, 100, '{}', 0)",
-        [],
-    )?;
-
-    // Insert p2ms_outputs (Schema V2 requirement)
-    for vout in 0..4 {
-        conn.execute(
-            &format!(
-                "INSERT INTO p2ms_outputs (txid, vout, required_sigs, total_pubkeys, pubkeys_json)
-                 VALUES ('stamps_tx1', {}, 1, 3, '[]')",
-                vout
-            ),
-            [],
+    let cp_amounts = [546, 547, 1000];
+    for (vout, amount) in cp_amounts.iter().enumerate() {
+        insert_test_output(
+            db,
+            &TestOutputParams::multisig("cp_tx1", vout as i64, 100001, *amount, 100),
         )?;
-    }
-    for vout in 0..3 {
-        conn.execute(
-            &format!(
-                "INSERT INTO p2ms_outputs (txid, vout, required_sigs, total_pubkeys, pubkeys_json)
-                 VALUES ('cp_tx1', {}, 1, 3, '[]')",
-                vout
-            ),
-            [],
-        )?;
+        insert_test_p2ms_output(db, &TestP2msOutputParams::standard("cp_tx1", vout as i64))?;
     }
 
-    // Insert enriched transactions (Schema V2 requirement)
-    conn.execute(
-        "INSERT INTO enriched_transactions (txid, height, total_input_value, total_output_value,
-         transaction_fee, fee_per_byte, transaction_size_bytes, fee_per_kb, total_p2ms_amount,
-         data_storage_fee_rate, p2ms_outputs_count, input_count, output_count, is_coinbase)
-         VALUES ('stamps_tx1', 100000, 2000, 1132, 868, 1.0, 500, 2.0, 1132, 2.0, 4, 1, 4, 0)",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO enriched_transactions (txid, height, total_input_value, total_output_value,
-         transaction_fee, fee_per_byte, transaction_size_bytes, fee_per_kb, total_p2ms_amount,
-         data_storage_fee_rate, p2ms_outputs_count, input_count, output_count, is_coinbase)
-         VALUES ('cp_tx1', 100001, 3000, 2093, 907, 1.0, 500, 2.0, 2093, 2.0, 3, 1, 3, 0)",
-        [],
-    )?;
+    // Insert enriched transactions
+    insert_test_enriched_transaction(db, "stamps_tx1", 100000)?;
+    insert_test_enriched_transaction(db, "cp_tx1", 100001)?;
 
     // Insert transaction classifications (parent)
-    conn.execute(
-        "INSERT INTO transaction_classifications (txid, protocol, variant, protocol_signature_found,
-         classification_method, content_type)
-         VALUES ('stamps_tx1', 'BitcoinStamps', 'StampsClassic', 1, 'SignatureBased', 'image/png')",
-        [],
+    insert_test_tx_classification(
+        db,
+        &TestClassificationParams::new("stamps_tx1", "BitcoinStamps")
+            .with_variant("StampsClassic")
+            .with_content_type("image/png"),
     )?;
-    conn.execute(
-        "INSERT INTO transaction_classifications (txid, protocol, variant, protocol_signature_found,
-         classification_method, content_type)
-         VALUES ('cp_tx1', 'Counterparty', NULL, 1, 'SignatureBased', 'application/octet-stream')",
-        [],
+    insert_test_tx_classification(
+        db,
+        &TestClassificationParams::new("cp_tx1", "Counterparty")
+            .with_content_type("application/octet-stream"),
     )?;
 
     // Insert output classifications (child)
     for vout in 0..4 {
-        conn.execute(
-            &format!(
-                "INSERT INTO p2ms_output_classifications (txid, vout, protocol, variant, protocol_signature_found,
-                 classification_method, content_type, is_spendable, spendability_reason)
-                 VALUES ('stamps_tx1', {}, 'BitcoinStamps', 'StampsClassic', 1, 'SignatureBased', 'image/png', 1, NULL)",
-                vout
-            ),
-            [],
+        insert_test_output_classification(
+            db,
+            &TestOutputClassificationParams::spendable("stamps_tx1", vout, "BitcoinStamps")
+                .with_variant("StampsClassic")
+                .with_content_type("image/png"),
         )?;
     }
     for vout in 0..3 {
-        conn.execute(
-            &format!(
-                "INSERT INTO p2ms_output_classifications (txid, vout, protocol, variant, protocol_signature_found,
-                 classification_method, content_type, is_spendable, spendability_reason)
-                 VALUES ('cp_tx1', {}, 'Counterparty', NULL, 1, 'SignatureBased', 'application/octet-stream', 0, 'InvalidECPoints')",
-                vout
-            ),
-            [],
+        insert_test_output_classification(
+            db,
+            &TestOutputClassificationParams::unspendable("cp_tx1", vout, "Counterparty")
+                .with_content_type("application/octet-stream"),
         )?;
     }
 
@@ -158,7 +88,7 @@ fn seed_boundary_test_data(db: &Database) -> AppResult<()> {
 
 #[test]
 fn test_global_dust_analysis_boundaries() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_boundary_test_data(&db)?;
 
     let report = DustAnalyser::analyse_dust_thresholds(&db)?;
@@ -212,7 +142,7 @@ fn test_global_dust_analysis_boundaries() -> AppResult<()> {
 
 #[test]
 fn test_per_protocol_breakdown() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_boundary_test_data(&db)?;
 
     let report = DustAnalyser::analyse_dust_thresholds(&db)?;
@@ -254,7 +184,7 @@ fn test_per_protocol_breakdown() -> AppResult<()> {
 
 #[test]
 fn test_protocol_ordering() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_boundary_test_data(&db)?;
 
     let report = DustAnalyser::analyse_dust_thresholds(&db)?;
@@ -276,7 +206,7 @@ fn test_protocol_ordering() -> AppResult<()> {
 
 #[test]
 fn test_empty_database() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     // Don't seed any data
 
     let report = DustAnalyser::analyse_dust_thresholds(&db)?;
@@ -308,25 +238,19 @@ fn test_empty_database() -> AppResult<()> {
 
 #[test]
 fn test_spent_outputs_excluded() -> AppResult<()> {
-    let db = create_test_db()?;
-    let conn = db.connection();
-
-    conn.execute("INSERT INTO blocks (height) VALUES (100000)", [])?;
+    let db = create_analysis_test_db()?;
+    seed_analysis_blocks(&db, &[100000])?;
 
     // Unspent output (should be included)
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('test_tx1', 0, 100000, 500, 'aabbcc', 'multisig', 0, 100, '{}', 0)",
-        [],
+    insert_test_output(
+        &db,
+        &TestOutputParams::multisig("test_tx1", 0, 100000, 500, 100),
     )?;
 
     // Spent output (should be excluded)
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('test_tx1', 1, 100000, 600, 'aabbcc', 'multisig', 0, 100, '{}', 1)",
-        [],
+    insert_test_output(
+        &db,
+        &TestOutputParams::multisig("test_tx1", 1, 100000, 600, 100).spent(),
     )?;
 
     let report = DustAnalyser::analyse_dust_thresholds(&db)?;
@@ -346,56 +270,20 @@ fn test_spent_outputs_excluded() -> AppResult<()> {
 
 #[test]
 fn test_unclassified_vs_unknown() -> AppResult<()> {
-    let db = create_test_db()?;
-    let conn = db.connection();
-
-    conn.execute("INSERT INTO blocks (height) VALUES (100000)", [])?;
-    conn.execute("INSERT INTO blocks (height) VALUES (100001)", [])?;
+    let db = create_analysis_test_db()?;
+    seed_analysis_blocks(&db, &[100000, 100001])?;
 
     // Output classified as Unknown (has classification row with protocol='Unknown')
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('unknown_tx', 0, 100000, 500, 'aabbcc', 'multisig', 0, 100, '{}', 0)",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO p2ms_outputs (txid, vout, required_sigs, total_pubkeys, pubkeys_json)
-         VALUES ('unknown_tx', 0, 1, 3, '[]')",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO enriched_transactions (txid, height, total_input_value, total_output_value,
-         transaction_fee, fee_per_byte, transaction_size_bytes, fee_per_kb, total_p2ms_amount,
-         data_storage_fee_rate, p2ms_outputs_count, input_count, output_count, is_coinbase)
-         VALUES ('unknown_tx', 100000, 1000, 500, 500, 1.0, 500, 2.0, 500, 2.0, 1, 1, 1, 0)",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO transaction_classifications (txid, protocol, variant, protocol_signature_found,
-         classification_method, content_type)
-         VALUES ('unknown_tx', 'Unknown', NULL, 0, 'Fallback', NULL)",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO p2ms_output_classifications (txid, vout, protocol, variant, protocol_signature_found,
-         classification_method, content_type, is_spendable, spendability_reason)
-         VALUES ('unknown_tx', 0, 'Unknown', NULL, 0, 'Fallback', NULL, 1, NULL)",
-        [],
+    insert_complete_p2ms_output(&db, "unknown_tx", 0, 100000, 500, 100)?;
+    insert_test_enriched_transaction(&db, "unknown_tx", 100000)?;
+    insert_test_tx_classification(&db, &TestClassificationParams::new("unknown_tx", "Unknown"))?;
+    insert_test_output_classification(
+        &db,
+        &TestOutputClassificationParams::spendable("unknown_tx", 0, "Unknown"),
     )?;
 
     // Output truly unclassified (no classification row at all)
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('unclassified_tx', 0, 100001, 600, 'aabbcc', 'multisig', 0, 100, '{}', 0)",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO p2ms_outputs (txid, vout, required_sigs, total_pubkeys, pubkeys_json)
-         VALUES ('unclassified_tx', 0, 1, 3, '[]')",
-        [],
-    )?;
+    insert_complete_p2ms_output(&db, "unclassified_tx", 0, 100001, 600, 100)?;
     // NO classification rows for unclassified_tx - this is intentional for the test
 
     let report = DustAnalyser::analyse_dust_thresholds(&db)?;
@@ -434,7 +322,7 @@ fn test_unclassified_vs_unknown() -> AppResult<()> {
 
 #[test]
 fn test_consistency_validation() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_boundary_test_data(&db)?;
 
     let report = DustAnalyser::analyse_dust_thresholds(&db)?;
@@ -484,7 +372,7 @@ fn test_consistency_validation() -> AppResult<()> {
 
 #[test]
 fn test_percentage_calculations() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_boundary_test_data(&db)?;
 
     let report = DustAnalyser::analyse_dust_thresholds(&db)?;
@@ -533,7 +421,7 @@ fn test_percentage_calculations() -> AppResult<()> {
 
 #[test]
 fn test_thresholds_values() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     let report = DustAnalyser::analyse_dust_thresholds(&db)?;
 
     // Verify threshold constants are correct
@@ -551,30 +439,12 @@ fn test_thresholds_values() -> AppResult<()> {
 
 #[test]
 fn test_all_outputs_in_one_bucket() -> AppResult<()> {
-    let db = create_test_db()?;
-    let conn = db.connection();
-
-    conn.execute("INSERT INTO blocks (height) VALUES (100000)", [])?;
+    let db = create_analysis_test_db()?;
+    seed_analysis_blocks(&db, &[100000])?;
 
     // All outputs above dust (1000 sats each)
     for vout in 0..5 {
-        conn.execute(
-            &format!(
-                "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-                 is_coinbase, script_size, metadata_json, is_spent)
-                 VALUES ('all_high', {}, 100000, 1000, 'aabbcc', 'multisig', 0, 100, '{{}}', 0)",
-                vout
-            ),
-            [],
-        )?;
-        conn.execute(
-            &format!(
-                "INSERT INTO p2ms_outputs (txid, vout, required_sigs, total_pubkeys, pubkeys_json)
-                 VALUES ('all_high', {}, 1, 3, '[]')",
-                vout
-            ),
-            [],
-        )?;
+        insert_complete_p2ms_output(&db, "all_high", vout, 100000, 1000, 100)?;
     }
 
     let report = DustAnalyser::analyse_dust_thresholds(&db)?;
@@ -590,20 +460,17 @@ fn test_all_outputs_in_one_bucket() -> AppResult<()> {
 
 #[test]
 fn test_non_multisig_outputs_excluded() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     let conn = db.connection();
-
-    conn.execute("INSERT INTO blocks (height) VALUES (100000)", [])?;
+    seed_analysis_blocks(&db, &[100000])?;
 
     // Multisig output (should be included)
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('test_tx', 0, 100000, 500, 'aabbcc', 'multisig', 0, 100, '{}', 0)",
-        [],
+    insert_test_output(
+        &db,
+        &TestOutputParams::multisig("test_tx", 0, 100000, 500, 100),
     )?;
 
-    // P2PKH output (should be excluded)
+    // P2PKH output (should be excluded) - uses raw SQL since not multisig
     conn.execute(
         "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
          is_coinbase, script_size, metadata_json, is_spent)
@@ -611,7 +478,7 @@ fn test_non_multisig_outputs_excluded() -> AppResult<()> {
         [],
     )?;
 
-    // OP_RETURN output (should be excluded)
+    // OP_RETURN output (should be excluded) - uses raw SQL since not multisig
     conn.execute(
         "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
          is_coinbase, script_size, metadata_json, is_spent)

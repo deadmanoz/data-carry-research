@@ -1,165 +1,92 @@
 //! Unit tests for data size analysis functionality
 
+use crate::common::analysis_test_setup::{
+    create_analysis_test_db, insert_complete_p2ms_output, insert_test_enriched_transaction,
+    insert_test_output, insert_test_output_classification, insert_test_p2ms_output,
+    insert_test_tx_classification, seed_analysis_blocks, TestClassificationParams,
+    TestOutputClassificationParams, TestOutputParams, TestP2msOutputParams,
+};
 use data_carry_research::analysis::DataSizeAnalyser;
 use data_carry_research::database::Database;
 use data_carry_research::errors::AppResult;
 
-/// Helper to create test database with Schema V2
-fn create_test_db() -> AppResult<Database> {
-    Database::new_v2(":memory:")
-}
-
 /// Helper to seed test data with proper FK relationships
 fn seed_test_data(db: &Database) -> AppResult<()> {
-    let conn = db.connection();
+    seed_analysis_blocks(db, &[100000, 100001, 100002])?;
 
-    // Insert stub blocks
-    conn.execute("INSERT INTO blocks (height) VALUES (100000)", [])?;
-    conn.execute("INSERT INTO blocks (height) VALUES (100001)", [])?;
-    conn.execute("INSERT INTO blocks (height) VALUES (100002)", [])?;
-
-    // Insert transaction outputs (P2MS, unspent)
     // BitcoinStamps - 2 outputs, 500 + 600 = 1100 bytes, spendable
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('stamps_tx1', 0, 100000, 1000, 'aabbcc', 'multisig', 0, 500, '{}', 0)",
-        [],
+    insert_test_output(
+        db,
+        &TestOutputParams::multisig("stamps_tx1", 0, 100000, 1000, 500),
     )?;
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('stamps_tx1', 1, 100000, 1000, 'ddeeff', 'multisig', 0, 600, '{}', 0)",
-        [],
+    insert_test_p2ms_output(db, &TestP2msOutputParams::standard("stamps_tx1", 0))?;
+    insert_test_output(
+        db,
+        &TestOutputParams::multisig("stamps_tx1", 1, 100000, 1000, 600),
     )?;
+    insert_test_p2ms_output(db, &TestP2msOutputParams::standard("stamps_tx1", 1))?;
 
     // Counterparty - 1 output, 800 bytes, unspendable
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('cp_tx1', 0, 100001, 1000, 'aabbcc', 'multisig', 0, 800, '{}', 0)",
-        [],
-    )?;
+    insert_complete_p2ms_output(db, "cp_tx1", 0, 100001, 1000, 800)?;
 
     // Omni - 2 outputs, 300 + 400 = 700 bytes, mixed spendability
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('omni_tx1', 0, 100002, 1000, 'aabbcc', 'multisig', 0, 300, '{}', 0)",
-        [],
+    insert_complete_p2ms_output(db, "omni_tx1", 0, 100002, 1000, 300)?;
+    insert_complete_p2ms_output(db, "omni_tx1", 1, 100002, 1000, 400)?;
+
+    // Insert enriched transactions
+    insert_test_enriched_transaction(db, "stamps_tx1", 100000)?;
+    insert_test_enriched_transaction(db, "cp_tx1", 100001)?;
+    insert_test_enriched_transaction(db, "omni_tx1", 100002)?;
+
+    // Transaction classifications
+    insert_test_tx_classification(
+        db,
+        &TestClassificationParams::new("stamps_tx1", "BitcoinStamps")
+            .with_variant("StampsClassic")
+            .with_content_type("image/png"),
     )?;
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('omni_tx1', 1, 100002, 1000, 'ddeeff', 'multisig', 0, 400, '{}', 0)",
-        [],
+    insert_test_tx_classification(
+        db,
+        &TestClassificationParams::new("cp_tx1", "Counterparty")
+            .with_content_type("application/octet-stream"),
+    )?;
+    insert_test_tx_classification(
+        db,
+        &TestClassificationParams::new("omni_tx1", "OmniLayer").with_content_type("text/plain"),
     )?;
 
-    // Insert into p2ms_outputs (Schema V2 requirement)
-    conn.execute(
-        "INSERT INTO p2ms_outputs (txid, vout, required_sigs, total_pubkeys, pubkeys_json)
-         VALUES ('stamps_tx1', 0, 1, 3, '[]')",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO p2ms_outputs (txid, vout, required_sigs, total_pubkeys, pubkeys_json)
-         VALUES ('stamps_tx1', 1, 1, 3, '[]')",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO p2ms_outputs (txid, vout, required_sigs, total_pubkeys, pubkeys_json)
-         VALUES ('cp_tx1', 0, 1, 3, '[]')",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO p2ms_outputs (txid, vout, required_sigs, total_pubkeys, pubkeys_json)
-         VALUES ('omni_tx1', 0, 1, 3, '[]')",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO p2ms_outputs (txid, vout, required_sigs, total_pubkeys, pubkeys_json)
-         VALUES ('omni_tx1', 1, 1, 3, '[]')",
-        [],
-    )?;
-
-    // Insert enriched transactions (Schema V2 fields)
-    conn.execute(
-        "INSERT INTO enriched_transactions (txid, height, total_input_value, total_output_value,
-         transaction_fee, fee_per_byte, transaction_size_bytes, fee_per_kb, total_p2ms_amount,
-         data_storage_fee_rate, p2ms_outputs_count, input_count, output_count, is_coinbase)
-         VALUES ('stamps_tx1', 100000, 2000, 1000, 1000, 1.0, 500, 2.0, 1000, 2.0, 2, 1, 2, 0)",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO enriched_transactions (txid, height, total_input_value, total_output_value,
-         transaction_fee, fee_per_byte, transaction_size_bytes, fee_per_kb, total_p2ms_amount,
-         data_storage_fee_rate, p2ms_outputs_count, input_count, output_count, is_coinbase)
-         VALUES ('cp_tx1', 100001, 2000, 1000, 1000, 1.0, 500, 2.0, 1000, 2.0, 1, 1, 1, 0)",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO enriched_transactions (txid, height, total_input_value, total_output_value,
-         transaction_fee, fee_per_byte, transaction_size_bytes, fee_per_kb, total_p2ms_amount,
-         data_storage_fee_rate, p2ms_outputs_count, input_count, output_count, is_coinbase)
-         VALUES ('omni_tx1', 100002, 2000, 1000, 1000, 1.0, 500, 2.0, 1000, 2.0, 2, 1, 2, 0)",
-        [],
-    )?;
-
-    // Insert transaction classifications (parent - Schema V2 fields)
-    conn.execute(
-        "INSERT INTO transaction_classifications (txid, protocol, variant, protocol_signature_found,
-         classification_method, content_type)
-         VALUES ('stamps_tx1', 'BitcoinStamps', 'StampsClassic', 1, 'SignatureBased', 'image/png')",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO transaction_classifications (txid, protocol, variant, protocol_signature_found,
-         classification_method, content_type)
-         VALUES ('cp_tx1', 'Counterparty', NULL, 1, 'SignatureBased', 'application/octet-stream')",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO transaction_classifications (txid, protocol, variant, protocol_signature_found,
-         classification_method, content_type)
-         VALUES ('omni_tx1', 'OmniLayer', NULL, 1, 'SignatureBased', 'text/plain')",
-        [],
-    )?;
-
-    // Insert output classifications (child, with FK to transaction_outputs)
+    // Output classifications
     // BitcoinStamps - both spendable
-    conn.execute(
-        "INSERT INTO p2ms_output_classifications (txid, vout, protocol, variant, protocol_signature_found,
-         classification_method, content_type, is_spendable, spendability_reason)
-         VALUES ('stamps_tx1', 0, 'BitcoinStamps', 'StampsClassic', 1, 'SignatureBased', 'image/png', 1, NULL)",
-        [],
+    insert_test_output_classification(
+        db,
+        &TestOutputClassificationParams::spendable("stamps_tx1", 0, "BitcoinStamps")
+            .with_variant("StampsClassic")
+            .with_content_type("image/png"),
     )?;
-    conn.execute(
-        "INSERT INTO p2ms_output_classifications (txid, vout, protocol, variant, protocol_signature_found,
-         classification_method, content_type, is_spendable, spendability_reason)
-         VALUES ('stamps_tx1', 1, 'BitcoinStamps', 'StampsClassic', 1, 'SignatureBased', 'image/png', 1, NULL)",
-        [],
+    insert_test_output_classification(
+        db,
+        &TestOutputClassificationParams::spendable("stamps_tx1", 1, "BitcoinStamps")
+            .with_variant("StampsClassic")
+            .with_content_type("image/png"),
     )?;
 
-    // Counterparty - unspendable (invalid EC points)
-    conn.execute(
-        "INSERT INTO p2ms_output_classifications (txid, vout, protocol, variant, protocol_signature_found,
-         classification_method, content_type, is_spendable, spendability_reason)
-         VALUES ('cp_tx1', 0, 'Counterparty', NULL, 1, 'SignatureBased', 'application/octet-stream', 0, 'InvalidECPoints')",
-        [],
+    // Counterparty - unspendable
+    insert_test_output_classification(
+        db,
+        &TestOutputClassificationParams::unspendable("cp_tx1", 0, "Counterparty")
+            .with_content_type("application/octet-stream"),
     )?;
 
     // Omni - mixed (one spendable, one unspendable)
-    conn.execute(
-        "INSERT INTO p2ms_output_classifications (txid, vout, protocol, variant, protocol_signature_found,
-         classification_method, content_type, is_spendable, spendability_reason)
-         VALUES ('omni_tx1', 0, 'OmniLayer', NULL, 1, 'SignatureBased', 'text/plain', 1, NULL)",
-        [],
+    insert_test_output_classification(
+        db,
+        &TestOutputClassificationParams::spendable("omni_tx1", 0, "OmniLayer")
+            .with_content_type("text/plain"),
     )?;
-    conn.execute(
-        "INSERT INTO p2ms_output_classifications (txid, vout, protocol, variant, protocol_signature_found,
-         classification_method, content_type, is_spendable, spendability_reason)
-         VALUES ('omni_tx1', 1, 'OmniLayer', NULL, 1, 'SignatureBased', 'text/plain', 0, 'InvalidECPoints')",
-        [],
+    insert_test_output_classification(
+        db,
+        &TestOutputClassificationParams::unspendable("omni_tx1", 1, "OmniLayer")
+            .with_content_type("text/plain"),
     )?;
 
     Ok(())
@@ -167,7 +94,7 @@ fn seed_test_data(db: &Database) -> AppResult<()> {
 
 #[test]
 fn test_analyse_protocol_data_sizes() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_test_data(&db)?;
 
     let report = DataSizeAnalyser::analyse_protocol_data_sizes(&db)?;
@@ -235,7 +162,7 @@ fn test_analyse_protocol_data_sizes() -> AppResult<()> {
 
 #[test]
 fn test_analyse_spendability_data_sizes() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_test_data(&db)?;
 
     let report = DataSizeAnalyser::analyse_spendability_data_sizes(&db)?;
@@ -283,7 +210,7 @@ fn test_analyse_spendability_data_sizes() -> AppResult<()> {
 
 #[test]
 fn test_analyse_content_type_spendability() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_test_data(&db)?;
 
     let report = DataSizeAnalyser::analyse_content_type_spendability(&db)?;
@@ -331,7 +258,7 @@ fn test_analyse_content_type_spendability() -> AppResult<()> {
 
 #[test]
 fn test_analyse_comprehensive_data_sizes() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_test_data(&db)?;
 
     let report = DataSizeAnalyser::analyse_comprehensive_data_sizes(&db)?;
@@ -392,7 +319,7 @@ fn test_analyse_comprehensive_data_sizes() -> AppResult<()> {
 
 #[test]
 fn test_empty_database() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
 
     // Don't seed any data - test with empty database
 
@@ -425,45 +352,20 @@ fn test_empty_database() -> AppResult<()> {
 
 #[test]
 fn test_null_content_types() -> AppResult<()> {
-    let db = create_test_db()?;
-    let conn = db.connection();
+    let db = create_analysis_test_db()?;
+    seed_analysis_blocks(&db, &[100000])?;
 
-    // Seed minimal data with NULL content_type
-    conn.execute("INSERT INTO blocks (height) VALUES (100000)", [])?;
-
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('unknown_tx1', 0, 100000, 1000, 'aabbcc', 'multisig', 0, 500, '{}', 0)",
-        [],
+    // Seed minimal data with NULL content_type (Unknown protocol with no content_type)
+    insert_complete_p2ms_output(&db, "unknown_tx1", 0, 100000, 1000, 500)?;
+    insert_test_enriched_transaction(&db, "unknown_tx1", 100000)?;
+    insert_test_tx_classification(
+        &db,
+        &TestClassificationParams::new("unknown_tx1", "Unknown").without_content_type(),
     )?;
-
-    conn.execute(
-        "INSERT INTO p2ms_outputs (txid, vout, required_sigs, total_pubkeys, pubkeys_json)
-         VALUES ('unknown_tx1', 0, 1, 3, '[]')",
-        [],
-    )?;
-
-    conn.execute(
-        "INSERT INTO enriched_transactions (txid, height, total_input_value, total_output_value,
-         transaction_fee, fee_per_byte, transaction_size_bytes, fee_per_kb, total_p2ms_amount,
-         data_storage_fee_rate, p2ms_outputs_count, input_count, output_count, is_coinbase)
-         VALUES ('unknown_tx1', 100000, 2000, 1000, 1000, 1.0, 500, 2.0, 1000, 2.0, 1, 1, 1, 0)",
-        [],
-    )?;
-
-    conn.execute(
-        "INSERT INTO transaction_classifications (txid, protocol, variant, protocol_signature_found,
-         classification_method, content_type)
-         VALUES ('unknown_tx1', 'Unknown', NULL, 0, 'Fallback', NULL)",
-        [],
-    )?;
-
-    conn.execute(
-        "INSERT INTO p2ms_output_classifications (txid, vout, protocol, variant, protocol_signature_found,
-         classification_method, content_type, is_spendable, spendability_reason)
-         VALUES ('unknown_tx1', 0, 'Unknown', NULL, 0, 'Fallback', NULL, 1, NULL)",
-        [],
+    insert_test_output_classification(
+        &db,
+        &TestOutputClassificationParams::spendable("unknown_tx1", 0, "Unknown")
+            .without_content_type(),
     )?;
 
     let report = DataSizeAnalyser::analyse_content_type_spendability(&db)?;
@@ -483,55 +385,36 @@ fn test_null_content_types() -> AppResult<()> {
 
 #[test]
 fn test_spent_outputs_excluded() -> AppResult<()> {
-    let db = create_test_db()?;
-    let conn = db.connection();
-
-    // Seed data with both spent and unspent outputs
-    conn.execute("INSERT INTO blocks (height) VALUES (100000)", [])?;
+    let db = create_analysis_test_db()?;
+    seed_analysis_blocks(&db, &[100000])?;
 
     // Unspent output (should be included)
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('test_tx1', 0, 100000, 1000, 'aabbcc', 'multisig', 0, 500, '{}', 0)",
-        [],
+    insert_test_output(
+        &db,
+        &TestOutputParams::multisig("test_tx1", 0, 100000, 1000, 500),
     )?;
+    insert_test_p2ms_output(&db, &TestP2msOutputParams::standard("test_tx1", 0))?;
 
     // Spent output (should be excluded)
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('test_tx1', 1, 100000, 1000, 'ddeeff', 'multisig', 0, 600, '{}', 1)",
-        [],
+    insert_test_output(
+        &db,
+        &TestOutputParams::multisig("test_tx1", 1, 100000, 1000, 600).spent(),
     )?;
 
-    conn.execute(
-        "INSERT INTO p2ms_outputs (txid, vout, required_sigs, total_pubkeys, pubkeys_json)
-         VALUES ('test_tx1', 0, 1, 3, '[]')",
-        [],
-    )?;
-
-    conn.execute(
-        "INSERT INTO enriched_transactions (txid, height, total_input_value, total_output_value,
-         transaction_fee, fee_per_byte, transaction_size_bytes, fee_per_kb, total_p2ms_amount,
-         data_storage_fee_rate, p2ms_outputs_count, input_count, output_count, is_coinbase)
-         VALUES ('test_tx1', 100000, 2000, 1000, 1000, 1.0, 500, 2.0, 1000, 2.0, 1, 1, 2, 0)",
-        [],
-    )?;
-
-    conn.execute(
-        "INSERT INTO transaction_classifications (txid, protocol, variant, protocol_signature_found,
-         classification_method, content_type)
-         VALUES ('test_tx1', 'BitcoinStamps', 'StampsClassic', 1, 'SignatureBased', 'image/png')",
-        [],
+    insert_test_enriched_transaction(&db, "test_tx1", 100000)?;
+    insert_test_tx_classification(
+        &db,
+        &TestClassificationParams::new("test_tx1", "BitcoinStamps")
+            .with_variant("StampsClassic")
+            .with_content_type("image/png"),
     )?;
 
     // Only classify the unspent output
-    conn.execute(
-        "INSERT INTO p2ms_output_classifications (txid, vout, protocol, variant, protocol_signature_found,
-         classification_method, content_type, is_spendable, spendability_reason)
-         VALUES ('test_tx1', 0, 'BitcoinStamps', 'StampsClassic', 1, 'SignatureBased', 'image/png', 1, NULL)",
-        [],
+    insert_test_output_classification(
+        &db,
+        &TestOutputClassificationParams::spendable("test_tx1", 0, "BitcoinStamps")
+            .with_variant("StampsClassic")
+            .with_content_type("image/png"),
     )?;
 
     let report = DataSizeAnalyser::analyse_protocol_data_sizes(&db)?;

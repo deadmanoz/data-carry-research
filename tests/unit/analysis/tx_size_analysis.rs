@@ -3,14 +3,48 @@
 //! Tests the TxSizeAnalyser which reports transaction size distributions across
 //! P2MS transactions, with global and per-protocol breakdowns plus percentiles.
 
+use crate::common::analysis_test_setup::{
+    create_analysis_test_db, insert_complete_p2ms_output, insert_test_output_classification,
+    insert_test_tx_classification, seed_analysis_blocks, TestClassificationParams,
+    TestOutputClassificationParams,
+};
 use data_carry_research::analysis::TxSizeAnalyser;
-use data_carry_research::database::Database;
 use data_carry_research::errors::AppResult;
 use data_carry_research::types::ProtocolType;
 
-/// Helper to create test database with Schema V2
-fn create_test_db() -> AppResult<Database> {
-    Database::new_v2(":memory:")
+/// Helper to insert an enriched transaction with specific size and fee parameters.
+///
+/// This is specific to tx_size tests as they need precise control over sizes and fees.
+fn insert_size_test_enriched_tx(
+    db: &data_carry_research::database::Database,
+    txid: &str,
+    height: i64,
+    size_bytes: i64,
+    fee: i64,
+    is_coinbase: bool,
+) -> AppResult<()> {
+    let fee_per_byte = if size_bytes > 0 {
+        fee as f64 / size_bytes as f64
+    } else {
+        0.0
+    };
+    let conn = db.connection();
+    conn.execute(
+        "INSERT INTO enriched_transactions (txid, height, total_input_value, total_output_value,
+         transaction_fee, fee_per_byte, transaction_size_bytes, fee_per_kb, total_p2ms_amount,
+         data_storage_fee_rate, p2ms_outputs_count, input_count, output_count, is_coinbase)
+         VALUES (?1, ?2, 2000, 1000, ?3, ?4, ?5, ?6, 1000, ?4, 1, 1, 1, ?7)",
+        rusqlite::params![
+            txid,
+            height,
+            fee,
+            fee_per_byte,
+            size_bytes,
+            fee_per_byte * 1000.0,
+            is_coinbase as i32
+        ],
+    )?;
+    Ok(())
 }
 
 /// Seed test data with transactions at various size boundaries
@@ -18,145 +52,69 @@ fn create_test_db() -> AppResult<Database> {
 /// Creates transactions at these specific sizes to test bucket assignment:
 /// - 100 bytes (bucket 0: [0, 250))
 /// - 300 bytes (bucket 1: [250, 500))
-/// - 750 bytes (bucket 2: [500, 1000))
-/// - 1500 bytes (bucket 3: [1000, 2000))
 /// - 6000 bytes (bucket 5: [5000, 10000))
 /// - 150000 bytes (bucket 9: [100000, ∞))
-fn seed_size_test_data(db: &Database) -> AppResult<()> {
-    let conn = db.connection();
+fn seed_size_test_data(db: &data_carry_research::database::Database) -> AppResult<()> {
+    seed_analysis_blocks(db, &[100000, 100001])?;
 
-    // Insert stub blocks
-    conn.execute("INSERT INTO blocks (height) VALUES (100000)", [])?;
-    conn.execute("INSERT INTO blocks (height) VALUES (100001)", [])?;
-
-    // Insert transaction outputs (required for enriched_transactions FK)
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('small_tx', 0, 100000, 1000, 'aabbcc', 'multisig', 0, 100, '{}', 0)",
-        [],
+    // small_tx: 100 bytes, 1000 sats fee (BitcoinStamps StampsClassic)
+    insert_complete_p2ms_output(db, "small_tx", 0, 100000, 1000, 100)?;
+    insert_size_test_enriched_tx(db, "small_tx", 100000, 100, 1000, false)?;
+    insert_test_tx_classification(
+        db,
+        &TestClassificationParams::new("small_tx", "BitcoinStamps")
+            .with_variant("StampsClassic")
+            .with_content_type("image/png"),
     )?;
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('medium_tx', 0, 100000, 1000, 'aabbcc', 'multisig', 0, 300, '{}', 0)",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('large_tx', 0, 100001, 1000, 'aabbcc', 'multisig', 0, 6000, '{}', 0)",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('huge_tx', 0, 100001, 1000, 'aabbcc', 'multisig', 0, 150000, '{}', 0)",
-        [],
+    insert_test_output_classification(
+        db,
+        &TestOutputClassificationParams::unspendable("small_tx", 0, "BitcoinStamps")
+            .with_variant("StampsClassic")
+            .with_content_type("image/png"),
     )?;
 
-    // Insert p2ms_outputs (Schema V2 requirement)
-    conn.execute(
-        "INSERT INTO p2ms_outputs (txid, vout, required_sigs, total_pubkeys, pubkeys_json)
-         VALUES ('small_tx', 0, 1, 3, '[]')",
-        [],
+    // medium_tx: 300 bytes, 2000 sats fee (BitcoinStamps StampsSRC20)
+    insert_complete_p2ms_output(db, "medium_tx", 0, 100000, 1000, 300)?;
+    insert_size_test_enriched_tx(db, "medium_tx", 100000, 300, 2000, false)?;
+    insert_test_tx_classification(
+        db,
+        &TestClassificationParams::new("medium_tx", "BitcoinStamps")
+            .with_variant("StampsSRC20")
+            .with_content_type("application/json"),
     )?;
-    conn.execute(
-        "INSERT INTO p2ms_outputs (txid, vout, required_sigs, total_pubkeys, pubkeys_json)
-         VALUES ('medium_tx', 0, 1, 3, '[]')",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO p2ms_outputs (txid, vout, required_sigs, total_pubkeys, pubkeys_json)
-         VALUES ('large_tx', 0, 1, 3, '[]')",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO p2ms_outputs (txid, vout, required_sigs, total_pubkeys, pubkeys_json)
-         VALUES ('huge_tx', 0, 1, 3, '[]')",
-        [],
+    insert_test_output_classification(
+        db,
+        &TestOutputClassificationParams::unspendable("medium_tx", 0, "BitcoinStamps")
+            .with_variant("StampsSRC20")
+            .with_content_type("application/json"),
     )?;
 
-    // Insert enriched transactions with various sizes and fees
-    conn.execute(
-        "INSERT INTO enriched_transactions (txid, height, total_input_value, total_output_value,
-         transaction_fee, fee_per_byte, transaction_size_bytes, fee_per_kb, total_p2ms_amount,
-         data_storage_fee_rate, p2ms_outputs_count, input_count, output_count, is_coinbase)
-         VALUES ('small_tx', 100000, 2000, 1000, 1000, 10.0, 100, 10000.0, 1000, 10.0, 1, 1, 1, 0)",
-        [],
+    // large_tx: 6000 bytes, 9000 sats fee (Counterparty)
+    insert_complete_p2ms_output(db, "large_tx", 0, 100001, 1000, 6000)?;
+    insert_size_test_enriched_tx(db, "large_tx", 100001, 6000, 9000, false)?;
+    insert_test_tx_classification(
+        db,
+        &TestClassificationParams::new("large_tx", "Counterparty"),
     )?;
-    conn.execute(
-        "INSERT INTO enriched_transactions (txid, height, total_input_value, total_output_value,
-         transaction_fee, fee_per_byte, transaction_size_bytes, fee_per_kb, total_p2ms_amount,
-         data_storage_fee_rate, p2ms_outputs_count, input_count, output_count, is_coinbase)
-         VALUES ('medium_tx', 100000, 3000, 1000, 2000, 6.67, 300, 6670.0, 1000, 6.67, 1, 1, 1, 0)",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO enriched_transactions (txid, height, total_input_value, total_output_value,
-         transaction_fee, fee_per_byte, transaction_size_bytes, fee_per_kb, total_p2ms_amount,
-         data_storage_fee_rate, p2ms_outputs_count, input_count, output_count, is_coinbase)
-         VALUES ('large_tx', 100001, 10000, 1000, 9000, 1.5, 6000, 1500.0, 1000, 1.5, 1, 1, 1, 0)",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO enriched_transactions (txid, height, total_input_value, total_output_value,
-         transaction_fee, fee_per_byte, transaction_size_bytes, fee_per_kb, total_p2ms_amount,
-         data_storage_fee_rate, p2ms_outputs_count, input_count, output_count, is_coinbase)
-         VALUES ('huge_tx', 100001, 200000, 1000, 199000, 1.33, 150000, 1326.67, 1000, 1.33, 1, 1, 1, 0)",
-        [],
+    insert_test_output_classification(
+        db,
+        &TestOutputClassificationParams::unspendable("large_tx", 0, "Counterparty"),
     )?;
 
-    // Insert transaction classifications (parent)
-    conn.execute(
-        "INSERT INTO transaction_classifications (txid, protocol, variant, protocol_signature_found,
-         classification_method, content_type)
-         VALUES ('small_tx', 'BitcoinStamps', 'StampsClassic', 1, 'SignatureBased', 'image/png')",
-        [],
+    // huge_tx: 150000 bytes, 199000 sats fee (BitcoinStamps StampsClassic)
+    insert_complete_p2ms_output(db, "huge_tx", 0, 100001, 1000, 150000)?;
+    insert_size_test_enriched_tx(db, "huge_tx", 100001, 150000, 199000, false)?;
+    insert_test_tx_classification(
+        db,
+        &TestClassificationParams::new("huge_tx", "BitcoinStamps")
+            .with_variant("StampsClassic")
+            .with_content_type("image/png"),
     )?;
-    conn.execute(
-        "INSERT INTO transaction_classifications (txid, protocol, variant, protocol_signature_found,
-         classification_method, content_type)
-         VALUES ('medium_tx', 'BitcoinStamps', 'StampsSRC20', 1, 'SignatureBased', 'application/json')",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO transaction_classifications (txid, protocol, variant, protocol_signature_found,
-         classification_method, content_type)
-         VALUES ('large_tx', 'Counterparty', NULL, 1, 'SignatureBased', 'application/octet-stream')",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO transaction_classifications (txid, protocol, variant, protocol_signature_found,
-         classification_method, content_type)
-         VALUES ('huge_tx', 'BitcoinStamps', 'StampsClassic', 1, 'SignatureBased', 'image/png')",
-        [],
-    )?;
-
-    // Insert output classifications (child)
-    conn.execute(
-        "INSERT INTO p2ms_output_classifications (txid, vout, protocol, variant, protocol_signature_found,
-         classification_method, content_type, is_spendable, spendability_reason)
-         VALUES ('small_tx', 0, 'BitcoinStamps', 'StampsClassic', 1, 'SignatureBased', 'image/png', 0, 'InvalidECPoints')",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO p2ms_output_classifications (txid, vout, protocol, variant, protocol_signature_found,
-         classification_method, content_type, is_spendable, spendability_reason)
-         VALUES ('medium_tx', 0, 'BitcoinStamps', 'StampsSRC20', 1, 'SignatureBased', 'application/json', 0, 'InvalidECPoints')",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO p2ms_output_classifications (txid, vout, protocol, variant, protocol_signature_found,
-         classification_method, content_type, is_spendable, spendability_reason)
-         VALUES ('large_tx', 0, 'Counterparty', NULL, 1, 'SignatureBased', 'application/octet-stream', 0, 'InvalidECPoints')",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO p2ms_output_classifications (txid, vout, protocol, variant, protocol_signature_found,
-         classification_method, content_type, is_spendable, spendability_reason)
-         VALUES ('huge_tx', 0, 'BitcoinStamps', 'StampsClassic', 1, 'SignatureBased', 'image/png', 0, 'InvalidECPoints')",
-        [],
+    insert_test_output_classification(
+        db,
+        &TestOutputClassificationParams::unspendable("huge_tx", 0, "BitcoinStamps")
+            .with_variant("StampsClassic")
+            .with_content_type("image/png"),
     )?;
 
     Ok(())
@@ -164,7 +122,7 @@ fn seed_size_test_data(db: &Database) -> AppResult<()> {
 
 #[test]
 fn test_global_distribution_bucket_assignment() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_size_test_data(&db)?;
 
     let report = TxSizeAnalyser::analyse_tx_sizes(&db)?;
@@ -205,7 +163,7 @@ fn test_global_distribution_bucket_assignment() -> AppResult<()> {
 
 #[test]
 fn test_total_fees_in_buckets() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_size_test_data(&db)?;
 
     let report = TxSizeAnalyser::analyse_tx_sizes(&db)?;
@@ -233,7 +191,7 @@ fn test_total_fees_in_buckets() -> AppResult<()> {
 
 #[test]
 fn test_percentiles_calculation() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_size_test_data(&db)?;
 
     let report = TxSizeAnalyser::analyse_tx_sizes(&db)?;
@@ -266,7 +224,7 @@ fn test_percentiles_calculation() -> AppResult<()> {
 
 #[test]
 fn test_per_protocol_distribution() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_size_test_data(&db)?;
 
     let report = TxSizeAnalyser::analyse_tx_sizes(&db)?;
@@ -310,7 +268,7 @@ fn test_per_protocol_distribution() -> AppResult<()> {
 
 #[test]
 fn test_protocol_ordering() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_size_test_data(&db)?;
 
     let report = TxSizeAnalyser::analyse_tx_sizes(&db)?;
@@ -332,7 +290,7 @@ fn test_protocol_ordering() -> AppResult<()> {
 
 #[test]
 fn test_empty_database() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     // Don't seed any data
 
     let report = TxSizeAnalyser::analyse_tx_sizes(&db)?;
@@ -357,7 +315,7 @@ fn test_empty_database() -> AppResult<()> {
 
 #[test]
 fn test_min_max_avg_sizes() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_size_test_data(&db)?;
 
     let report = TxSizeAnalyser::analyse_tx_sizes(&db)?;
@@ -395,24 +353,14 @@ fn test_min_max_avg_sizes() -> AppResult<()> {
 
 #[test]
 fn test_excluded_zero_size_count() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_size_test_data(&db)?;
     let conn = db.connection();
 
     // Add a transaction with zero size (should be excluded from analysis)
-    // The query filters out transaction_size_bytes = 0 as well as NULL
-    conn.execute("INSERT INTO blocks (height) VALUES (100002)", [])?;
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('zero_size_tx', 0, 100002, 1000, 'aabbcc', 'multisig', 0, 100, '{}', 0)",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO p2ms_outputs (txid, vout, required_sigs, total_pubkeys, pubkeys_json)
-         VALUES ('zero_size_tx', 0, 1, 3, '[]')",
-        [],
-    )?;
+    seed_analysis_blocks(&db, &[100002])?;
+    insert_complete_p2ms_output(&db, "zero_size_tx", 0, 100002, 1000, 100)?;
+
     // Insert with transaction_size_bytes = 0 (indicates missing/invalid data)
     conn.execute(
         "INSERT INTO enriched_transactions (txid, height, total_input_value, total_output_value,
@@ -441,50 +389,16 @@ fn test_excluded_zero_size_count() -> AppResult<()> {
 
 #[test]
 fn test_coinbase_excluded() -> AppResult<()> {
-    let db = create_test_db()?;
-    let conn = db.connection();
-
-    conn.execute("INSERT INTO blocks (height) VALUES (100000)", [])?;
+    let db = create_analysis_test_db()?;
+    seed_analysis_blocks(&db, &[100000])?;
 
     // Regular transaction (should be included)
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('regular_tx', 0, 100000, 1000, 'aabbcc', 'multisig', 0, 100, '{}', 0)",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO p2ms_outputs (txid, vout, required_sigs, total_pubkeys, pubkeys_json)
-         VALUES ('regular_tx', 0, 1, 3, '[]')",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO enriched_transactions (txid, height, total_input_value, total_output_value,
-         transaction_fee, fee_per_byte, transaction_size_bytes, fee_per_kb, total_p2ms_amount,
-         data_storage_fee_rate, p2ms_outputs_count, input_count, output_count, is_coinbase)
-         VALUES ('regular_tx', 100000, 2000, 1000, 1000, 10.0, 100, 10000.0, 1000, 10.0, 1, 1, 1, 0)",
-        [],
-    )?;
+    insert_complete_p2ms_output(&db, "regular_tx", 0, 100000, 1000, 100)?;
+    insert_size_test_enriched_tx(&db, "regular_tx", 100000, 100, 1000, false)?;
 
     // Coinbase transaction (should be excluded)
-    conn.execute(
-        "INSERT INTO transaction_outputs (txid, vout, height, amount, script_hex, script_type,
-         is_coinbase, script_size, metadata_json, is_spent)
-         VALUES ('coinbase_tx', 0, 100000, 5000000, 'aabbcc', 'multisig', 1, 200, '{}', 0)",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO p2ms_outputs (txid, vout, required_sigs, total_pubkeys, pubkeys_json)
-         VALUES ('coinbase_tx', 0, 1, 3, '[]')",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO enriched_transactions (txid, height, total_input_value, total_output_value,
-         transaction_fee, fee_per_byte, transaction_size_bytes, fee_per_kb, total_p2ms_amount,
-         data_storage_fee_rate, p2ms_outputs_count, input_count, output_count, is_coinbase)
-         VALUES ('coinbase_tx', 100000, 0, 5000000, 0, 0.0, 200, 0.0, 5000000, 0.0, 1, 0, 1, 1)",
-        [],
-    )?;
+    insert_complete_p2ms_output(&db, "coinbase_tx", 0, 100000, 5000000, 200)?;
+    insert_size_test_enriched_tx(&db, "coinbase_tx", 100000, 200, 0, true)?;
 
     let report = TxSizeAnalyser::analyse_tx_sizes(&db)?;
 
@@ -503,7 +417,7 @@ fn test_coinbase_excluded() -> AppResult<()> {
 
 #[test]
 fn test_per_protocol_avg_fee_per_byte() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_size_test_data(&db)?;
 
     let report = TxSizeAnalyser::analyse_tx_sizes(&db)?;
@@ -543,7 +457,7 @@ fn test_per_protocol_avg_fee_per_byte() -> AppResult<()> {
 
 #[test]
 fn test_bucket_ranges_consistency() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_size_test_data(&db)?;
 
     let report = TxSizeAnalyser::analyse_tx_sizes(&db)?;
@@ -582,7 +496,7 @@ fn test_bucket_ranges_consistency() -> AppResult<()> {
 
 #[test]
 fn test_bucket_count_consistency() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     seed_size_test_data(&db)?;
 
     let report = TxSizeAnalyser::analyse_tx_sizes(&db)?;

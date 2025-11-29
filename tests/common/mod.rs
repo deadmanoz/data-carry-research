@@ -316,6 +316,9 @@ pub mod rpc_helpers;
 /// Database seeding helpers for FK-safe test data insertion
 pub mod db_seeding;
 
+/// Analysis test setup helpers for FK-safe database seeding
+pub mod analysis_test_setup;
+
 /// Common assertion helpers for protocol tests
 pub mod assertion_helpers;
 

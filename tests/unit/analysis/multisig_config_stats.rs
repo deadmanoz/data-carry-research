@@ -1,48 +1,11 @@
 //! Unit tests for multisig configuration analysis
 
+use crate::common::analysis_test_setup::{
+    create_analysis_test_db, insert_test_output, seed_analysis_blocks, TestOutputParams,
+};
 use data_carry_research::analysis::MultisigConfigAnalyser;
-use data_carry_research::database::Database;
 use data_carry_research::errors::AppResult;
 use serde_json::json;
-
-/// Helper to create test database with Schema V2
-fn create_test_db() -> AppResult<Database> {
-    Database::new_v2(":memory:")
-}
-
-/// Helper to seed test blocks
-fn seed_blocks(db: &Database, heights: &[u32]) -> AppResult<()> {
-    let conn = db.connection();
-    for height in heights {
-        conn.execute("INSERT INTO blocks (height) VALUES (?1)", [height])?;
-    }
-    Ok(())
-}
-
-/// Helper to seed test transaction outputs
-fn seed_transaction_outputs(db: &Database, outputs: &[TransactionOutput]) -> AppResult<()> {
-    let conn = db.connection();
-    for output in outputs {
-        conn.execute(
-            "INSERT INTO transaction_outputs (
-                txid, vout, height, amount, script_hex, script_type,
-                is_coinbase, script_size, metadata_json, is_spent
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0)",
-            (
-                &output.txid,
-                output.vout,
-                output.height,
-                output.amount,
-                &output.script_hex,
-                &output.script_type,
-                output.is_coinbase,
-                output.script_size,
-                output.metadata.to_string(),
-            ),
-        )?;
-    }
-    Ok(())
-}
 
 #[test]
 fn test_determine_configuration_compressed_keys() -> AppResult<()> {
@@ -148,7 +111,7 @@ fn test_unknown_configuration_fallback() -> AppResult<()> {
 #[test]
 fn test_analyse_empty_database() -> AppResult<()> {
     // Test analysis with empty database
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
 
     let report = MultisigConfigAnalyser::analyse_multisig_configurations(&db)?;
 
@@ -165,19 +128,14 @@ fn test_analyse_empty_database() -> AppResult<()> {
 #[test]
 fn test_overall_efficiency_calculation() -> AppResult<()> {
     // Test that overall efficiency is correctly calculated
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
 
     // Add test data with known values
-    seed_blocks(&db, &[100])?;
-    seed_transaction_outputs(
-        &db,
-        &[
-            // 1-of-3 CCC: 105 bytes script, 64 bytes data
-            create_test_multisig("tx1", 0, 100, 1000, 105, 1, 3),
-            // Another 1-of-3 CCC
-            create_test_multisig("tx2", 0, 100, 2000, 105, 1, 3),
-        ],
-    )?;
+    seed_analysis_blocks(&db, &[100])?;
+    // 1-of-3 CCC: 105 bytes script, 64 bytes data
+    insert_test_output(&db, &create_test_multisig_params("tx1", 0, 100, 1000, 105, 1, 3))?;
+    // Another 1-of-3 CCC
+    insert_test_output(&db, &create_test_multisig_params("tx2", 0, 100, 2000, 105, 1, 3))?;
 
     let report = MultisigConfigAnalyser::analyse_multisig_configurations(&db)?;
 
@@ -194,23 +152,18 @@ fn test_overall_efficiency_calculation() -> AppResult<()> {
 #[test]
 fn test_type_summary_grouping() -> AppResult<()> {
     // Test that type_summary correctly groups by m-of-n
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
 
-    seed_blocks(&db, &[100])?;
-    seed_transaction_outputs(
-        &db,
-        &[
-            // Three 1-of-3 outputs
-            create_test_multisig("tx1", 0, 100, 1000, 105, 1, 3),
-            create_test_multisig("tx2", 0, 100, 2000, 105, 1, 3),
-            create_test_multisig("tx3", 0, 100, 3000, 105, 1, 3),
-            // Two 1-of-2 outputs
-            create_test_multisig("tx4", 0, 100, 4000, 71, 1, 2),
-            create_test_multisig("tx5", 0, 100, 5000, 71, 1, 2),
-            // One 2-of-3 output
-            create_test_multisig("tx6", 0, 100, 6000, 105, 2, 3),
-        ],
-    )?;
+    seed_analysis_blocks(&db, &[100])?;
+    // Three 1-of-3 outputs
+    insert_test_output(&db, &create_test_multisig_params("tx1", 0, 100, 1000, 105, 1, 3))?;
+    insert_test_output(&db, &create_test_multisig_params("tx2", 0, 100, 2000, 105, 1, 3))?;
+    insert_test_output(&db, &create_test_multisig_params("tx3", 0, 100, 3000, 105, 1, 3))?;
+    // Two 1-of-2 outputs
+    insert_test_output(&db, &create_test_multisig_params("tx4", 0, 100, 4000, 71, 1, 2))?;
+    insert_test_output(&db, &create_test_multisig_params("tx5", 0, 100, 5000, 71, 1, 2))?;
+    // One 2-of-3 output
+    insert_test_output(&db, &create_test_multisig_params("tx6", 0, 100, 6000, 105, 2, 3))?;
 
     let report = MultisigConfigAnalyser::analyse_multisig_configurations(&db)?;
 
@@ -225,16 +178,11 @@ fn test_type_summary_grouping() -> AppResult<()> {
 #[test]
 fn test_zero_data_capacity_efficiency() -> AppResult<()> {
     // Test that efficiency is handled correctly when data capacity is 0
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
 
-    seed_blocks(&db, &[100])?;
-    seed_transaction_outputs(
-        &db,
-        &[
-            // 2-of-2 CC: 71 bytes script, 0 bytes data
-            create_test_multisig("tx1", 0, 100, 1000, 71, 2, 2),
-        ],
-    )?;
+    seed_analysis_blocks(&db, &[100])?;
+    // 2-of-2 CC: 71 bytes script, 0 bytes data
+    insert_test_output(&db, &create_test_multisig_params("tx1", 0, 100, 1000, 71, 2, 2))?;
 
     let report = MultisigConfigAnalyser::analyse_multisig_configurations(&db)?;
 
@@ -286,28 +234,19 @@ fn assert_config_pattern(
     );
 }
 
-// Test data structure that matches database schema
-struct TransactionOutput {
-    txid: String,
-    vout: u32,
-    height: u32,
-    amount: u64,
-    script_hex: String,
-    script_type: String,
-    is_coinbase: bool,
-    script_size: usize,
-    metadata: serde_json::Value,
-}
-
-fn create_test_multisig(
+/// Create test multisig output params with specific configuration.
+///
+/// This helper creates a `TestOutputParams` with the metadata required for
+/// multisig configuration analysis (pubkeys, required_sigs, total_pubkeys).
+fn create_test_multisig_params(
     txid: &str,
-    vout: u32,
-    height: u32,
-    amount: u64,
-    script_size: u32,
+    vout: i64,
+    height: i64,
+    amount: i64,
+    script_size: i64,
     m: u32,
     n: u32,
-) -> TransactionOutput {
+) -> TestOutputParams {
     // Create fake pubkeys for testing
     let pubkeys: Vec<String> = (0..n)
         .map(|i| {
@@ -321,19 +260,21 @@ fn create_test_multisig(
         })
         .collect();
 
-    TransactionOutput {
+    let metadata = json!({
+        "pubkeys": pubkeys,
+        "required_sigs": m,
+        "total_pubkeys": n
+    });
+
+    TestOutputParams {
         txid: txid.to_string(),
         vout,
         height,
         amount,
-        script_hex: "dummy".to_string(), // Not used in tests
+        script_hex: "dummy".to_string(),
         script_type: "multisig".to_string(),
-        is_coinbase: false,
-        script_size: script_size as usize,
-        metadata: json!({
-            "pubkeys": pubkeys,
-            "required_sigs": m,
-            "total_pubkeys": n
-        }),
+        script_size,
+        is_spent: false,
+        metadata_json: metadata.to_string(),
     }
 }

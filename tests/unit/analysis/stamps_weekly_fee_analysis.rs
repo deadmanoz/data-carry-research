@@ -3,14 +3,9 @@
 //! Tests the StampsWeeklyFeeAnalyser which aggregates transaction fees
 //! for Bitcoin Stamps at the week level with proper de-duplication.
 
+use crate::common::analysis_test_setup::create_analysis_test_db;
 use data_carry_research::analysis::StampsWeeklyFeeAnalyser;
-use data_carry_research::database::Database;
 use data_carry_research::errors::AppResult;
-
-/// Helper to create test database with Schema V2
-fn create_test_db() -> AppResult<Database> {
-    Database::new_v2(":memory:")
-}
 
 /// Seed a single Bitcoin Stamps transaction with associated data
 ///
@@ -119,7 +114,7 @@ fn seed_stamps_transaction(
 
 #[test]
 fn test_empty_database() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
 
     let report = StampsWeeklyFeeAnalyser::analyse_weekly_fees(&db)?;
 
@@ -156,7 +151,7 @@ fn test_empty_database() -> AppResult<()> {
 
 #[test]
 fn test_single_week_single_transaction() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     let conn = db.connection();
 
     // 2024-01-11 00:00:00 UTC = 1704931200 (Thursday, start of a week bucket)
@@ -213,7 +208,7 @@ fn test_single_week_single_transaction() -> AppResult<()> {
 
 #[test]
 fn test_multi_week_aggregation() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     let conn = db.connection();
 
     // Week 1: 2024-01-11 (timestamp 1704931200)
@@ -306,7 +301,7 @@ fn test_multi_week_aggregation() -> AppResult<()> {
 
 #[test]
 fn test_multi_output_deduplication() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     let conn = db.connection();
 
     // Single transaction with 3 P2MS outputs - fee should be counted ONCE
@@ -349,7 +344,7 @@ fn test_multi_output_deduplication() -> AppResult<()> {
 
 #[test]
 fn test_null_timestamp_exclusion() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     let conn = db.connection();
 
     // Transaction with valid timestamp (should be included)
@@ -383,7 +378,7 @@ fn test_null_timestamp_exclusion() -> AppResult<()> {
 
 #[test]
 fn test_zero_script_bytes_division() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     let conn = db.connection();
 
     // Create a transaction with classification but NO p2ms_output_classifications rows
@@ -432,7 +427,7 @@ fn test_zero_script_bytes_division() -> AppResult<()> {
 
 #[test]
 fn test_coinbase_exclusion() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     let conn = db.connection();
 
     // Normal transaction (should be included)
@@ -475,7 +470,7 @@ fn test_coinbase_exclusion() -> AppResult<()> {
 
 #[test]
 fn test_non_stamps_protocols_excluded() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     let conn = db.connection();
 
     // BitcoinStamps transaction (should be included)
@@ -525,7 +520,7 @@ fn test_non_stamps_protocols_excluded() -> AppResult<()> {
 
 #[test]
 fn test_week_boundary_calculation() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     let conn = db.connection();
 
     // Timestamps exactly at week boundaries
@@ -569,7 +564,7 @@ fn test_week_boundary_calculation() -> AppResult<()> {
 
 #[test]
 fn test_plotly_chart_generation() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     let conn = db.connection();
 
     seed_stamps_transaction(conn, "tx1", 800000, Some(1704931200), 10000, 100, false, 1)?;
@@ -615,7 +610,7 @@ fn test_plotly_chart_generation() -> AppResult<()> {
 
 #[test]
 fn test_summary_calculations() -> AppResult<()> {
-    let db = create_test_db()?;
+    let db = create_analysis_test_db()?;
     let conn = db.connection();
 
     // Week 1: 2 tx, 30000 sats, 200 bytes
