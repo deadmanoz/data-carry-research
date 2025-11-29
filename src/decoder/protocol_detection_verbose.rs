@@ -244,57 +244,18 @@ fn extract_multi_output_with_debug(
                 None
             };
 
-            // Try different extraction patterns based on multisig type
-            let chunk_data = if multisig_info.required_sigs == 1 && multisig_info.total_pubkeys == 3
-            {
-                if let Some(chunk) = classifier.extract_raw_data_chunk_1_of_3(output) {
-                    if let Some(ref mut debug) = output_debug {
-                        debug.set_extraction(
-                            "1-of-3 Counterparty pattern (31 bytes from pubkey[0] + 31 bytes from pubkey[1])".to_string(),
-                            chunk.clone()
-                        );
-                    }
-                    Some(chunk)
-                } else {
-                    None
+            // Unified extraction - handles all M-of-N patterns
+            let chunk_data = if let Some(chunk) = classifier.extract_raw_data_chunk(output) {
+                if let Some(ref mut debug) = output_debug {
+                    // Generate pattern description for debug output
+                    let pattern_desc = match (multisig_info.required_sigs, multisig_info.total_pubkeys) {
+                        (m, 3) => format!("{}-of-3 Counterparty pattern (31 bytes from pubkey[0] + 31 bytes from pubkey[1])", m),
+                        (m, 2) => format!("{}-of-2 Counterparty pattern (length-prefixed data from pubkey[1])", m),
+                        (m, n) => format!("{}-of-{} Counterparty pattern", m, n),
+                    };
+                    debug.set_extraction(pattern_desc, chunk.clone());
                 }
-            } else if multisig_info.required_sigs == 2 && multisig_info.total_pubkeys == 3 {
-                if let Some(chunk) = classifier.extract_raw_data_chunk_2_of_3(output) {
-                    if let Some(ref mut debug) = output_debug {
-                        debug.set_extraction(
-                            "2-of-3 Counterparty pattern".to_string(),
-                            chunk.clone(),
-                        );
-                    }
-                    Some(chunk)
-                } else {
-                    None
-                }
-            } else if multisig_info.required_sigs == 1 && multisig_info.total_pubkeys == 2 {
-                if let Some(chunk) = classifier.extract_raw_data_chunk_1_of_2(output) {
-                    if let Some(ref mut debug) = output_debug {
-                        debug.set_extraction(
-                            "1-of-2 Counterparty pattern (length-prefixed data from pubkey[1])"
-                                .to_string(),
-                            chunk.clone(),
-                        );
-                    }
-                    Some(chunk)
-                } else {
-                    None
-                }
-            } else if multisig_info.required_sigs == 2 && multisig_info.total_pubkeys == 2 {
-                if let Some(chunk) = classifier.extract_raw_data_chunk_2_of_2(output) {
-                    if let Some(ref mut debug) = output_debug {
-                        debug.set_extraction(
-                            "2-of-2 Counterparty pattern".to_string(),
-                            chunk.clone(),
-                        );
-                    }
-                    Some(chunk)
-                } else {
-                    None
-                }
+                Some(chunk)
             } else {
                 None
             };

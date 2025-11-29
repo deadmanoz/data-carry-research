@@ -377,20 +377,10 @@ mod test_data {
         let config = Stage3Config::default();
         let classifier = CounterpartyClassifier::new(&config);
 
-        // Extract raw data using production functions
+        // Extract raw data using unified extraction method
         for output in &p2ms_outputs {
-            if output.multisig_info().map(|i| i.required_sigs).unwrap_or(0) == 1
-                && output.multisig_info().map(|i| i.total_pubkeys).unwrap_or(0) == 3
-            {
-                if let Some(chunk) = classifier.extract_raw_data_chunk_1_of_3(output) {
-                    raw_data.extend_from_slice(&chunk);
-                }
-            } else if output.multisig_info().map(|i| i.required_sigs).unwrap_or(0) == 1
-                && output.multisig_info().map(|i| i.total_pubkeys).unwrap_or(0) == 2
-            {
-                if let Some(chunk) = classifier.extract_raw_data_chunk_1_of_2(output) {
-                    raw_data.extend_from_slice(&chunk);
-                }
+            if let Some(chunk) = classifier.extract_raw_data_chunk(output) {
+                raw_data.extend_from_slice(&chunk);
             }
         }
 

@@ -240,42 +240,16 @@ impl CounterpartyClassifier {
             return Some(data);
         }
 
+        // Try each single output - unified method handles all M-of-N patterns
         for output in &sorted_outputs {
-            if let Some(info) = output.multisig_info() {
-                if info.required_sigs == 1 && info.total_pubkeys == 3 && info.pubkeys.len() == 3 {
-                    if let Some(data) = self.extract_1_of_3_multisig_data(tx, output, database) {
-                        return Some(data);
-                    }
-                }
-                if info.required_sigs == 1 && info.total_pubkeys == 2 && info.pubkeys.len() == 2 {
-                    if let Some(data) = self.extract_1_of_2_multisig_data(tx, output, database) {
-                        return Some(data);
-                    }
-                }
-                // 2-of-2 multisig (always check all patterns for complete coverage)
-                if info.required_sigs == 2 && info.total_pubkeys == 2 && info.pubkeys.len() == 2 {
-                    if let Some(data) = self.extract_2_of_2_multisig_data(tx, output, database) {
-                        return Some(data);
-                    }
-                }
-                // 2-of-3 multisig
-                if info.required_sigs == 2 && info.total_pubkeys == 3 && info.pubkeys.len() == 3 {
-                    if let Some(data) = self.extract_2_of_3_multisig_data(tx, output, database) {
-                        return Some(data);
-                    }
-                }
-                // 3-of-3 multisig
-                if info.required_sigs == 3 && info.total_pubkeys == 3 && info.pubkeys.len() == 3 {
-                    if let Some(data) = self.extract_3_of_3_multisig_data(tx, output, database) {
-                        return Some(data);
-                    }
-                }
+            if let Some(data) = self.extract_multisig_data(tx, output, database) {
+                return Some(data);
             }
         }
         None
     }
 
-    // The following helpers mirror existing logic in stage3_processor.rs
+    /// Extract Counterparty data from multiple P2MS outputs (multi-output transactions).
     pub fn extract_multi_output_counterparty_data(
         &self,
         tx: &EnrichedTransaction,
@@ -284,35 +258,15 @@ impl CounterpartyClassifier {
     ) -> Option<CounterpartyP2msData> {
         let mut combined_raw_data = Vec::new();
         let mut data_outputs = Vec::new();
+
+        // Unified extraction - handles all M-of-N patterns
         for output in outputs {
-            if let Some(info) = output.multisig_info() {
-                // 1-of-3 multisig (primary Counterparty format)
-                if info.required_sigs == 1 && info.total_pubkeys == 3 && info.pubkeys.len() == 3 {
-                    if let Some(chunk_data) = self.extract_raw_data_chunk_1_of_3(output) {
-                        combined_raw_data.extend_from_slice(&chunk_data);
-                        data_outputs.push(output.vout);
-                    }
-                // 2-of-3 multisig
-                } else if info.required_sigs == 2
-                    && info.total_pubkeys == 3
-                    && info.pubkeys.len() == 3
-                {
-                    if let Some(chunk_data) = self.extract_raw_data_chunk_2_of_3(output) {
-                        combined_raw_data.extend_from_slice(&chunk_data);
-                        data_outputs.push(output.vout);
-                    }
-                // 2-of-2 multisig
-                } else if info.required_sigs == 2
-                    && info.total_pubkeys == 2
-                    && info.pubkeys.len() == 2
-                {
-                    if let Some(chunk_data) = self.extract_raw_data_chunk_2_of_2(output) {
-                        combined_raw_data.extend_from_slice(&chunk_data);
-                        data_outputs.push(output.vout);
-                    }
-                }
+            if let Some(chunk_data) = self.extract_raw_data_chunk(output) {
+                combined_raw_data.extend_from_slice(&chunk_data);
+                data_outputs.push(output.vout);
             }
         }
+
         if data_outputs.len() < 2 {
             return None;
         }
@@ -342,243 +296,85 @@ impl CounterpartyClassifier {
         None
     }
 
-    pub fn extract_raw_data_chunk_1_of_3(
+    /// Extract raw data chunk from a single P2MS output based on multisig shape.
+    ///
+    /// The M value (required_sigs) does NOT affect extraction - only N (total_pubkeys):
+    /// - 3-pubkey: Fixed 31-byte chunks from pubkeys[0] and pubkeys[1] (62 bytes total)
+    /// - 2-pubkey: Length-prefixed variable data from pubkeys[1]
+    pub fn extract_raw_data_chunk(
         &self,
         output: &crate::types::TransactionOutput,
     ) -> Option<Vec<u8>> {
-        let multisig_info = output.multisig_info()?;
-        if multisig_info.pubkeys.len() != 3 {
-            return None;
-        }
-        // Extract 31 bytes from each of the first two compressed pubkeys
-        // Counterparty encoding uses bytes [1..32] (31 bytes) from each compressed pubkey
-        let chunk1 = PubkeyExtractor::extract_p2ms_chunk(&multisig_info.pubkeys[0])?;
-        let chunk2 = PubkeyExtractor::extract_p2ms_chunk(&multisig_info.pubkeys[1])?;
+        let info = output.multisig_info()?;
 
-        let mut raw_data = Vec::with_capacity(62);
-        raw_data.extend_from_slice(&chunk1); // 31 bytes
-        raw_data.extend_from_slice(&chunk2); // 31 bytes
-        Some(raw_data)
+        match info.total_pubkeys {
+            3 if info.pubkeys.len() == 3 => {
+                // 3-pubkey patterns (1-of-3, 2-of-3, 3-of-3): Extract 31-byte chunks
+                // from first two compressed pubkeys
+                let chunk1 = PubkeyExtractor::extract_p2ms_chunk(&info.pubkeys[0])?;
+                let chunk2 = PubkeyExtractor::extract_p2ms_chunk(&info.pubkeys[1])?;
+
+                let mut raw_data = Vec::with_capacity(62);
+                raw_data.extend_from_slice(&chunk1); // 31 bytes
+                raw_data.extend_from_slice(&chunk2); // 31 bytes
+                Some(raw_data)
+            }
+            2 if info.pubkeys.len() == 2 => {
+                // 2-pubkey patterns (1-of-2, 2-of-2): Length-prefixed extraction
+                // from second pubkey
+                PubkeyExtractor::extract_with_length_prefix(&info.pubkeys[1])
+            }
+            _ => None,
+        }
     }
 
-    pub fn extract_raw_data_chunk_2_of_3(
-        &self,
-        output: &crate::types::TransactionOutput,
-    ) -> Option<Vec<u8>> {
-        let multisig_info = output.multisig_info()?;
-        if multisig_info.pubkeys.len() != 3 {
-            return None;
-        }
-        // Extract 31 bytes from each of the first two compressed pubkeys
-        // For 33-byte compressed keys: [1..len-1] == [1..32] (31 bytes)
-        let chunk1 = PubkeyExtractor::extract_p2ms_chunk(&multisig_info.pubkeys[0])?;
-        let chunk2 = PubkeyExtractor::extract_p2ms_chunk(&multisig_info.pubkeys[1])?;
-
-        let mut raw_data = Vec::with_capacity(62);
-        raw_data.extend_from_slice(&chunk1); // 31 bytes
-        raw_data.extend_from_slice(&chunk2); // 31 bytes
-        Some(raw_data)
-    }
-
-    #[allow(dead_code)] // Used in tests
-    pub fn extract_raw_data_chunk_1_of_2(
-        &self,
-        output: &crate::types::TransactionOutput,
-    ) -> Option<Vec<u8>> {
-        let multisig_info = output.multisig_info()?;
-        if multisig_info.pubkeys.len() != 2 {
-            return None;
-        }
-        // Extract data with length prefix from second pubkey
-        PubkeyExtractor::extract_with_length_prefix(&multisig_info.pubkeys[1])
-    }
-
-    pub fn extract_raw_data_chunk_2_of_2(
-        &self,
-        output: &crate::types::TransactionOutput,
-    ) -> Option<Vec<u8>> {
-        let multisig_info = output.multisig_info()?;
-        if multisig_info.pubkeys.len() != 2 {
-            return None;
-        }
-        // Extract data with length prefix from second pubkey
-        PubkeyExtractor::extract_with_length_prefix(&multisig_info.pubkeys[1])
-    }
-
-    pub fn extract_1_of_3_multisig_data(
+    /// Extract and decrypt Counterparty data from a single P2MS output.
+    ///
+    /// Handles all supported multisig patterns (1-of-2, 1-of-3, 2-of-2, 2-of-3, 3-of-3).
+    /// The M value determines the MultisigPattern variant but not the extraction logic.
+    pub fn extract_multisig_data(
         &self,
         tx: &EnrichedTransaction,
         output: &crate::types::TransactionOutput,
         database: &Database,
     ) -> Option<CounterpartyP2msData> {
-        let multisig_info = output.multisig_info()?;
-        let pubkeys: Vec<Vec<u8>> = multisig_info
-            .pubkeys
-            .iter()
-            .filter_map(|hex| hex::decode(hex).ok())
-            .collect();
-        // Only check that we have 3 pubkeys and the FIRST TWO are compressed (33 bytes)
-        // The third pubkey can be any format (compressed or uncompressed)
-        if pubkeys.len() != 3 || pubkeys[0].len() != 33 || pubkeys[1].len() != 33 {
-            return None;
-        }
-        let mut raw_data = Vec::with_capacity(62);
-        raw_data.extend_from_slice(&pubkeys[0][1..pubkeys[0].len() - 1]);
-        raw_data.extend_from_slice(&pubkeys[1][1..pubkeys[1].len() - 1]);
-        if let Some(decrypted_data) =
-            self.decrypt_and_validate_counterparty(tx, &raw_data, database)
-        {
-            if let Some((message_type, payload)) = self.parse_counterparty_message(&decrypted_data)
-            {
-                return Some(CounterpartyP2msData {
-                    raw_data,
-                    decrypted_data,
-                    vout_index: output.vout,
-                    message_type,
-                    payload,
-                    multisig_pattern: MultisigPattern::OneOfThree { data_capacity: 64 },
-                });
-            }
-        }
-        None
-    }
+        let info = output.multisig_info()?;
 
-    pub fn extract_1_of_2_multisig_data(
-        &self,
-        tx: &EnrichedTransaction,
-        output: &crate::types::TransactionOutput,
-        database: &Database,
-    ) -> Option<CounterpartyP2msData> {
-        let multisig_info = output.multisig_info()?;
-        let pubkeys: Vec<Vec<u8>> = multisig_info
-            .pubkeys
-            .iter()
-            .filter_map(|hex| hex::decode(hex).ok())
-            .collect();
-        if pubkeys.len() != 2 {
-            return None;
-        }
-        let data_pubkey = &pubkeys[1];
-        if data_pubkey.len() < 2 {
-            return None;
-        }
-        let data_length = data_pubkey[0] as usize;
-        if data_length + 1 > data_pubkey.len() {
-            return None;
-        }
-        let raw_data = data_pubkey[1..=data_length].to_vec();
-        if let Some(decrypted_data) =
-            self.decrypt_and_validate_counterparty(tx, &raw_data, database)
-        {
-            if let Some((message_type, payload)) = self.parse_counterparty_message(&decrypted_data)
-            {
-                return Some(CounterpartyP2msData {
-                    raw_data: raw_data.clone(),
-                    decrypted_data,
-                    vout_index: output.vout,
-                    message_type,
-                    payload,
-                    multisig_pattern: MultisigPattern::OneOfTwo {
-                        data_capacity: raw_data.len(),
-                    },
-                });
-            }
-        }
-        None
-    }
+        // Extract raw data using unified chunk extractor
+        let raw_data = self.extract_raw_data_chunk(output)?;
 
-    pub fn extract_2_of_2_multisig_data(
-        &self,
-        tx: &EnrichedTransaction,
-        output: &crate::types::TransactionOutput,
-        database: &Database,
-    ) -> Option<CounterpartyP2msData> {
-        let raw_data = self.extract_raw_data_chunk_2_of_2(output)?;
-        if let Some(decrypted_data) =
-            self.decrypt_and_validate_counterparty(tx, &raw_data, database)
-        {
-            if let Some((message_type, payload)) = self.parse_counterparty_message(&decrypted_data)
-            {
-                return Some(CounterpartyP2msData {
-                    raw_data: raw_data.clone(),
-                    decrypted_data,
-                    vout_index: output.vout,
-                    message_type,
-                    payload,
-                    multisig_pattern: MultisigPattern::TwoOfTwo {
-                        data_capacity: raw_data.len(),
-                    },
-                });
-            }
-        }
-        None
-    }
+        // Decrypt and validate
+        let decrypted_data = self.decrypt_and_validate_counterparty(tx, &raw_data, database)?;
 
-    pub fn extract_2_of_3_multisig_data(
-        &self,
-        tx: &EnrichedTransaction,
-        output: &crate::types::TransactionOutput,
-        database: &Database,
-    ) -> Option<CounterpartyP2msData> {
-        let raw_data = self.extract_raw_data_chunk_2_of_3(output)?;
-        if let Some(decrypted_data) =
-            self.decrypt_and_validate_counterparty(tx, &raw_data, database)
-        {
-            if let Some((message_type, payload)) = self.parse_counterparty_message(&decrypted_data)
-            {
-                return Some(CounterpartyP2msData {
-                    raw_data: raw_data.clone(),
-                    decrypted_data,
-                    vout_index: output.vout,
-                    message_type,
-                    payload,
-                    multisig_pattern: MultisigPattern::TwoOfThree {
-                        data_capacity: raw_data.len(),
-                    },
-                });
-            }
-        }
-        None
-    }
+        // Parse message
+        let (message_type, payload) = self.parse_counterparty_message(&decrypted_data)?;
 
-    pub fn extract_3_of_3_multisig_data(
-        &self,
-        tx: &EnrichedTransaction,
-        output: &crate::types::TransactionOutput,
-        database: &Database,
-    ) -> Option<CounterpartyP2msData> {
-        let multisig_info = output.multisig_info()?;
-        let pubkeys: Vec<Vec<u8>> = multisig_info
-            .pubkeys
-            .iter()
-            .filter_map(|hex| hex::decode(hex).ok())
-            .collect();
-        if pubkeys.len() != 3 || !pubkeys.iter().all(|pk| pk.len() == 33) {
-            return None;
-        }
-        let data_pubkey_1 = &pubkeys[0];
-        let data_pubkey_2 = &pubkeys[1];
-        let mut raw_data = Vec::with_capacity(62);
-        raw_data.extend_from_slice(&data_pubkey_1[1..data_pubkey_1.len() - 1]);
-        raw_data.extend_from_slice(&data_pubkey_2[1..data_pubkey_2.len() - 1]);
-        if let Some(decrypted_data) =
-            self.decrypt_and_validate_counterparty(tx, &raw_data, database)
-        {
-            if let Some((message_type, payload)) = self.parse_counterparty_message(&decrypted_data)
-            {
-                return Some(CounterpartyP2msData {
-                    raw_data: raw_data.clone(),
-                    decrypted_data,
-                    vout_index: output.vout,
-                    message_type,
-                    payload,
-                    multisig_pattern: MultisigPattern::ThreeOfThree {
-                        data_capacity: raw_data.len(),
-                    },
-                });
-            }
-        }
-        None
+        // Determine MultisigPattern based on actual M-of-N values
+        let multisig_pattern = match (info.required_sigs, info.total_pubkeys) {
+            (1, 2) => MultisigPattern::OneOfTwo {
+                data_capacity: raw_data.len(),
+            },
+            (1, 3) => MultisigPattern::OneOfThree { data_capacity: 64 },
+            (2, 2) => MultisigPattern::TwoOfTwo {
+                data_capacity: raw_data.len(),
+            },
+            (2, 3) => MultisigPattern::TwoOfThree {
+                data_capacity: raw_data.len(),
+            },
+            (3, 3) => MultisigPattern::ThreeOfThree {
+                data_capacity: raw_data.len(),
+            },
+            _ => return None,
+        };
+
+        Some(CounterpartyP2msData {
+            raw_data,
+            decrypted_data,
+            vout_index: output.vout,
+            message_type,
+            payload,
+            multisig_pattern,
+        })
     }
 
     pub fn decrypt_and_validate_counterparty(
@@ -681,78 +477,41 @@ impl CounterpartyClassifier {
 
     // ===== CORE DATA EXTRACTION (DATABASE-FREE) =====
 
-    /// Extract raw data from multiple P2MS outputs without database dependency
+    /// Extract raw data from multiple P2MS outputs without database dependency.
     ///
-    /// This is the core multi-output extraction logic extracted from the original
-    /// extract_multi_output_counterparty_data method. It concatenates raw data
-    /// from multiple outputs. All valid patterns are always checked.
+    /// Concatenates raw data from multiple outputs. Requires at least 2 outputs.
     pub fn extract_multi_output_raw_data(
         &self,
         outputs: &[crate::types::TransactionOutput],
     ) -> Option<Vec<u8>> {
         let mut combined_raw_data = Vec::new();
-        let mut data_outputs = Vec::new();
+        let mut data_output_count = 0;
 
+        // Unified extraction - handles all M-of-N patterns
         for output in outputs {
-            if let Some(info) = output.multisig_info() {
-                // 1-of-3 multisig (primary Counterparty format)
-                if info.required_sigs == 1 && info.total_pubkeys == 3 && info.pubkeys.len() == 3 {
-                    if let Some(chunk_data) = self.extract_raw_data_chunk_1_of_3(output) {
-                        combined_raw_data.extend_from_slice(&chunk_data);
-                        data_outputs.push(output.vout);
-                    }
-                // 2-of-3 multisig
-                } else if info.required_sigs == 2
-                    && info.total_pubkeys == 3
-                    && info.pubkeys.len() == 3
-                {
-                    if let Some(chunk_data) = self.extract_raw_data_chunk_2_of_3(output) {
-                        combined_raw_data.extend_from_slice(&chunk_data);
-                        data_outputs.push(output.vout);
-                    }
-                // 2-of-2 multisig
-                } else if info.required_sigs == 2
-                    && info.total_pubkeys == 2
-                    && info.pubkeys.len() == 2
-                {
-                    if let Some(chunk_data) = self.extract_raw_data_chunk_2_of_2(output) {
-                        combined_raw_data.extend_from_slice(&chunk_data);
-                        data_outputs.push(output.vout);
-                    }
-                }
+            if let Some(chunk_data) = self.extract_raw_data_chunk(output) {
+                combined_raw_data.extend_from_slice(&chunk_data);
+                data_output_count += 1;
             }
         }
 
         // Must have at least 2 outputs for multi-output transaction
-        if data_outputs.len() < 2 {
+        if data_output_count < 2 {
             return None;
         }
 
         Some(combined_raw_data)
     }
 
-    /// Extract raw data from a single P2MS output using pattern-specific methods
+    /// Extract raw data from a single P2MS output.
     ///
-    /// This covers all supported multisig patterns and serves as fallback when
+    /// Handles all supported multisig patterns. Used as fallback when
     /// multi-output extraction fails.
     pub fn extract_single_output_raw_data(
         &self,
         output: &crate::types::TransactionOutput,
     ) -> Option<Vec<u8>> {
-        let info = output.multisig_info()?;
-        match (info.required_sigs, info.total_pubkeys) {
-            (1, 3) => self.extract_raw_data_chunk_1_of_3(output),
-            (1, 2) => self.extract_raw_data_chunk_1_of_2(output),
-            (2, 2) => self.extract_raw_data_chunk_2_of_2(output),
-            (2, 3) => self.extract_raw_data_chunk_2_of_3(output),
-            _ => {
-                debug!(
-                    "Unsupported multisig pattern: {}-of-{}",
-                    info.required_sigs, info.total_pubkeys
-                );
-                None
-            }
-        }
+        self.extract_raw_data_chunk(output)
     }
 
     // ===== TIER 2: DECRYPTION LAYER (MINIMAL DEPENDENCIES) =====
