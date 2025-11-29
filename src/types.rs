@@ -192,11 +192,6 @@ mod tests {
     fn test_stage3_config_default() {
         let config = Stage3Config::default();
         assert_eq!(config.batch_size, 100);
-        // Test Tier 2 patterns are enabled by default
-        assert!(config.tier2_patterns_config.enable_2_of_2);
-        assert!(config.tier2_patterns_config.enable_2_of_3);
-        assert!(config.tier2_patterns_config.enable_3_of_3);
-        assert!(config.tier2_patterns_config.enable_multi_output_tier2);
     }
 
     #[test]

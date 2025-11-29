@@ -19,7 +19,7 @@ use crate::rpc::BitcoinRpcClient;
 use crate::types::counterparty::COUNTERPARTY_PREFIX;
 use crate::types::stamps::validation::{self, StampsProcessingResult};
 use crate::types::stamps::StampsTransport;
-use crate::types::{Stage3Config, Tier2PatternsConfig, TransactionOutput};
+use crate::types::{Stage3Config, TransactionOutput};
 use anyhow::{Context, Result};
 
 /// Result of ARC4 deobfuscation analysis
@@ -153,10 +153,9 @@ fn try_counterparty_path(
     input_txid: &str,
 ) -> Option<CounterpartyArc4> {
     let classifier = CounterpartyClassifier::new(&Stage3Config::default());
-    let tier2_config = Tier2PatternsConfig::default();
 
     // Try multi-output extraction first
-    if let Some(raw_data) = classifier.extract_multi_output_raw_data(p2ms_outputs, &tier2_config) {
+    if let Some(raw_data) = classifier.extract_multi_output_raw_data(p2ms_outputs) {
         if let Some(decrypted) =
             classifier.decrypt_counterparty_data_with_txid(&raw_data, input_txid)
         {
@@ -170,7 +169,7 @@ fn try_counterparty_path(
     // Fallback: try single-output extraction on ALL outputs (not just first!)
     // This handles transactions with a single data-bearing P2MS output
     for output in p2ms_outputs {
-        if let Some(raw_data) = classifier.extract_single_output_raw_data(output, &tier2_config) {
+        if let Some(raw_data) = classifier.extract_single_output_raw_data(output) {
             if let Some(decrypted) =
                 classifier.decrypt_counterparty_data_with_txid(&raw_data, input_txid)
             {

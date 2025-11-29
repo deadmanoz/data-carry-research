@@ -16,15 +16,11 @@ use super::{ProtocolSpecificClassifier, SpendabilityAnalyser};
 use crate::shared::PubkeyExtractor;
 
 /// Counterparty classifier with comprehensive P2MS data extraction and ARC4 decryption
-pub struct CounterpartyClassifier {
-    pub(crate) tier2_config: crate::types::Tier2PatternsConfig,
-}
+pub struct CounterpartyClassifier;
 
 impl CounterpartyClassifier {
-    pub fn new(config: &Stage3Config) -> Self {
-        Self {
-            tier2_config: config.tier2_patterns_config.clone(),
-        }
+    pub fn new(_config: &Stage3Config) -> Self {
+        Self
     }
 }
 
@@ -256,35 +252,22 @@ impl CounterpartyClassifier {
                         return Some(data);
                     }
                 }
-                if self.tier2_config.enable_2_of_2
-                    && info.required_sigs == 2
-                    && info.total_pubkeys == 2
-                    && info.pubkeys.len() == 2
-                {
+                // 2-of-2 multisig (always check all patterns for complete coverage)
+                if info.required_sigs == 2 && info.total_pubkeys == 2 && info.pubkeys.len() == 2 {
                     if let Some(data) = self.extract_2_of_2_multisig_data(tx, output, database) {
                         return Some(data);
                     }
                 }
-            }
-            if self.tier2_config.enable_2_of_3 {
-                if let Some(info) = output.multisig_info() {
-                    if info.required_sigs == 2 && info.total_pubkeys == 3 && info.pubkeys.len() == 3
-                    {
-                        if let Some(data) = self.extract_2_of_3_multisig_data(tx, output, database)
-                        {
-                            return Some(data);
-                        }
+                // 2-of-3 multisig
+                if info.required_sigs == 2 && info.total_pubkeys == 3 && info.pubkeys.len() == 3 {
+                    if let Some(data) = self.extract_2_of_3_multisig_data(tx, output, database) {
+                        return Some(data);
                     }
                 }
-            }
-            if self.tier2_config.enable_3_of_3 {
-                if let Some(info) = output.multisig_info() {
-                    if info.required_sigs == 3 && info.total_pubkeys == 3 && info.pubkeys.len() == 3
-                    {
-                        if let Some(data) = self.extract_3_of_3_multisig_data(tx, output, database)
-                        {
-                            return Some(data);
-                        }
+                // 3-of-3 multisig
+                if info.required_sigs == 3 && info.total_pubkeys == 3 && info.pubkeys.len() == 3 {
+                    if let Some(data) = self.extract_3_of_3_multisig_data(tx, output, database) {
+                        return Some(data);
                     }
                 }
             }
@@ -303,14 +286,14 @@ impl CounterpartyClassifier {
         let mut data_outputs = Vec::new();
         for output in outputs {
             if let Some(info) = output.multisig_info() {
+                // 1-of-3 multisig (primary Counterparty format)
                 if info.required_sigs == 1 && info.total_pubkeys == 3 && info.pubkeys.len() == 3 {
                     if let Some(chunk_data) = self.extract_raw_data_chunk_1_of_3(output) {
                         combined_raw_data.extend_from_slice(&chunk_data);
                         data_outputs.push(output.vout);
                     }
-                } else if self.tier2_config.enable_multi_output_tier2
-                    && self.tier2_config.enable_2_of_3
-                    && info.required_sigs == 2
+                // 2-of-3 multisig
+                } else if info.required_sigs == 2
                     && info.total_pubkeys == 3
                     && info.pubkeys.len() == 3
                 {
@@ -318,9 +301,8 @@ impl CounterpartyClassifier {
                         combined_raw_data.extend_from_slice(&chunk_data);
                         data_outputs.push(output.vout);
                     }
-                } else if self.tier2_config.enable_multi_output_tier2
-                    && self.tier2_config.enable_2_of_2
-                    && info.required_sigs == 2
+                // 2-of-2 multisig
+                } else if info.required_sigs == 2
                     && info.total_pubkeys == 2
                     && info.pubkeys.len() == 2
                 {
@@ -697,32 +679,30 @@ impl CounterpartyClassifier {
         None
     }
 
-    // ===== TIER 1: CORE DATA EXTRACTION (DATABASE-FREE) =====
+    // ===== CORE DATA EXTRACTION (DATABASE-FREE) =====
 
     /// Extract raw data from multiple P2MS outputs without database dependency
     ///
     /// This is the core multi-output extraction logic extracted from the original
     /// extract_multi_output_counterparty_data method. It concatenates raw data
-    /// from multiple outputs based on pattern configuration.
+    /// from multiple outputs. All valid patterns are always checked.
     pub fn extract_multi_output_raw_data(
         &self,
         outputs: &[crate::types::TransactionOutput],
-        tier2_config: &crate::types::Tier2PatternsConfig,
     ) -> Option<Vec<u8>> {
         let mut combined_raw_data = Vec::new();
         let mut data_outputs = Vec::new();
 
         for output in outputs {
-            // Pattern matching logic from original extract_multi_output_counterparty_data
             if let Some(info) = output.multisig_info() {
+                // 1-of-3 multisig (primary Counterparty format)
                 if info.required_sigs == 1 && info.total_pubkeys == 3 && info.pubkeys.len() == 3 {
                     if let Some(chunk_data) = self.extract_raw_data_chunk_1_of_3(output) {
                         combined_raw_data.extend_from_slice(&chunk_data);
                         data_outputs.push(output.vout);
                     }
-                } else if tier2_config.enable_multi_output_tier2
-                    && tier2_config.enable_2_of_3
-                    && info.required_sigs == 2
+                // 2-of-3 multisig
+                } else if info.required_sigs == 2
                     && info.total_pubkeys == 3
                     && info.pubkeys.len() == 3
                 {
@@ -730,9 +710,8 @@ impl CounterpartyClassifier {
                         combined_raw_data.extend_from_slice(&chunk_data);
                         data_outputs.push(output.vout);
                     }
-                } else if tier2_config.enable_multi_output_tier2
-                    && tier2_config.enable_2_of_2
-                    && info.required_sigs == 2
+                // 2-of-2 multisig
+                } else if info.required_sigs == 2
                     && info.total_pubkeys == 2
                     && info.pubkeys.len() == 2
                 {
@@ -754,22 +733,21 @@ impl CounterpartyClassifier {
 
     /// Extract raw data from a single P2MS output using pattern-specific methods
     ///
-    /// This covers all 6 multisig patterns and serves as fallback when
+    /// This covers all supported multisig patterns and serves as fallback when
     /// multi-output extraction fails.
     pub fn extract_single_output_raw_data(
         &self,
         output: &crate::types::TransactionOutput,
-        tier2_config: &crate::types::Tier2PatternsConfig,
     ) -> Option<Vec<u8>> {
         let info = output.multisig_info()?;
         match (info.required_sigs, info.total_pubkeys) {
             (1, 3) => self.extract_raw_data_chunk_1_of_3(output),
             (1, 2) => self.extract_raw_data_chunk_1_of_2(output),
-            (2, 2) if tier2_config.enable_2_of_2 => self.extract_raw_data_chunk_2_of_2(output),
-            (2, 3) if tier2_config.enable_2_of_3 => self.extract_raw_data_chunk_2_of_3(output),
+            (2, 2) => self.extract_raw_data_chunk_2_of_2(output),
+            (2, 3) => self.extract_raw_data_chunk_2_of_3(output),
             _ => {
                 debug!(
-                    "Unsupported or disabled multisig pattern: {}-of-{}",
+                    "Unsupported multisig pattern: {}-of-{}",
                     info.required_sigs, info.total_pubkeys
                 );
                 None

@@ -22,13 +22,11 @@ use super::database::TestDatabase;
 /// Creates a consistent Stage3Config for all protocol tests with:
 /// - Small batch size for testing (10)
 /// - No height filtering (signature-based detection only)
-/// - Default tier2 patterns configuration
 pub fn create_protocol_test_config(db_path: &str) -> Stage3Config {
     Stage3Config {
         database_path: db_path.into(),
         batch_size: 10,
         progress_interval: 1000,
-        tier2_patterns_config: data_carry_research::types::Tier2PatternsConfig::default(),
     }
 }
 

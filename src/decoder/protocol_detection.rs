@@ -464,10 +464,8 @@ pub fn try_counterparty_verbose(
         &crate::types::Stage3Config::default(),
     );
 
-    let tier2_config = crate::types::Tier2PatternsConfig::default();
-
     // Try multi-output extraction first
-    if let Some(raw_data) = classifier.extract_multi_output_raw_data(&p2ms_outputs, &tier2_config) {
+    if let Some(raw_data) = classifier.extract_multi_output_raw_data(&p2ms_outputs) {
         if let Some(decrypted) =
             classifier.decrypt_counterparty_data_with_txid(&raw_data, &first_input_txid)
         {
@@ -526,7 +524,7 @@ pub fn try_counterparty_verbose(
     // Try single-output fallback
     let mut all_data = Vec::new();
     for output in &p2ms_outputs {
-        if let Some(chunk) = classifier.extract_single_output_raw_data(output, &tier2_config) {
+        if let Some(chunk) = classifier.extract_single_output_raw_data(output) {
             all_data.extend_from_slice(&chunk);
         }
     }

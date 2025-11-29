@@ -42,11 +42,9 @@ pub fn try_counterparty_verbose(
         &crate::types::Stage3Config::default(),
     );
 
-    let tier2_config = crate::types::Tier2PatternsConfig::default();
-
     // Try multi-output extraction first
     if let Some((raw_data, mut output_debug_infos)) =
-        extract_multi_output_with_debug(&p2ms_outputs, &classifier, &tier2_config, verbose)
+        extract_multi_output_with_debug(&p2ms_outputs, &classifier, verbose)
     {
         // Decrypt each chunk individually for verbose output
         if verbose {
@@ -139,7 +137,7 @@ pub fn try_counterparty_verbose(
     let mut single_output_debug = Vec::new();
 
     for output in p2ms_outputs.iter() {
-        if let Some(chunk) = classifier.extract_single_output_raw_data(output, &tier2_config) {
+        if let Some(chunk) = classifier.extract_single_output_raw_data(output) {
             if verbose {
                 let mut output_debug =
                     P2MSOutputDebugInfo::from_output(output).unwrap_or_else(|| {
@@ -233,7 +231,6 @@ pub fn try_counterparty_verbose(
 fn extract_multi_output_with_debug(
     outputs: &[crate::types::TransactionOutput],
     classifier: &crate::processor::stage3::counterparty::CounterpartyClassifier,
-    _tier2_config: &crate::types::Tier2PatternsConfig,
     verbose: bool,
 ) -> Option<(Vec<u8>, Vec<P2MSOutputDebugInfo>)> {
     let mut combined_raw_data = Vec::new();

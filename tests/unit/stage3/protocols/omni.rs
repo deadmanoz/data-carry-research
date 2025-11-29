@@ -518,7 +518,7 @@ mod test_data {
     /// Display rich analysis using production functions
     fn display_rich_analysis(json_path: &str, tx: &EnrichedTransaction) -> anyhow::Result<()> {
         use data_carry_research::processor::stage3::omni::OmniClassifier;
-        use data_carry_research::types::{Stage3Config, Tier2PatternsConfig};
+        use data_carry_research::types::Stage3Config;
 
         // Display P2MS outputs analysis
         println!("║ P2MS Outputs Found: {}", tx.outputs.len());
@@ -538,7 +538,6 @@ mod test_data {
                 database_path: "test.db".into(),
                 batch_size: 100,
                 progress_interval: 1000,
-                tier2_patterns_config: Tier2PatternsConfig::default(),
             };
             let classifier = OmniClassifier::new(&config);
 

@@ -14,7 +14,6 @@ pub struct Stage3Config {
     pub database_path: PathBuf,
     pub batch_size: usize,
     pub progress_interval: usize,
-    pub tier2_patterns_config: Tier2PatternsConfig,
 }
 
 impl Default for Stage3Config {
@@ -23,7 +22,6 @@ impl Default for Stage3Config {
             database_path: "./test_output/testing.db".into(),
             batch_size: 100,
             progress_interval: 1000,
-            tier2_patterns_config: Tier2PatternsConfig::default(),
         }
     }
 }
@@ -45,62 +43,6 @@ impl Stage3Config {
     /// Get the progress reporting interval
     pub fn get_progress_interval(&self) -> usize {
         self.progress_interval
-    }
-}
-
-/// Configuration for Tier 2 P2MS pattern detection
-/// These patterns are less common but provide complete UTXO coverage
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Tier2PatternsConfig {
-    /// Enable detection of 2-of-2 multisig patterns
-    pub enable_2_of_2: bool,
-    /// Enable detection of 2-of-3 multisig patterns
-    pub enable_2_of_3: bool,
-    /// Enable detection of 3-of-3 multisig patterns
-    pub enable_3_of_3: bool,
-    /// Enable Tier 2 patterns in multi-output combinations
-    pub enable_multi_output_tier2: bool,
-}
-
-impl Default for Tier2PatternsConfig {
-    fn default() -> Self {
-        Self {
-            // Default: Enable all Tier 2 patterns for complete coverage
-            enable_2_of_2: true,
-            enable_2_of_3: true,
-            enable_3_of_3: true,
-            enable_multi_output_tier2: true,
-        }
-    }
-}
-
-impl Tier2PatternsConfig {
-    /// Create a configuration with all patterns disabled (for minimal processing)
-    pub fn disabled() -> Self {
-        Self {
-            enable_2_of_2: false,
-            enable_2_of_3: false,
-            enable_3_of_3: false,
-            enable_multi_output_tier2: false,
-        }
-    }
-
-    /// Create a configuration with only essential patterns enabled
-    pub fn essential_only() -> Self {
-        Self {
-            enable_2_of_2: true,
-            enable_2_of_3: true,
-            enable_3_of_3: false,
-            enable_multi_output_tier2: false,
-        }
-    }
-
-    /// Check if any tier 2 patterns are enabled
-    pub fn has_any_enabled(&self) -> bool {
-        self.enable_2_of_2
-            || self.enable_2_of_3
-            || self.enable_3_of_3
-            || self.enable_multi_output_tier2
     }
 }
 
@@ -557,27 +499,6 @@ mod tests {
         let config = Stage3Config::default();
         assert_eq!(config.batch_size, 100);
         assert_eq!(config.progress_interval, 1000);
-
-        // Test Tier 2 patterns are enabled by default
-        assert!(config.tier2_patterns_config.enable_2_of_2);
-        assert!(config.tier2_patterns_config.enable_2_of_3);
-        assert!(config.tier2_patterns_config.enable_3_of_3);
-        assert!(config.tier2_patterns_config.enable_multi_output_tier2);
-    }
-
-    #[test]
-    fn test_tier2_patterns_config() {
-        let default_config = Tier2PatternsConfig::default();
-        assert!(default_config.has_any_enabled());
-
-        let disabled_config = Tier2PatternsConfig::disabled();
-        assert!(!disabled_config.has_any_enabled());
-
-        let essential_config = Tier2PatternsConfig::essential_only();
-        assert!(essential_config.has_any_enabled());
-        assert!(essential_config.enable_2_of_2);
-        assert!(essential_config.enable_2_of_3);
-        assert!(!essential_config.enable_3_of_3);
     }
 
     #[test]
@@ -586,13 +507,10 @@ mod tests {
             database_path: "/path/to/db.sqlite".into(),
             batch_size: 200,
             progress_interval: 500,
-            tier2_patterns_config: Tier2PatternsConfig::essential_only(),
         };
 
         assert_eq!(config.database_path, PathBuf::from("/path/to/db.sqlite"));
         assert_eq!(config.batch_size, 200);
-        assert!(config.tier2_patterns_config.enable_2_of_2);
-        assert!(!config.tier2_patterns_config.enable_3_of_3);
         assert!(config.validate().is_ok());
     }
 

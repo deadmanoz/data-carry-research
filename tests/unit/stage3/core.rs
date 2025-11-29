@@ -31,7 +31,6 @@ fn create_test_config(db_path: &str) -> Stage3Config {
         database_path: db_path.into(),
         batch_size: 10,
         progress_interval: 1000,
-        tier2_patterns_config: Default::default(),
     }
 }
 

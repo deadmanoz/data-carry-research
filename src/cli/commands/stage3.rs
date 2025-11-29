@@ -57,7 +57,6 @@ impl Stage3Command {
                 .unwrap_or_else(|| app_config.database.default_path.clone()),
             batch_size: self.batch_size.unwrap_or(100),
             progress_interval: 1000,
-            tier2_patterns_config: crate::types::Tier2PatternsConfig::default(),
         };
 
         info!("Stage 3 Configuration:");
