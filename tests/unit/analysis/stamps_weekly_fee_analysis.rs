@@ -18,14 +18,8 @@ use data_carry_research::errors::AppResult;
 /// 6. p2ms_output_classifications (CHILD)
 ///
 /// # Arguments
-/// * `conn` - Database connection
-/// * `txid` - Transaction ID
-/// * `height` - Block height
-/// * `timestamp` - Block timestamp (Unix epoch seconds)
-/// * `fee` - Transaction fee in satoshis
-/// * `script_size` - Size of P2MS script in bytes
-/// * `is_coinbase` - Whether this is a coinbase transaction
-/// * `num_outputs` - Number of P2MS outputs to create
+/// * `params` - Transaction parameters (txid, height, timestamp, fee, script_size, is_coinbase, num_outputs)
+#[allow(clippy::too_many_arguments)]
 fn seed_stamps_transaction(
     conn: &rusqlite::Connection,
     txid: &str,

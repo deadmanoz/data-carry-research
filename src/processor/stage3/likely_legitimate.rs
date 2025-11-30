@@ -280,7 +280,7 @@ mod tests {
         let config = Stage3Config::default();
         let _classifier = LikelyLegitimateClassifier::new(&config);
 
-        let validation = aggregate_validation_for_outputs(&[output.clone()]);
+        let validation = aggregate_validation_for_outputs(std::slice::from_ref(&output));
         assert!(validation.is_some());
 
         let v = validation.unwrap();
@@ -321,7 +321,7 @@ mod tests {
         let config = Stage3Config::default();
         let _classifier = LikelyLegitimateClassifier::new(&config);
 
-        let validation = aggregate_validation_for_outputs(&[output.clone()]);
+        let validation = aggregate_validation_for_outputs(std::slice::from_ref(&output));
         assert!(validation.is_some());
 
         let v = validation.unwrap();
@@ -367,7 +367,7 @@ mod tests {
         let config = Stage3Config::default();
         let _classifier = LikelyLegitimateClassifier::new(&config);
 
-        let validation = aggregate_validation_for_outputs(&[output.clone()]);
+        let validation = aggregate_validation_for_outputs(std::slice::from_ref(&output));
         assert!(validation.is_some());
 
         let v = validation.unwrap();

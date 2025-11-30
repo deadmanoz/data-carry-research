@@ -142,7 +142,7 @@ pub fn detect_binary_signature(data: &[u8]) -> Option<&'static str> {
     // P2MS outputs store data in pubkey slots where byte 0 is the EC point marker.
     // Similar pattern to ZLIB multi-offset detection below.
     // Example: height 690497 has JPEG magic at offset 1 after 0x04 prefix.
-    if data.len() >= 4 && matches!(data[0], 0x02 | 0x03 | 0x04) {
+    if data.len() >= 4 && matches!(data[0], 0x02..=0x04) {
         // JPEG: FF D8 FF at offset 1
         if data[1..4] == [0xFF, 0xD8, 0xFF] {
             return Some("JPEG");
@@ -179,19 +179,19 @@ pub fn detect_binary_signature(data: &[u8]) -> Option<&'static str> {
     // Verify FLG byte checksum: (CMF * 256 + FLG) must be divisible by 31
     if data.len() >= 2 && data[0] == 0x78 {
         let cmf_flg = (data[0] as u16) * 256 + (data[1] as u16);
-        if cmf_flg % 31 == 0 {
+        if cmf_flg.is_multiple_of(31) {
             return Some("ZLIB");
         }
     }
     if data.len() >= 7 && data[5] == 0x78 {
         let cmf_flg = (data[5] as u16) * 256 + (data[6] as u16);
-        if cmf_flg % 31 == 0 {
+        if cmf_flg.is_multiple_of(31) {
             return Some("ZLIB");
         }
     }
     if data.len() >= 9 && data[7] == 0x78 {
         let cmf_flg = (data[7] as u16) * 256 + (data[8] as u16);
-        if cmf_flg % 31 == 0 {
+        if cmf_flg.is_multiple_of(31) {
             return Some("ZLIB");
         }
     }

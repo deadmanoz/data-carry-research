@@ -425,11 +425,15 @@ mod tests {
         );
 
         // Verify marker is detected (should match 1-of-2 pattern AND have marker)
-        assert!(has_multisig_pattern(&[p2ms_with_marker.clone()], 1, 2));
+        assert!(has_multisig_pattern(
+            std::slice::from_ref(&p2ms_with_marker),
+            1,
+            2
+        ));
 
         // Verify full detection works
         let opreturn = create_test_opreturn_output(&hex::encode(b"test"), 0);
-        let result = detect_ppk_variant(&[opreturn.clone()], &[p2ms_with_marker]);
+        let result = detect_ppk_variant(std::slice::from_ref(&opreturn), &[p2ms_with_marker]);
         assert!(result.is_some(), "PPk marker should be detected");
 
         // Test 2: Transaction WITHOUT PPk marker should NOT be detected

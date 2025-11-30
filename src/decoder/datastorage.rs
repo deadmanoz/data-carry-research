@@ -159,7 +159,7 @@ impl DataStorageDecoder {
                 let flg = w[1];
                 if cmf == 0x78 {
                     let cmf_flg = (cmf as u16) * 256 + (flg as u16);
-                    cmf_flg % 31 == 0
+                    cmf_flg.is_multiple_of(31)
                 } else {
                     false
                 }
@@ -862,7 +862,7 @@ impl DataStorageDecoder {
 
     /// Check if data looks like a hex string
     fn looks_like_hex_string(&self, data: &[u8]) -> bool {
-        if data.len() < 2 || data.len() % 2 != 0 {
+        if data.len() < 2 || !data.len().is_multiple_of(2) {
             return false;
         }
 

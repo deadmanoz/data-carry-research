@@ -66,7 +66,7 @@ impl WikiLeaksCablegateClassifier {
 
     /// Check if transaction is in the Cablegate height range
     fn is_in_cablegate_height_range(height: u32) -> bool {
-        height >= CABLEGATE_MIN_HEIGHT && height <= CABLEGATE_MAX_HEIGHT
+        (CABLEGATE_MIN_HEIGHT..=CABLEGATE_MAX_HEIGHT).contains(&height)
     }
 
     /// Check if transaction is part of WikiLeaks Cablegate upload

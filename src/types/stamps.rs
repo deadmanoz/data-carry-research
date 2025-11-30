@@ -334,7 +334,7 @@ pub mod validation {
                 // ZLIB CMF byte check (0x78 for deflate with 32K window)
                 if cmf == 0x78 {
                     // Validate CMF-FLG checksum: (CMF * 256 + FLG) % 31 == 0
-                    if ((cmf as u16) * 256 + (flg as u16)) % 31 == 0 {
+                    if ((cmf as u16) * 256 + (flg as u16)).is_multiple_of(31) {
                         return true;
                     }
                 }
@@ -768,8 +768,7 @@ pub mod validation {
         let stamp_result = find_stamp_signature(&final_decoded_bytes);
 
         // Must have both signatures to qualify as Counterparty-embedded
-        if has_cntrprty && stamp_result.is_some() {
-            let (stamp_offset, variant) = stamp_result.unwrap();
+        if let Some((stamp_offset, variant)) = stamp_result.filter(|_| has_cntrprty) {
             Some(StampsProcessingResult {
                 valid_outputs,
                 concatenated_data_size: total_raw_data_size,

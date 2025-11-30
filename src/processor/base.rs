@@ -295,7 +295,7 @@ impl CheckpointManager {
 
     /// Determine if a checkpoint should be saved based on processing progress
     pub fn should_save_checkpoint(processed: usize, interval: usize) -> bool {
-        processed > 0 && processed % interval == 0
+        processed > 0 && processed.is_multiple_of(interval)
     }
 }
 

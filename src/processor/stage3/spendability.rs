@@ -105,7 +105,7 @@ impl SpendabilityAnalyser {
                         burn_count += 1;
                     } else {
                         // Validate EC point
-                        let validation = validate_pubkeys(&[pubkey.clone()]);
+                        let validation = validate_pubkeys(std::slice::from_ref(pubkey));
                         if validation.all_valid_ec_points {
                             real_count += 1;
                         } else {
@@ -282,7 +282,7 @@ impl SpendabilityAnalyser {
                     burn_count += 1;
                 } else {
                     // Validate EC point
-                    let validation = validate_pubkeys(&[pubkey.clone()]);
+                    let validation = validate_pubkeys(std::slice::from_ref(pubkey));
                     // Check for REAL EC points (null keys have valid_keys == 0)
                     if validation.all_valid_ec_points && validation.valid_keys > 0 {
                         real_count += 1;
@@ -317,7 +317,7 @@ impl SpendabilityAnalyser {
                 burn_count += 1;
             } else {
                 // Validate EC point
-                let validation = validate_pubkeys(&[pubkey.clone()]);
+                let validation = validate_pubkeys(std::slice::from_ref(pubkey));
                 // Check for REAL EC points (null keys have valid_keys == 0)
                 if validation.all_valid_ec_points && validation.valid_keys > 0 {
                     real_count += 1;

@@ -222,7 +222,7 @@ impl OutputManager {
         let filepath = counterparty_dir.join(filename);
 
         let json_string = serde_json::to_string_pretty(&json_data)
-            .map_err(|e| OutputError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+            .map_err(|e| OutputError::Io(std::io::Error::other(e)))?;
 
         fs::write(&filepath, json_string)?;
         Ok(filepath)
@@ -267,7 +267,7 @@ impl OutputManager {
         let filepath = omni_dir.join(filename);
 
         let json_string = serde_json::to_string_pretty(&json_data)
-            .map_err(|e| OutputError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+            .map_err(|e| OutputError::Io(std::io::Error::other(e)))?;
 
         fs::write(&filepath, json_string)?;
         Ok(filepath)
@@ -310,7 +310,7 @@ impl OutputManager {
         let filepath = chancecoin_dir.join(filename);
 
         let json_string = serde_json::to_string_pretty(&output_json)
-            .map_err(|e| OutputError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+            .map_err(|e| OutputError::Io(std::io::Error::other(e)))?;
         fs::write(&filepath, json_string)?;
 
         Ok(filepath)
@@ -389,7 +389,7 @@ impl OutputManager {
         let filepath = ppk_dir.join(filename);
 
         let json_string = serde_json::to_string_pretty(&output_json)
-            .map_err(|e| OutputError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+            .map_err(|e| OutputError::Io(std::io::Error::other(e)))?;
         fs::write(&filepath, json_string)?;
 
         Ok(filepath)

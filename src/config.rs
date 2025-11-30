@@ -116,7 +116,7 @@ impl AppConfig {
         }
 
         // Validate that the CSV path was actually configured
-        if app_config.paths.utxo_csv == PathBuf::from("/dev/null") {
+        if app_config.paths.utxo_csv == std::path::Path::new("/dev/null") {
             return Err(ConfigError::Message(
                 "UTXO CSV path not configured. Please set UTXO_CSV_PATH environment variable or configure paths.utxo_csv in config.toml".to_string()
             ));

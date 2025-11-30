@@ -443,7 +443,7 @@ impl ProtocolDecoder {
 
         let rpc_client = BitcoinRpcClient::new(rpc_config).await?;
         let output_manager = OutputManager::new(output_dir)
-            .map_err(|e| DecoderError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+            .map_err(|e| DecoderError::Io(std::io::Error::other(e)))?;
 
         info!("Multi-protocol decoder initialised successfully");
 
@@ -656,8 +656,7 @@ impl ProtocolDecoder {
                         .output_manager
                         .write_compressed(&txid, &bytes, ct)
                         .map_err(|e| {
-                            DecoderError::Io(std::io::Error::new(
-                                std::io::ErrorKind::Other,
+                            DecoderError::Io(std::io::Error::other(
                                 e,
                             ))
                         })?;
@@ -688,8 +687,7 @@ impl ProtocolDecoder {
                         .output_manager
                         .write_document(&txid, &bytes, DocumentFormat::Pdf)
                         .map_err(|e| {
-                            DecoderError::Io(std::io::Error::new(
-                                std::io::ErrorKind::Other,
+                            DecoderError::Io(std::io::Error::other(
                                 e,
                             ))
                         })?;
@@ -725,8 +723,7 @@ impl ProtocolDecoder {
                                 .output_manager
                                 .write_data(&txid, &bytes, Some("application/octet-stream"))
                                 .map_err(|e| {
-                                    DecoderError::Io(std::io::Error::new(
-                                        std::io::ErrorKind::Other,
+                                    DecoderError::Io(std::io::Error::other(
                                         e,
                                     ))
                                 })?;
@@ -751,8 +748,7 @@ impl ProtocolDecoder {
                         .output_manager
                         .write_image(&txid, &bytes, fmt)
                         .map_err(|e| {
-                            DecoderError::Io(std::io::Error::new(
-                                std::io::ErrorKind::Other,
+                            DecoderError::Io(std::io::Error::other(
                                 e,
                             ))
                         })?;
@@ -781,8 +777,7 @@ impl ProtocolDecoder {
                                 .output_manager
                                 .write_json(&txid, &bytes, json_type.clone())
                                 .map_err(|e| {
-                                    DecoderError::Io(std::io::Error::new(
-                                        std::io::ErrorKind::Other,
+                                    DecoderError::Io(std::io::Error::other(
                                         e,
                                     ))
                                 })?;
@@ -817,8 +812,7 @@ impl ProtocolDecoder {
                                     Some("application/octet-stream"),
                                 )
                                 .map_err(|e| {
-                                    DecoderError::Io(std::io::Error::new(
-                                        std::io::ErrorKind::Other,
+                                    DecoderError::Io(std::io::Error::other(
                                         e,
                                     ))
                                 })?;
@@ -847,8 +841,7 @@ impl ProtocolDecoder {
                         .output_manager
                         .write_html(&txid, &bytes)
                         .map_err(|e| {
-                            DecoderError::Io(std::io::Error::new(
-                                std::io::ErrorKind::Other,
+                            DecoderError::Io(std::io::Error::other(
                                 e,
                             ))
                         })?;
@@ -879,8 +872,7 @@ impl ProtocolDecoder {
                         .output_manager
                         .write_data(&txid, &bytes, Some(ct))
                         .map_err(|e| {
-                            DecoderError::Io(std::io::Error::new(
-                                std::io::ErrorKind::Other,
+                            DecoderError::Io(std::io::Error::other(
                                 e,
                             ))
                         })?;
@@ -1068,7 +1060,7 @@ impl ProtocolDecoder {
         // Parse the payload into structured data using our new parsing infrastructure
         let parsed_message = match message_type.parse_payload(&payload) {
             Ok(parsed) => Some(serde_json::to_value(parsed).map_err(|e| {
-                DecoderError::Io(std::io::Error::new(std::io::ErrorKind::Other, e))
+                DecoderError::Io(std::io::Error::other(e))
             })?),
             Err(parse_err) => {
                 info!(
@@ -1083,7 +1075,7 @@ impl ProtocolDecoder {
         let output_path = self
             .output_manager
             .write_counterparty_json(&txid, &message_type, &payload, &parsed_message)
-            .map_err(|e| DecoderError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+            .map_err(|e| DecoderError::Io(std::io::Error::other(e)))?;
 
         let counterparty_data = CounterpartyData {
             txid: txid.clone(),
@@ -1170,7 +1162,7 @@ impl ProtocolDecoder {
                 packet_count,
                 parsed_data,
             )
-            .map_err(|e| DecoderError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+            .map_err(|e| DecoderError::Io(std::io::Error::other(e)))?;
 
         let omni_data = OmniData {
             txid: txid.clone(),
@@ -1395,7 +1387,7 @@ impl ProtocolDecoder {
 
         // Write metadata JSON
         let json_str = serde_json::to_string_pretty(&metadata)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            .map_err(std::io::Error::other)?;
         std::fs::write(&output_path, json_str)?;
 
         info!(

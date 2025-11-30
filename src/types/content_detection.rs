@@ -410,7 +410,7 @@ impl ContentType {
         if data.len() >= 2 && data[0] == 0x78 {
             let cmf = data[0] as u16;
             let flg = data[1] as u16;
-            if (cmf * 256 + flg) % 31 == 0 {
+            if (cmf * 256 + flg).is_multiple_of(31) {
                 return Some(ArchiveFormat::Zlib);
             }
         }
