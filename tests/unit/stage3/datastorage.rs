@@ -295,8 +295,8 @@ mod basic_classification {
     #[serial]
     fn test_datastorage_compressed_proof_of_burn() -> Result<()> {
         let test_name = "datastorage_compressed";
-        let (mut test_db, config) = setup_protocol_test(test_name)?;
-        let classifier = DataStorageClassifier::new(&config);
+        let (mut test_db, _config) = setup_protocol_test(test_name)?;
+        let classifier = DataStorageClassifier;
 
         // Display test header
         print!(
@@ -349,8 +349,8 @@ mod basic_classification {
     #[serial]
     fn test_datastorage_uncompressed_proof_of_burn() -> Result<()> {
         let test_name = "datastorage_uncompressed";
-        let (mut test_db, config) = setup_protocol_test(test_name)?;
-        let classifier = DataStorageClassifier::new(&config);
+        let (mut test_db, _config) = setup_protocol_test(test_name)?;
+        let classifier = DataStorageClassifier;
 
         // Display test header
         print!(
@@ -399,8 +399,8 @@ mod basic_classification {
     #[serial]
     fn test_datastorage_normal_pubkey_not_classified() -> Result<()> {
         let test_name = "datastorage_normal";
-        let (mut test_db, config) = setup_protocol_test(test_name)?;
-        let classifier = DataStorageClassifier::new(&config);
+        let (mut test_db, _config) = setup_protocol_test(test_name)?;
+        let classifier = DataStorageClassifier;
 
         // Display test header
         print!(
@@ -446,8 +446,8 @@ mod edge_cases {
     #[serial]
     fn test_datastorage_partial_burn_pattern_not_classified() -> Result<()> {
         let test_name = "datastorage_partial";
-        let (mut test_db, config) = setup_protocol_test(test_name)?;
-        let classifier = DataStorageClassifier::new(&config);
+        let (mut test_db, _config) = setup_protocol_test(test_name)?;
+        let classifier = DataStorageClassifier;
 
         // Display test header
         print!(
@@ -489,8 +489,8 @@ mod edge_cases {
     #[serial]
     fn test_datastorage_wrong_prefix_not_classified() -> Result<()> {
         let test_name = "datastorage_wrong_prefix";
-        let (mut test_db, config) = setup_protocol_test(test_name)?;
-        let classifier = DataStorageClassifier::new(&config);
+        let (mut test_db, _config) = setup_protocol_test(test_name)?;
+        let classifier = DataStorageClassifier;
 
         print!(
             "{}",
@@ -528,8 +528,8 @@ mod edge_cases {
     #[serial]
     fn test_datastorage_empty_pubkeys_not_classified() -> Result<()> {
         let test_name = "datastorage_empty";
-        let (mut test_db, config) = setup_protocol_test(test_name)?;
-        let classifier = DataStorageClassifier::new(&config);
+        let (mut test_db, _config) = setup_protocol_test(test_name)?;
+        let classifier = DataStorageClassifier;
 
         print!(
             "{}",
@@ -565,8 +565,8 @@ mod archive_formats {
     #[serial]
     fn test_datastorage_gzip_detection() -> Result<()> {
         let test_name = "datastorage_gzip";
-        let (mut test_db, config) = setup_protocol_test(test_name)?;
-        let classifier = DataStorageClassifier::new(&config);
+        let (mut test_db, _config) = setup_protocol_test(test_name)?;
+        let classifier = DataStorageClassifier;
 
         print!(
             "{}",
@@ -618,8 +618,8 @@ mod archive_formats {
     #[serial]
     fn test_datastorage_zlib_moderate_compression() -> Result<()> {
         let test_name = "datastorage_zlib";
-        let (mut test_db, config) = setup_protocol_test(test_name)?;
-        let classifier = DataStorageClassifier::new(&config);
+        let (mut test_db, _config) = setup_protocol_test(test_name)?;
+        let classifier = DataStorageClassifier;
 
         print!(
             "{}",
@@ -674,8 +674,8 @@ mod archive_formats {
     #[serial]
     fn test_datastorage_bzip2_detection() -> Result<()> {
         let test_name = "datastorage_bzip2";
-        let (mut test_db, config) = setup_protocol_test(test_name)?;
-        let classifier = DataStorageClassifier::new(&config);
+        let (mut test_db, _config) = setup_protocol_test(test_name)?;
+        let classifier = DataStorageClassifier;
 
         print!(
             "{}",
@@ -726,8 +726,8 @@ mod archive_formats {
     #[serial]
     fn test_datastorage_tar_detection_concatenated() -> Result<()> {
         let test_name = "datastorage_tar";
-        let (mut test_db, config) = setup_protocol_test(test_name)?;
-        let classifier = DataStorageClassifier::new(&config);
+        let (mut test_db, _config) = setup_protocol_test(test_name)?;
+        let classifier = DataStorageClassifier;
 
         print!(
             "{}",
@@ -808,8 +808,8 @@ mod archive_formats {
     #[serial]
     fn test_datastorage_png_detection() -> Result<()> {
         let test_name = "datastorage_png";
-        let (mut test_db, config) = setup_protocol_test(test_name)?;
-        let classifier = DataStorageClassifier::new(&config);
+        let (mut test_db, _config) = setup_protocol_test(test_name)?;
+        let classifier = DataStorageClassifier;
 
         print!(
             "{}",
@@ -860,8 +860,8 @@ mod archive_formats {
     #[serial]
     fn test_datastorage_pdf_detection() -> Result<()> {
         let test_name = "datastorage_pdf";
-        let (mut test_db, config) = setup_protocol_test(test_name)?;
-        let classifier = DataStorageClassifier::new(&config);
+        let (mut test_db, _config) = setup_protocol_test(test_name)?;
+        let classifier = DataStorageClassifier;
 
         print!(
             "{}",
@@ -919,8 +919,8 @@ mod real_transactions {
     #[serial]
     fn test_linpyro_transaction_1() -> Result<()> {
         let test_name = "linpyro_tx1";
-        let (mut test_db, config) = setup_protocol_test(test_name)?;
-        let classifier = DataStorageClassifier::new(&config);
+        let (mut test_db, _config) = setup_protocol_test(test_name)?;
+        let classifier = DataStorageClassifier;
 
         // Load real Linpyro transaction 3344647bc080...
         let txid = "3344647bc0801d3c4f5ca9a33106e6e4ed34754a1d7833e7bbcdc9094db347b0";
@@ -996,8 +996,8 @@ mod real_transactions {
     #[serial]
     fn test_linpyro_transaction_2() -> Result<()> {
         let test_name = "linpyro_tx2";
-        let (mut test_db, config) = setup_protocol_test(test_name)?;
-        let classifier = DataStorageClassifier::new(&config);
+        let (mut test_db, _config) = setup_protocol_test(test_name)?;
+        let classifier = DataStorageClassifier;
 
         // Load real Linpyro transaction d246f58b59be...
         let txid = "d246f58b59be6595df03c404a6497177564c7b2bf5396596641e59d268b1b40d";
@@ -1072,8 +1072,8 @@ mod real_transactions {
     #[serial]
     fn test_wikileaks_python_script_1() -> Result<()> {
         let test_name = "wikileaks_python_1";
-        let (mut test_db, config) = setup_protocol_test(test_name)?;
-        let classifier = DataStorageClassifier::new(&config);
+        let (mut test_db, _config) = setup_protocol_test(test_name)?;
+        let classifier = DataStorageClassifier;
 
         // Load first WikiLeaks Python script transaction 6c53cd98...
         // This contains a File downloader script (#!/usr/bin/python3)
@@ -1170,8 +1170,8 @@ mod real_transactions {
     #[serial]
     fn test_wikileaks_python_script_2() -> Result<()> {
         let test_name = "wikileaks_python_2";
-        let (mut test_db, config) = setup_protocol_test(test_name)?;
-        let classifier = DataStorageClassifier::new(&config);
+        let (mut test_db, _config) = setup_protocol_test(test_name)?;
+        let classifier = DataStorageClassifier;
 
         // Load second WikiLeaks Python script transaction 4b72a223...
         // This contains a File insertion tool script
@@ -1268,8 +1268,8 @@ mod real_transactions {
     #[serial]
     fn test_null_data_classification() -> Result<()> {
         let test_name = "datastorage_null";
-        let (mut test_db, config) = setup_protocol_test(test_name)?;
-        let classifier = DataStorageClassifier::new(&config);
+        let (mut test_db, _config) = setup_protocol_test(test_name)?;
+        let classifier = DataStorageClassifier;
 
         // Load real transaction with all-zero pubkey data
         // TXID: 9cf7c3fcf15ec0427a98623abe1fa752ad10c1615670c0dbe0a11516f277540e
@@ -1336,8 +1336,8 @@ mod real_transactions {
     #[serial]
     fn test_url_embedding_classification() -> Result<()> {
         let test_name = "datastorage_url";
-        let (mut test_db, config) = setup_protocol_test(test_name)?;
-        let classifier = DataStorageClassifier::new(&config);
+        let (mut test_db, _config) = setup_protocol_test(test_name)?;
+        let classifier = DataStorageClassifier;
 
         // Load real transaction with URL embedded in pubkeys
         // TXID: 0716406f435e576bea06a9de51b3756594f59c8c7272f9c41b63a90442348d07
@@ -1417,8 +1417,8 @@ mod real_transactions {
     #[serial]
     fn test_ascii_personal_message_classification() -> Result<()> {
         let test_name = "datastorage_ascii_message";
-        let (mut test_db, config) = setup_protocol_test(test_name)?;
-        let classifier = DataStorageClassifier::new(&config);
+        let (mut test_db, _config) = setup_protocol_test(test_name)?;
+        let classifier = DataStorageClassifier;
 
         // Load real transaction with ASCII personal message in P2MS pubkey
         // TXID: 4a3574cd6053c14f6858555b942da16d1f6594aa1750e515c1f6be77e7f686e4
@@ -1523,8 +1523,8 @@ mod bitcoin_whitepaper {
     #[serial]
     fn test_bitcoin_whitepaper_txid_detection() -> Result<()> {
         let test_name = "bitcoin_whitepaper";
-        let (mut test_db, config) = setup_protocol_test(test_name)?;
-        let classifier = DataStorageClassifier::new(&config);
+        let (mut test_db, _config) = setup_protocol_test(test_name)?;
+        let classifier = DataStorageClassifier;
 
         print!(
             "{}",
@@ -1629,8 +1629,8 @@ mod bitcoin_whitepaper {
     #[serial]
     fn test_non_whitepaper_txid_not_matched() -> Result<()> {
         let test_name = "non_whitepaper";
-        let (mut test_db, config) = setup_protocol_test(test_name)?;
-        let classifier = DataStorageClassifier::new(&config);
+        let (mut test_db, _config) = setup_protocol_test(test_name)?;
+        let classifier = DataStorageClassifier;
 
         print!(
             "{}",

@@ -3,7 +3,7 @@ use crate::database::traits::Stage2Operations;
 use crate::database::Database;
 use crate::types::counterparty::COUNTERPARTY_PREFIX;
 use crate::types::stamps::{validation, StampsTransport};
-use crate::types::{ClassificationResult, EnrichedTransaction, ProtocolType, Stage3Config};
+use crate::types::{ClassificationResult, EnrichedTransaction, ProtocolType};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::trace;
 
@@ -12,17 +12,7 @@ use super::{ProtocolSpecificClassifier, SpendabilityAnalyser};
 use crate::shared::SignatureDetector;
 
 /// Bitcoin Stamps classifier - detects keyburn P2MS and validates ARC4 'stamp:' payload
-pub struct BitcoinStampsClassifier {
-    _config: Stage3Config,
-}
-
-impl BitcoinStampsClassifier {
-    pub fn new(config: &Stage3Config) -> Self {
-        Self {
-            _config: config.clone(),
-        }
-    }
-}
+pub struct BitcoinStampsClassifier;
 
 impl ProtocolSpecificClassifier for BitcoinStampsClassifier {
     fn classify(

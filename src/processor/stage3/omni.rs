@@ -2,7 +2,7 @@ use crate::database::traits::Stage2Operations;
 use crate::database::Database;
 use crate::types::content_detection::ContentType;
 use crate::types::omni::{OmniMessageType, OmniP2msData, OmniPacket};
-use crate::types::{ClassificationResult, EnrichedTransaction, ProtocolType, Stage3Config};
+use crate::types::{ClassificationResult, EnrichedTransaction, ProtocolType};
 use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::debug;
@@ -12,17 +12,9 @@ use super::{ProtocolSpecificClassifier, SpendabilityAnalyser};
 use crate::shared::PubkeyExtractor;
 
 /// Omni Layer classifier focused on Class B (P2MS) transactions
-pub struct OmniClassifier {
-    _config: Stage3Config,
-}
+pub struct OmniClassifier;
 
 impl OmniClassifier {
-    pub fn new(config: &Stage3Config) -> Self {
-        Self {
-            _config: config.clone(),
-        }
-    }
-
     #[allow(dead_code)]
     pub async fn classify_with_rpc(
         &self,

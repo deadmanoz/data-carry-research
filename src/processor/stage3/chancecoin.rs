@@ -12,8 +12,7 @@
 use crate::database::Database;
 use crate::types::chancecoin::{ChancecoinMessage, ChancecoinMessageType, CHANCECOIN_SIGNATURE};
 use crate::types::{
-    ClassificationResult, EnrichedTransaction, ProtocolType, ProtocolVariant, Stage3Config,
-    TransactionOutput,
+    ClassificationResult, EnrichedTransaction, ProtocolType, ProtocolVariant, TransactionOutput,
 };
 use tracing::debug;
 
@@ -23,17 +22,9 @@ use super::ProtocolSpecificClassifier;
 use crate::shared::PubkeyExtractor;
 
 /// Chancecoin protocol classifier
-pub struct ChancecoinClassifier {
-    _config: Stage3Config,
-}
+pub struct ChancecoinClassifier;
 
 impl ChancecoinClassifier {
-    pub fn new(config: &Stage3Config) -> Self {
-        Self {
-            _config: config.clone(),
-        }
-    }
-
     /// Extract Chancecoin data from P2MS outputs
     ///
     /// Chancecoin uses multiple P2MS outputs to store data:

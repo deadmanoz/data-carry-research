@@ -518,7 +518,6 @@ mod test_data {
     /// Display rich analysis using production functions
     fn display_rich_analysis(json_path: &str, tx: &EnrichedTransaction) -> anyhow::Result<()> {
         use data_carry_research::processor::stage3::omni::OmniClassifier;
-        use data_carry_research::types::Stage3Config;
 
         // Display P2MS outputs analysis
         println!("║ P2MS Outputs Found: {}", tx.outputs.len());
@@ -534,12 +533,7 @@ mod test_data {
             print!("{}", display_deobfuscation_process(&sender_address, 1, &[]));
 
             // Use production OmniClassifier for deobfuscation
-            let config = Stage3Config {
-                database_path: "test.db".into(),
-                batch_size: 100,
-                progress_interval: 1000,
-            };
-            let classifier = OmniClassifier::new(&config);
+            let classifier = OmniClassifier;
 
             // Extract raw data and use production parsing
             if let Some(raw_data) = extract_raw_p2ms_data(json_path, &sender_address, &classifier)?

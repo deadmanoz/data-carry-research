@@ -68,8 +68,8 @@ mod bug_fix_verification {
     #[test]
     #[serial]
     fn test_100_plus_outputs_without_address_not_classified() -> Result<()> {
-        let (mut test_db, config) = setup_protocol_test("wikileaks_100_outputs")?;
-        let classifier = WikiLeaksCablegateClassifier::new(&config);
+        let (mut test_db, _config) = setup_protocol_test("wikileaks_100_outputs")?;
+        let classifier = WikiLeaksCablegateClassifier::new();
 
         // 105 P2MS outputs but NO WikiLeaks donation address
         let txid = "not_cablegate_100_outputs_1234567890123456789012345678901234";
@@ -91,8 +91,8 @@ mod bug_fix_verification {
     #[test]
     #[serial]
     fn test_4_to_10_outputs_without_address_not_classified() -> Result<()> {
-        let (mut test_db, config) = setup_protocol_test("wikileaks_few_outputs")?;
-        let classifier = WikiLeaksCablegateClassifier::new(&config);
+        let (mut test_db, _config) = setup_protocol_test("wikileaks_few_outputs")?;
+        let classifier = WikiLeaksCablegateClassifier::new();
 
         // 6 P2MS outputs (4-10 range from old heuristic) but NO WikiLeaks address
         let txid = "not_cablegate_few_outputs_123456789012345678901234567890123456";

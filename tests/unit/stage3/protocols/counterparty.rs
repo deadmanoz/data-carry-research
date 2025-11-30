@@ -375,7 +375,7 @@ mod test_data {
 
         // Create classifier instance for production function access
         let config = Stage3Config::default();
-        let classifier = CounterpartyClassifier::new(&config);
+        let classifier = CounterpartyClassifier;
 
         // Extract raw data using unified extraction method
         for output in &p2ms_outputs {

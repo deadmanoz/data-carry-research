@@ -16,26 +16,13 @@ use crate::database::traits::Stage1Operations;
 use crate::database::Database;
 use crate::processor::stage3::{ProtocolSpecificClassifier, SpendabilityAnalyser};
 use crate::types::{
-    ClassificationDetails, ClassificationResult, EnrichedTransaction, ProtocolType,
-    ProtocolVariant, Stage3Config,
+    ClassificationDetails, ClassificationResult, EnrichedTransaction, ProtocolType, ProtocolVariant,
 };
 use serde_json::json;
 use tracing::debug;
 
 /// Classifier for likely legitimate multisig transactions
-pub struct LikelyLegitimateClassifier {
-    #[allow(dead_code)]
-    config: Stage3Config,
-}
-
-impl LikelyLegitimateClassifier {
-    /// Create a new likely legitimate classifier
-    pub fn new(config: &Stage3Config) -> Self {
-        Self {
-            config: config.clone(),
-        }
-    }
-}
+pub struct LikelyLegitimateClassifier;
 
 impl ProtocolSpecificClassifier for LikelyLegitimateClassifier {
     fn classify(
@@ -180,12 +167,11 @@ impl ProtocolSpecificClassifier for LikelyLegitimateClassifier {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{Stage3Config, TransactionOutput};
+    use crate::types::TransactionOutput;
 
     #[test]
     fn test_likely_legitimate_classifier_creation() {
-        let config = Stage3Config::default();
-        let _classifier = LikelyLegitimateClassifier::new(&config);
+        let _classifier = LikelyLegitimateClassifier;
         // Classifier created successfully
     }
 
@@ -211,8 +197,7 @@ mod tests {
             address: None,
         };
 
-        let config = Stage3Config::default();
-        let _classifier = LikelyLegitimateClassifier::new(&config);
+        let _classifier = LikelyLegitimateClassifier;
 
         let validation = aggregate_validation_for_outputs(&[output]);
         assert!(validation.is_some());
@@ -244,8 +229,7 @@ mod tests {
             address: None,
         };
 
-        let config = Stage3Config::default();
-        let _classifier = LikelyLegitimateClassifier::new(&config);
+        let _classifier = LikelyLegitimateClassifier;
 
         let validation = aggregate_validation_for_outputs(&[output]);
         assert!(validation.is_some());
@@ -277,8 +261,7 @@ mod tests {
             address: None,
         };
 
-        let config = Stage3Config::default();
-        let _classifier = LikelyLegitimateClassifier::new(&config);
+        let _classifier = LikelyLegitimateClassifier;
 
         let validation = aggregate_validation_for_outputs(std::slice::from_ref(&output));
         assert!(validation.is_some());
@@ -318,8 +301,7 @@ mod tests {
             address: None,
         };
 
-        let config = Stage3Config::default();
-        let _classifier = LikelyLegitimateClassifier::new(&config);
+        let _classifier = LikelyLegitimateClassifier;
 
         let validation = aggregate_validation_for_outputs(std::slice::from_ref(&output));
         assert!(validation.is_some());
@@ -364,8 +346,7 @@ mod tests {
             address: None,
         };
 
-        let config = Stage3Config::default();
-        let _classifier = LikelyLegitimateClassifier::new(&config);
+        let _classifier = LikelyLegitimateClassifier;
 
         let validation = aggregate_validation_for_outputs(std::slice::from_ref(&output));
         assert!(validation.is_some());

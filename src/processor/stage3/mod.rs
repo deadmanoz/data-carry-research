@@ -406,18 +406,15 @@ impl Stage3Processor {
 
 /// Protocol classification engine that orchestrates different classifiers
 pub struct ProtocolClassificationEngine {
-    #[allow(dead_code)]
-    config: Stage3Config,
     cache: HashMap<String, ClassificationResult>,
     classifiers: ProtocolClassifiers,
 }
 
 impl ProtocolClassificationEngine {
-    pub fn new(config: &Stage3Config) -> Self {
+    pub fn new(_config: &Stage3Config) -> Self {
         Self {
-            config: config.clone(),
             cache: HashMap::new(),
-            classifiers: ProtocolClassifiers::new(config),
+            classifiers: ProtocolClassifiers::new(),
         }
     }
 
@@ -532,22 +529,28 @@ pub struct ProtocolClassifiers {
     pub unknown: UnknownClassifier,
 }
 
+impl Default for ProtocolClassifiers {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProtocolClassifiers {
-    pub fn new(config: &Stage3Config) -> Self {
+    pub fn new() -> Self {
         Self {
-            bitcoin_stamps: stamps::BitcoinStampsClassifier::new(config),
-            omni: omni::OmniClassifier::new(config),
-            chancecoin: chancecoin::ChancecoinClassifier::new(config),
-            counterparty: counterparty::CounterpartyClassifier::new(config),
+            bitcoin_stamps: stamps::BitcoinStampsClassifier,
+            omni: omni::OmniClassifier,
+            chancecoin: chancecoin::ChancecoinClassifier,
+            counterparty: counterparty::CounterpartyClassifier,
             ascii_identifier_protocols:
-                ascii_identifier_protocols::AsciiIdentifierProtocolsClassifier::new(config),
+                ascii_identifier_protocols::AsciiIdentifierProtocolsClassifier,
             ppk: ppk::PPkClassifier,
-            wikileaks_cablegate: wikileaks_cablegate::WikiLeaksCablegateClassifier::new(config),
-            datastorage: datastorage::DataStorageClassifier::new(config),
+            wikileaks_cablegate: wikileaks_cablegate::WikiLeaksCablegateClassifier::new(),
+            datastorage: datastorage::DataStorageClassifier,
             opreturn_signalled: opreturn_signalled::OpReturnSignalledDetector,
             likely_data_storage: likely_data_storage::LikelyDataStorageClassifier::new(),
-            likely_legitimate: likely_legitimate::LikelyLegitimateClassifier::new(config),
-            unknown: UnknownClassifier::new(config),
+            likely_legitimate: likely_legitimate::LikelyLegitimateClassifier,
+            unknown: UnknownClassifier,
         }
     }
 }
@@ -584,17 +587,7 @@ pub trait ProtocolSpecificClassifier {
 // ===== Protocol-Specific Classifiers (Placeholder Implementations) =====
 
 /// Unknown pattern classifier (fallback)
-pub struct UnknownClassifier {
-    _config: Stage3Config, // For future use
-}
-
-impl UnknownClassifier {
-    pub fn new(config: &Stage3Config) -> Self {
-        Self {
-            _config: config.clone(),
-        }
-    }
-}
+pub struct UnknownClassifier;
 
 impl ProtocolSpecificClassifier for UnknownClassifier {
     fn classify(
@@ -739,8 +732,7 @@ mod tests {
 
     #[test]
     fn test_bitcoin_stamps_classifier() {
-        let config = Stage3Config::default();
-        let classifier = stamps::BitcoinStampsClassifier::new(&config);
+        let classifier = stamps::BitcoinStampsClassifier;
         let database = create_test_database();
 
         // Test transaction after Stamps launch with burn patterns
@@ -770,8 +762,7 @@ mod tests {
 
     #[test]
     fn test_unknown_classifier() {
-        let config = Stage3Config::default();
-        let classifier = UnknownClassifier::new(&config);
+        let classifier = UnknownClassifier;
         let database = create_test_database();
 
         let tx = create_test_transaction("unknown_tx", 100000, false);

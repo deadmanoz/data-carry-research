@@ -3,9 +3,7 @@ use crate::shared::datastorage_helpers::{
     detect_binary_signature, extract_key_data, is_burn_pattern,
 };
 use crate::types::content_detection::ContentType;
-use crate::types::{
-    ClassificationResult, EnrichedTransaction, ProtocolType, ProtocolVariant, Stage3Config,
-};
+use crate::types::{ClassificationResult, EnrichedTransaction, ProtocolType, ProtocolVariant};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::filter_p2ms_for_classification;
@@ -17,17 +15,9 @@ const BITCOIN_WHITEPAPER_TXID: &str =
     "54e48e5f5c656b26c3bca14a8c95aa583d07ebe84dde3b7dd4a78f4e4186e713";
 
 /// DataStorage classifier - detects various data embedding patterns in P2MS outputs
-pub struct DataStorageClassifier {
-    _config: Stage3Config, // For future use if needed
-}
+pub struct DataStorageClassifier;
 
 impl DataStorageClassifier {
-    pub fn new(config: &Stage3Config) -> Self {
-        Self {
-            _config: config.clone(),
-        }
-    }
-
     /// Check for known historical artifacts by TXID
     fn check_known_artifacts(txid: &str) -> Option<(ProtocolVariant, &'static str, &'static str)> {
         if txid == BITCOIN_WHITEPAPER_TXID {

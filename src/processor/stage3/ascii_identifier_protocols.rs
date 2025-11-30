@@ -1,7 +1,5 @@
 use crate::database::Database;
-use crate::types::{
-    ClassificationResult, EnrichedTransaction, ProtocolType, ProtocolVariant, Stage3Config,
-};
+use crate::types::{ClassificationResult, EnrichedTransaction, ProtocolType, ProtocolVariant};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::debug;
 
@@ -30,17 +28,9 @@ const KNOWN_ASCII_IDENTIFIERS: &[&[u8]] = &[
 /// - Metronotes (METROXMN): March 2015 cryptocurrency project (~100 transactions, historical range 346000-357000)
 ///
 ///   Historical ranges documented for reference only - detection based on signature, not height.
-pub struct AsciiIdentifierProtocolsClassifier {
-    _config: Stage3Config,
-}
+pub struct AsciiIdentifierProtocolsClassifier;
 
 impl AsciiIdentifierProtocolsClassifier {
-    pub fn new(config: &Stage3Config) -> Self {
-        Self {
-            _config: config.clone(),
-        }
-    }
-
     /// Check if transaction contains TB0001 protocol signature
     /// Returns vout if detected
     fn detect_tb0001(&self, tx: &EnrichedTransaction) -> Option<u32> {

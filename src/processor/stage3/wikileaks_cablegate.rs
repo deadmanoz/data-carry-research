@@ -1,8 +1,7 @@
 use crate::database::traits::Stage2Operations;
 use crate::database::Database;
 use crate::types::{
-    ClassificationDetails, ClassificationResult, EnrichedTransaction, ProtocolType,
-    ProtocolVariant, Stage3Config,
+    ClassificationDetails, ClassificationResult, EnrichedTransaction, ProtocolType, ProtocolVariant,
 };
 
 use super::filter_p2ms_for_classification;
@@ -40,15 +39,19 @@ const CABLEGATE_MAX_HEIGHT: u32 = 230_256;
 /// 1. Tool transactions: Hardcoded TXIDs (downloader + uploader don't have donation address)
 /// 2. Data transactions: WikiLeaks donation address + height range 229,991-230,256
 pub struct WikiLeaksCablegateClassifier {
-    _config: Stage3Config,
     /// WikiLeaks donation address
     wikileaks_address: String,
 }
 
+impl Default for WikiLeaksCablegateClassifier {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WikiLeaksCablegateClassifier {
-    pub fn new(config: &Stage3Config) -> Self {
+    pub fn new() -> Self {
         Self {
-            _config: config.clone(),
             wikileaks_address: "1HB5XMLmzFVj8ALj6mfBsbifRoD4miY36v".to_string(),
         }
     }
@@ -178,8 +181,7 @@ mod tests {
 
     #[test]
     fn test_wikileaks_address() {
-        let config = Stage3Config::default();
-        let classifier = WikiLeaksCablegateClassifier::new(&config);
+        let classifier = WikiLeaksCablegateClassifier::new();
 
         // Verify WikiLeaks donation address
         assert_eq!(
