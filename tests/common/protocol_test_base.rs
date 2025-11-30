@@ -8,11 +8,14 @@ use anyhow::Result;
 use data_carry_research::database::Database;
 use data_carry_research::processor::stage3::Stage3Processor;
 use data_carry_research::types::{
-    ClassificationDetails, ProtocolType, ProtocolVariant, Stage3Config, TransactionOutput,
+    burn_patterns::BurnPattern, ClassificationDetails, EnrichedTransaction, ProtocolType,
+    ProtocolVariant, Stage3Config, TransactionInput, TransactionOutput,
 };
 use rusqlite::Connection;
 use serde_json;
 use std::fs;
+
+use super::fixtures;
 
 use super::database::TestDatabase;
 
@@ -454,6 +457,136 @@ pub fn get_first_input_txid_from_json(json_path: &str) -> Result<String> {
     }
 
     Err(anyhow::anyhow!("No input txid found in {}", json_path))
+}
+
+/// Options for loading transaction data from JSON fixtures
+///
+/// This provides a consistent interface for loading transaction data
+/// across all protocol tests, eliminating per-protocol helper functions.
+#[derive(Default)]
+pub struct TransactionLoadOptions {
+    /// Load ALL outputs (P2MS, OP_RETURN, P2PKH, etc.) vs P2MS-only (default: false)
+    pub include_all_outputs: bool,
+    /// Load transaction inputs from JSON fixture (needed for Omni deobfuscation)
+    pub include_inputs: bool,
+    /// Apply burn patterns (e.g., Counterparty standard patterns)
+    pub burn_patterns: Option<Vec<BurnPattern>>,
+}
+
+/// Load transaction from JSON fixture with consistent handling
+///
+/// This is the unified entry point for loading test transaction data.
+/// All protocol tests should use this function instead of custom helpers.
+///
+/// # Arguments
+/// * `json_path` - Path to JSON fixture file
+/// * `txid` - Transaction ID to use
+/// * `options` - Loading options (outputs type, inputs, burn patterns)
+///
+/// # Returns
+/// Tuple of (EnrichedTransaction, Vec<TransactionInput>)
+///
+/// # Example
+/// ```ignore
+/// // Simple protocol (P2MS-only)
+/// let (tx, _inputs) = load_transaction_from_json(path, txid, Default::default())?;
+///
+/// // Protocol needing all outputs (PPk, Omni)
+/// let (tx, _) = load_transaction_from_json(path, txid,
+///     TransactionLoadOptions { include_all_outputs: true, ..Default::default() })?;
+///
+/// // Protocol with burn patterns and inputs (Counterparty)
+/// let (tx, inputs) = load_transaction_from_json(path, txid,
+///     TransactionLoadOptions {
+///         burn_patterns: Some(fixtures::counterparty_burn_patterns()),
+///         include_inputs: true,
+///         ..Default::default()
+///     })?;
+/// ```
+pub fn load_transaction_from_json(
+    json_path: &str,
+    txid: &str,
+    options: TransactionLoadOptions,
+) -> Result<(EnrichedTransaction, Vec<TransactionInput>)> {
+    // 1. Load outputs based on options.include_all_outputs
+    let outputs = if options.include_all_outputs {
+        load_all_outputs_from_json(json_path, txid)?
+    } else {
+        load_p2ms_outputs_from_json(json_path, txid)?
+    };
+
+    if outputs.is_empty() {
+        anyhow::bail!("No outputs found in {}", json_path);
+    }
+
+    // 2. Create EnrichedTransaction
+    let mut tx = fixtures::create_test_enriched_transaction(txid);
+    tx.outputs = outputs.clone();
+    tx.p2ms_outputs_count = outputs
+        .iter()
+        .filter(|o| o.script_type == "multisig")
+        .count();
+
+    // 3. Apply burn patterns if specified
+    if let Some(patterns) = options.burn_patterns {
+        tx.burn_patterns_detected = patterns;
+    }
+
+    // 4. Load inputs if requested
+    let inputs = if options.include_inputs {
+        load_transaction_inputs_from_json(json_path)?
+    } else {
+        Vec::new()
+    };
+
+    Ok((tx, inputs))
+}
+
+/// Load transaction inputs from JSON fixture
+///
+/// Extracts input data from the transaction's "vin" array. This is needed
+/// for protocols like Omni that require sender address for deobfuscation.
+///
+/// Note: This loads basic input data. For Omni which needs previous transaction
+/// outputs for source addresses, use the protocol-specific input loader in omni.rs.
+pub fn load_transaction_inputs_from_json(json_path: &str) -> Result<Vec<TransactionInput>> {
+    let content = fs::read_to_string(json_path)?;
+    let tx: serde_json::Value = serde_json::from_str(&content)?;
+
+    let mut inputs = Vec::new();
+    if let Some(vin) = tx["vin"].as_array() {
+        for (idx, input) in vin.iter().enumerate() {
+            // Skip coinbase inputs
+            if input.get("coinbase").is_some() {
+                continue;
+            }
+
+            let prev_txid = input["txid"]
+                .as_str()
+                .ok_or_else(|| anyhow::anyhow!("Missing txid in input {}", idx))?
+                .to_string();
+            let prev_vout = input["vout"]
+                .as_u64()
+                .ok_or_else(|| anyhow::anyhow!("Missing vout in input {}", idx))?
+                as u32;
+            let sequence = input["sequence"].as_u64().unwrap_or(0xffffffff) as u32;
+            let script_sig = input["scriptSig"]["hex"]
+                .as_str()
+                .unwrap_or("")
+                .to_string();
+
+            inputs.push(TransactionInput {
+                txid: prev_txid,
+                vout: prev_vout,
+                value: 0,          // Not available without looking up previous tx
+                script_sig,
+                sequence,
+                source_address: None, // Not available without looking up previous tx
+            });
+        }
+    }
+
+    Ok(inputs)
 }
 
 /// Standard Stage 3 processor runner

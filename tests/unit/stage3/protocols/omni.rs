@@ -39,20 +39,47 @@
 //! ensuring validation against real-world Omni Layer protocol usage during the protocol's
 //! active period.
 
+use data_carry_research::types::ProtocolVariant;
 use serial_test::serial;
 
 // Import standardised test utilities
+use crate::common::fixture_registry::{self, ProtocolFixture};
 use crate::common::test_output::TestOutputFormatter;
+
+/// Run an omni test using fixture registry metadata
+async fn run_omni_fixture_test(fixture: &ProtocolFixture) {
+    let expected_variant = fixture.variant.map(|v| match v {
+        "OmniTransfer" => ProtocolVariant::OmniTransfer,
+        "OmniIssuance" => ProtocolVariant::OmniIssuance,
+        "OmniDEX" => ProtocolVariant::OmniDEX,
+        "OmniDistribution" => ProtocolVariant::OmniDistribution,
+        "OmniAdministration" => ProtocolVariant::OmniAdministration,
+        "OmniDestruction" => ProtocolVariant::OmniDestruction,
+        _ => panic!("Unknown Omni variant: {}", v),
+    });
+
+    let result = test_data::run_omni_test_from_json(
+        fixture.path,
+        fixture.txid,
+        fixture.description,
+        expected_variant,
+        fixture.content_type,
+    )
+    .await;
+
+    if let Err(e) = result {
+        println!("⚠️  Test error: {}", e);
+    }
+}
 
 /// Omni Layer protocol test data creation
 mod test_data {
     use super::*;
     use crate::common::db_seeding::seed_enriched_transaction_with_outputs;
-    use crate::common::fixtures;
     use crate::common::protocol_test_base::{
-        load_p2ms_outputs_from_json, run_stage3_processor, setup_protocol_test,
+        load_transaction_from_json, run_stage3_processor, setup_protocol_test,
         verify_classification, verify_content_type, verify_output_spendability,
-        verify_stage3_completion,
+        verify_stage3_completion, TransactionLoadOptions,
     };
     use data_carry_research::types::{
         EnrichedTransaction, ProtocolType, ProtocolVariant, TransactionInput, TransactionOutput,
@@ -449,8 +476,38 @@ mod test_data {
 
         let (mut test_db, config) = setup_protocol_test(test_name)?;
 
-        // Load P2MS outputs from JSON
-        let p2ms_outputs = load_p2ms_outputs_from_json(json_path, txid)?;
+        // Load transaction data using unified helper (with ALL outputs for Exodus detection)
+        let (tx, _) = match load_transaction_from_json(
+            json_path,
+            txid,
+            TransactionLoadOptions {
+                include_all_outputs: true,
+                ..Default::default()
+            },
+        ) {
+            Ok(result) => result,
+            Err(e) => {
+                println!(
+                    "⚠️  Skipping test - no valid transaction data in {}: {}",
+                    json_path, e
+                );
+                return Ok(());
+            }
+        };
+
+        // Separate P2MS outputs from other outputs for seeding
+        let p2ms_outputs: Vec<_> = tx
+            .outputs
+            .iter()
+            .filter(|o| o.script_type == "multisig")
+            .cloned()
+            .collect();
+        let other_outputs: Vec<_> = tx
+            .outputs
+            .iter()
+            .filter(|o| o.script_type != "multisig")
+            .cloned()
+            .collect();
 
         // Verify Exodus address requirement
         if !has_exodus_address_output(&p2ms_outputs) {
@@ -458,21 +515,13 @@ mod test_data {
             return Ok(());
         }
 
-        // Create enriched transaction
-        let mut tx = fixtures::create_test_enriched_transaction(txid);
+        // Update tx to have only P2MS outputs for EnrichedTransaction
+        let mut tx = tx;
         tx.outputs = p2ms_outputs.clone();
-        tx.p2ms_outputs_count = tx.outputs.len();
+        tx.p2ms_outputs_count = p2ms_outputs.len();
 
-        // Load transaction inputs with real source addresses
+        // Load transaction inputs with real source addresses (Omni-specific for deobfuscation)
         let inputs = load_transaction_inputs(json_path)?;
-
-        // Load ALL transaction outputs to capture Exodus/P2PKH addresses
-        let all_outputs =
-            crate::common::protocol_test_base::load_all_outputs_from_json(json_path, txid)?;
-        let other_outputs: Vec<_> = all_outputs
-            .into_iter()
-            .filter(|output| output.script_type != "multisig")
-            .collect();
 
         // Seed database (Stage 1 + Stage 2) with helper to ensure FK-safe order
         seed_enriched_transaction_with_outputs(
@@ -720,271 +769,98 @@ mod framework_validation {
 /// Simple Send transaction tests (Type 0)
 mod simple_send {
     use super::*;
-    use data_carry_research::types::ProtocolVariant;
 
     #[tokio::test]
     #[serial]
     async fn test_omni_usdt_grant_tokens() {
-        // Test USDT (property ID 31) grant tokens - Type 55 (Grant Property Tokens)
-        // Source: OmniEngine tx.example, verified Type 55 in blockchain
-        let result = test_data::run_omni_test_from_json(
-            "tests/test_data/omni/omni_usdt_grant_tokens_tx.json",
-            "1caf0432ef165b19d5b5d726dc7fd1461390283c15bade2c9683fd712099e53b",
-            "omni_usdt_grant_tokens",
-            Some(ProtocolVariant::OmniIssuance), // Type 55 = Grant Property Tokens
-            Some("application/octet-stream"),    // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_omni_fixture_test(&fixture_registry::omni::USDT_GRANT_TOKENS).await;
     }
 
     #[tokio::test]
     #[serial]
     async fn test_omni_dex_sell_offer_cancel() {
-        // Test DEx sell offer cancel - Type 20 (DEx sell offer cancel)
-        // Source: OmniEngine tx.example, verified Type 20 cancel in blockchain
-        let result = test_data::run_omni_test_from_json(
-            "tests/test_data/omni/omni_dex_sell_offer_cancel_tx.json",
-            "f706f60ff3f8cfb4161e9135af82d432f5bc588cae77dfdfedde011ec8baf287",
-            "omni_dex_sell_offer_cancel",
-            Some(ProtocolVariant::OmniDEX),
-            Some("application/octet-stream"), // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_omni_fixture_test(&fixture_registry::omni::DEX_SELL_OFFER_CANCEL).await;
     }
 
     #[tokio::test]
     #[serial]
     async fn test_omni_multi_packet_transaction() {
-        // Test multi-packet transaction (Block 902578 - much later period!)
-        // Source: Real blockchain transaction, not from OmniEngine examples
-        let result = test_data::run_omni_test_from_json(
-            "tests/test_data/omni/omni_multi_packet_transaction_tx.json",
-            "153091863886921ab8bf6a7cc17ea99610795522f48b1824d2e417954e466281",
-            "omni_multi_packet_transaction",
-            None,                             // Unknown message type, needs investigation
-            Some("application/octet-stream"), // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_omni_fixture_test(&fixture_registry::omni::MULTI_PACKET).await;
     }
 }
 
 /// Send To Owners transaction tests (Type 3)
 mod send_to_owners {
     use super::*;
-    use data_carry_research::types::ProtocolVariant;
 
     #[tokio::test]
     #[serial]
     async fn test_omni_send_to_owners() {
-        // Test Send To Owners (Type 3) - Dividend distribution functionality
-        // Source: Real blockchain transaction verified via Bitcoin Core RPC
-        let result = test_data::run_omni_test_from_json(
-            "tests/test_data/omni/omni_send_to_owners_0937f1.json",
-            "0937f1627f7c8663bbc59c7e8f2c7e039c067c659fa5e5a0e0ee7f9f96bb27f1",
-            "omni_send_to_owners",
-            Some(ProtocolVariant::OmniDistribution), // Type 3 = SendToOwners
-            Some("application/octet-stream"),        // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_omni_fixture_test(&fixture_registry::omni::SEND_TO_OWNERS).await;
     }
 
     #[tokio::test]
     #[serial]
     async fn test_omni_close_crowdsale() {
-        // Test close crowdsale - Type 53 (Close Crowdsale)
-        // Source: OmniEngine tx.example, verified Type 53 in blockchain
-        let result = test_data::run_omni_test_from_json(
-            "tests/test_data/omni/omni_close_crowdsale_tx.json",
-            "b8864525a2eef4f76a58f33a4af50dc24461445e1a420e21bcc99a1901740e79",
-            "omni_close_crowdsale",
-            Some(ProtocolVariant::OmniAdministration), // Type 53 = Close Crowdsale
-            Some("application/octet-stream"),          // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_omni_fixture_test(&fixture_registry::omni::CLOSE_CROWDSALE).await;
     }
 
     #[tokio::test]
     #[serial]
     async fn test_omni_crowdsale_participation_1() {
-        // Test crowdsale participation - Type 0 (Participating in crowdsale)
-        // Source: OmniEngine tx.example, verified Type 0 crowdsale participation
-        let result = test_data::run_omni_test_from_json(
-            "tests/test_data/omni/omni_crowdsale_participation_tx.json",
-            "c1ff92f278432d6e14e08ab60f2dceab4d8b4396b4d7e62b5b10e88e840b39d4",
-            "omni_crowdsale_participation_1",
-            Some(ProtocolVariant::OmniTransfer), // Type 0 = Simple Send
-            Some("application/octet-stream"),    // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_omni_fixture_test(&fixture_registry::omni::CROWDSALE_PARTICIPATION_1).await;
     }
 
     #[tokio::test]
     #[serial]
     async fn test_omni_crowdsale_participation_2() {
-        // Test crowdsale participation - Type 0 (Simple Send for crowdsale participation)
-        // Source: Real blockchain transaction verified via Bitcoin Core RPC
-        let result = test_data::run_omni_test_from_json(
-            "tests/test_data/omni/omni_crowdsale_participation_8fbd96.json",
-            "8fbd9600ae1b3cc96406e983d7bbc017a0f2cf99f6e32a3ffd5a88ee9b39ebe2",
-            "omni_crowdsale_participation_2",
-            Some(ProtocolVariant::OmniTransfer), // Type 0 = Simple Send used for crowdsale participation
-            Some("application/octet-stream"),    // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_omni_fixture_test(&fixture_registry::omni::CROWDSALE_PARTICIPATION_2).await;
     }
 }
 
 /// Trade Offer transaction tests (Type 20)
 mod trade_offers {
     use super::*;
-    use data_carry_research::types::ProtocolVariant;
 
     #[tokio::test]
     #[serial]
     async fn test_omni_manual_property_creation() {
-        // Test manual property creation - Type 54 (Create Property - Manual)
-        // Source: OmniEngine tx.example, verified Type 54 in blockchain
-        let result = test_data::run_omni_test_from_json(
-            "tests/test_data/omni/omni_manual_property_creation_tx.json",
-            "73914fb386c19f09181ac01cb3680eaee01268ef0781dff9f25d5c069b5334f0",
-            "omni_manual_property_creation",
-            Some(ProtocolVariant::OmniIssuance), // Type 54 = Manual Property Creation
-            Some("text/plain"),                  // Contains text description in property creation
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_omni_fixture_test(&fixture_registry::omni::MANUAL_PROPERTY_CREATION).await;
     }
 
     #[tokio::test]
     #[serial]
     async fn test_omni_revoke_property_tokens() {
-        // Test revoke property tokens - Type 56 (Revoke Property Tokens)
-        // Source: OmniEngine tx.example, verified Type 56 in blockchain
-        let result = test_data::run_omni_test_from_json(
-            "tests/test_data/omni/omni_revoke_property_tokens_tx.json",
-            "7429731487105e72ab915a77e677a59d08e6be43b4e8daab58906058382ffbce",
-            "omni_revoke_property_tokens",
-            Some(ProtocolVariant::OmniDestruction), // Type 56 = Revoke Property Tokens
-            Some("application/octet-stream"),       // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_omni_fixture_test(&fixture_registry::omni::REVOKE_PROPERTY_TOKENS).await;
     }
 }
 
 /// Property Creation transaction tests (Type 50/51)
 mod property_creation {
     use super::*;
-    use data_carry_research::types::ProtocolVariant;
 
     #[tokio::test]
     #[serial]
     async fn test_omni_crowdsale_creation() {
-        // Test Crowdsale Creation - Type 51 (Create Property Variable - Crowdsale)
-        // Source: Real blockchain transaction verified via Bitcoin Core RPC
-        // Note: This transaction has multi-output P2MS data
-        let result = test_data::run_omni_test_from_json(
-            "tests/test_data/omni/omni_crowdsale_creation_eda3d2.json",
-            "eda3d2bb0d23797e6f3c76be50b0a28f57e24c1ad387e926ce9c4b1f1b5c9e30",
-            "omni_crowdsale_creation",
-            Some(ProtocolVariant::OmniIssuance), // Type 51 = Variable Property Creation (Crowdsale)
-            Some("application/octet-stream"),    // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_omni_fixture_test(&fixture_registry::omni::CROWDSALE_CREATION).await;
     }
 
     #[tokio::test]
     #[serial]
     async fn test_omni_fixed_property_creation() {
-        // Test fixed supply property creation (Type 25 - DEx Payment)
-        let result = test_data::run_omni_test_from_json(
-            "tests/test_data/omni/omni_property_fixed_tx.json",
-            "725ba706446baa48a2416ab2ffc229c56600d59f31b782ac6c5c82868e1ad97f",
-            "omni_property_fixed",
-            Some(ProtocolVariant::OmniDEX), // Type 25 = MetaDEX Trade
-            Some("application/octet-stream"), // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_omni_fixture_test(&fixture_registry::omni::PROPERTY_FIXED).await;
     }
 
     #[tokio::test]
     #[serial]
     async fn test_omni_variable_property_creation() {
-        // Test variable property creation - Type 51 (Variable property creation)
-        // Source: OmniEngine tx.example, verified Type 51 in blockchain
-        let result = test_data::run_omni_test_from_json(
-            "tests/test_data/omni/omni_variable_property_creation_tx.json",
-            "b01d1594a7e2083ebcd428706045df003f290c4dc7bd6d77c93df9fcca68232f",
-            "omni_variable_property_creation",
-            Some(ProtocolVariant::OmniIssuance), // Type 51 = Variable Property Creation
-            Some("application/octet-stream"),    // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_omni_fixture_test(&fixture_registry::omni::VARIABLE_PROPERTY_CREATION).await;
     }
 
     #[tokio::test]
     #[serial]
     async fn test_omni_dex_sell_offer_2() {
-        // Test DEx sell offer - Type 20 (DEx sell offer)
-        // Source: OmniEngine tx.example, verified Type 20 in blockchain
-        let result = test_data::run_omni_test_from_json(
-            "tests/test_data/omni/omni_dex_sell_offer_2_tx.json",
-            "9a017721f168c0a733d7a8495ffbab102c5c56ac3907f57382dc10a18357b004",
-            "omni_dex_sell_offer_2",
-            Some(ProtocolVariant::OmniDEX), // Type 20 = DEX Sell Offer
-            Some("application/octet-stream"), // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_omni_fixture_test(&fixture_registry::omni::DEX_SELL_OFFER_2).await;
     }
 }
 
@@ -995,61 +871,23 @@ mod historical_transactions {
     #[tokio::test]
     #[serial]
     async fn test_omni_fixed_property_creation_2() {
-        // Fixed Property Creation transaction (Type 50) - second example
-        let result = test_data::run_omni_test_from_json(
-            "tests/test_data/omni/omni_fixed_property_creation_2_tx.json",
-            "3bfadbdaa445bb0b5c6ba35d03cad7dc5631a0c26229edd234d0dc409619f03f",
-            "omni_fixed_property_creation_2",
-            None,
-            Some("application/octet-stream"), // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_omni_fixture_test(&fixture_registry::omni::FIXED_PROPERTY_CREATION_2).await;
     }
 }
 
 /// Edge cases and validation tests
 mod edge_cases {
     use super::*;
-    use data_carry_research::types::ProtocolVariant;
 
     #[tokio::test]
     #[serial]
     async fn test_omni_dex_accept_offer() {
-        // Test DEx accept offer - Type 22 (DEx accept offer)
-        // Source: OmniEngine tx.example, verified Type 22 in blockchain
-        let result = test_data::run_omni_test_from_json(
-            "tests/test_data/omni/omni_dex_accept_offer_tx.json",
-            "3d7742608f3df0436c7d482465b092344c083105fb4d8f5f7745494074ec1d3b",
-            "omni_dex_accept_offer",
-            Some(ProtocolVariant::OmniDEX), // Type 22 = DEx Accept Offer
-            Some("application/octet-stream"), // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_omni_fixture_test(&fixture_registry::omni::DEX_ACCEPT_OFFER).await;
     }
 
     #[tokio::test]
     #[serial]
     async fn test_omni_deobfuscation_failure() {
-        // Test failed deobfuscation scenarios
-        let result = test_data::run_omni_test_from_json(
-            "tests/test_data/omni/omni_deobfuscation_fail_tx.json",
-            "243e1d05d7098c3da5decb823707b67d4f547eb0588f26f1847ace57df7a9907",
-            "omni_deobfuscation_fail",
-            None,
-            Some("application/octet-stream"), // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_omni_fixture_test(&fixture_registry::omni::DEOBFUSCATION_FAIL).await;
     }
 }

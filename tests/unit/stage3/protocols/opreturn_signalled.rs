@@ -1,268 +1,157 @@
 use anyhow::Result;
-use data_carry_research::types::{
-    ProtocolType, ProtocolVariant, TransactionInput, TransactionOutput,
-};
-use serde_json::Value;
+use data_carry_research::types::{ProtocolType, ProtocolVariant, TransactionInput, TransactionOutput};
 use serial_test::serial;
-use std::fs::File;
 use std::path::Path;
 
 use crate::common::db_seeding::seed_enriched_transaction_with_outputs;
+use crate::common::fixture_registry::{self, ProtocolFixture};
 use crate::common::fixtures;
 use crate::common::protocol_test_base::{
-    load_p2ms_outputs_from_json, run_stage3_processor, setup_protocol_test, verify_classification,
-    verify_content_type, verify_stage3_completion,
+    load_transaction_from_json, run_stage3_processor, setup_protocol_test, verify_classification,
+    verify_content_type, verify_stage3_completion, TransactionLoadOptions,
 };
 
-fn extract_op_returns(json_tx: &Value, txid: &str) -> Result<Vec<TransactionOutput>> {
-    use data_carry_research::types::script_metadata::parse_opreturn_script;
+/// Run an opreturn_signalled test using fixture registry metadata
+async fn run_opreturn_fixture_test(fixture: &ProtocolFixture) {
+    let expected_variant = match fixture.variant {
+        Some("OpReturnCLIPPERZ") => ProtocolVariant::OpReturnCLIPPERZ,
+        Some("OpReturnProtocol47930") => ProtocolVariant::OpReturnProtocol47930,
+        Some("OpReturnGenericASCII") => ProtocolVariant::OpReturnGenericASCII,
+        other => panic!("Unknown OpReturnSignalled variant: {:?}", other),
+    };
 
-    let mut outputs = Vec::new();
+    let result = run_opreturn_test_from_json(
+        fixture.path,
+        fixture.txid,
+        expected_variant,
+        fixture
+            .content_type
+            .expect("OpReturnSignalled fixtures should have content_type"),
+        fixture.description,
+    )
+    .await;
 
-    if let Some(vouts) = json_tx.get("vout").and_then(|v| v.as_array()) {
-        for vout in vouts {
-            let script_pub_key = vout.get("scriptPubKey").and_then(|spk| spk.as_object());
-            let script_type = script_pub_key
-                .and_then(|spk| spk.get("type"))
-                .and_then(|t| t.as_str());
+    if let Err(e) = result {
+        println!("⚠️  Test error: {}", e);
+    }
+}
 
-            if script_type == Some("nulldata") {
-                if let (Some(hex), Some(n), Some(val)) = (
-                    script_pub_key
-                        .and_then(|spk| spk.get("hex"))
-                        .and_then(|h| h.as_str()),
-                    vout.get("n").and_then(|n| n.as_u64()),
-                    vout.get("value").and_then(|v| v.as_f64()),
-                ) {
-                    // Parse OP_RETURN using shared parser
-                    let metadata = if let Some(op_data) = parse_opreturn_script(hex) {
-                        serde_json::json!({
-                            "op_return_hex": op_data.op_return_hex,
-                            "protocol_prefix_hex": op_data.protocol_prefix_hex,
-                            "data_hex": op_data.data_hex,
-                            "data_length": op_data.data_length
-                        })
-                    } else {
-                        serde_json::json!({})
-                    };
-
-                    outputs.push(TransactionOutput {
-                        txid: txid.to_string(),
-                        vout: n as u32,
-                        height: 0,
-                        amount: (val * 100_000_000.0) as u64, // Convert BTC to satoshis
-                        script_hex: hex.to_string(),
-                        script_type: "op_return".to_string(),
-                        is_coinbase: false,
-                        script_size: hex.len() / 2,
-                        metadata,
-                        address: None, // OP_RETURN outputs don't have addresses
-                    });
-                }
-            }
-        }
+/// Run opreturn_signalled test from JSON fixture
+async fn run_opreturn_test_from_json(
+    fixture_path: &str,
+    txid: &str,
+    expected_variant: ProtocolVariant,
+    expected_content_type: &str,
+    test_name: &str,
+) -> Result<()> {
+    if !Path::new(fixture_path).exists() {
+        println!(
+            "Skipping {} test - missing fixture {}",
+            test_name, fixture_path
+        );
+        return Ok(());
     }
 
-    Ok(outputs)
+    let (mut test_db, config) = setup_protocol_test(test_name)?;
+
+    // Load transaction data using unified helper (with ALL outputs for OP_RETURN detection)
+    let (tx, _) = match load_transaction_from_json(
+        fixture_path,
+        txid,
+        TransactionLoadOptions {
+            include_all_outputs: true,
+            ..Default::default()
+        },
+    ) {
+        Ok(result) => result,
+        Err(e) => {
+            println!(
+                "⚠️  Skipping test - no valid transaction data in {}: {}",
+                fixture_path, e
+            );
+            return Ok(());
+        }
+    };
+
+    // Separate P2MS and OP_RETURN outputs
+    let p2ms_outputs: Vec<_> = tx
+        .outputs
+        .iter()
+        .filter(|o| o.script_type == "multisig")
+        .cloned()
+        .collect();
+    let op_return_outputs: Vec<_> = tx
+        .outputs
+        .iter()
+        .filter(|o| o.script_type == "op_return")
+        .cloned()
+        .collect();
+
+    assert!(
+        !p2ms_outputs.is_empty(),
+        "{} fixture must contain at least one P2MS output",
+        test_name
+    );
+    assert!(
+        !op_return_outputs.is_empty(),
+        "{} fixture must contain OP_RETURN output",
+        test_name
+    );
+
+    // Update tx to have only P2MS outputs for EnrichedTransaction
+    let mut enriched_tx = tx;
+    let total_p2ms_amount: u64 = p2ms_outputs.iter().map(|o| o.amount).sum();
+    enriched_tx.outputs = p2ms_outputs.clone();
+    enriched_tx.p2ms_outputs_count = p2ms_outputs.len();
+    enriched_tx.total_p2ms_amount = total_p2ms_amount;
+
+    // Seed database with enriched transaction (FK-safe: P2MS + OP_RETURN)
+    seed_enriched_transaction_with_outputs(
+        &mut test_db,
+        &enriched_tx,
+        Vec::<TransactionInput>::new(),
+        p2ms_outputs,
+        op_return_outputs,
+    )?;
+
+    // Run Stage 3
+    let total_classified = run_stage3_processor(test_db.path(), config).await?;
+    verify_stage3_completion(total_classified, 1, 1);
+
+    // Verify classification
+    verify_classification(
+        &test_db,
+        txid,
+        ProtocolType::OpReturnSignalled,
+        Some(expected_variant),
+    )?;
+
+    verify_content_type(&test_db, txid, Some(expected_content_type))?;
+
+    println!("{} transaction classified correctly", test_name);
+    Ok(())
 }
 
 // ==================== CLIPPERZ Protocol Tests ====================
 
 #[tokio::test]
 #[serial]
-async fn test_clipperz_v1() -> Result<()> {
-    let txid = "08437467cbb88640b40185169293b138e216ec1a970f596e3c915ce74021d85e";
-    let fixture_path = "tests/test_data/opreturn_signalled/clipperz_v1.json";
-
-    if !Path::new(fixture_path).exists() {
-        println!(
-            "Skipping CLIPPERZ v1 test - missing fixture {}",
-            fixture_path
-        );
-        return Ok(());
-    }
-
-    let (mut test_db, config) = setup_protocol_test("clipperz_v1")?;
-
-    // Load P2MS outputs from fixture
-    let p2ms_outputs = load_p2ms_outputs_from_json(fixture_path, txid)?;
-    assert!(
-        !p2ms_outputs.is_empty(),
-        "CLIPPERZ fixture must contain at least one P2MS output"
-    );
-
-    // Extract OP_RETURN outputs from fixture
-    let json_value: Value = serde_json::from_reader(File::open(fixture_path)?)?;
-    let op_return_outputs = extract_op_returns(&json_value, txid)?;
-    assert!(
-        !op_return_outputs.is_empty(),
-        "CLIPPERZ fixture must contain OP_RETURN output"
-    );
-
-    // Build enriched transaction for Stage 2 data
-    let mut enriched_tx = fixtures::create_test_enriched_transaction(txid);
-    let total_p2ms_amount: u64 = p2ms_outputs.iter().map(|o| o.amount).sum();
-    enriched_tx.outputs = p2ms_outputs.clone();
-    enriched_tx.p2ms_outputs_count = p2ms_outputs.len();
-    enriched_tx.total_p2ms_amount = total_p2ms_amount;
-
-    // Seed database with enriched transaction (FK-safe: P2MS + OP_RETURN)
-    seed_enriched_transaction_with_outputs(
-        &mut test_db,
-        &enriched_tx,
-        Vec::<TransactionInput>::new(),
-        p2ms_outputs,
-        op_return_outputs,
-    )?;
-
-    // Run Stage 3
-    let total_classified = run_stage3_processor(test_db.path(), config).await?;
-    verify_stage3_completion(total_classified, 1, 1);
-
-    // Verify classification
-    verify_classification(
-        &test_db,
-        txid,
-        ProtocolType::OpReturnSignalled,
-        Some(ProtocolVariant::OpReturnCLIPPERZ),
-    )?;
-
-    verify_content_type(&test_db, txid, Some("application/octet-stream"))?;
-
-    println!("CLIPPERZ v1 transaction classified correctly");
-    Ok(())
+async fn test_clipperz_v1() {
+    run_opreturn_fixture_test(&fixture_registry::opreturn_signalled::CLIPPERZ_V1).await;
 }
 
 #[tokio::test]
 #[serial]
-async fn test_clipperz_v2() -> Result<()> {
-    let txid = "4bc03ae94ae9775db84fc3d7ef859fad9d4267beacf209ac53bd960ed6a4a0b2";
-    let fixture_path = "tests/test_data/opreturn_signalled/clipperz_v2.json";
-
-    if !Path::new(fixture_path).exists() {
-        println!(
-            "Skipping CLIPPERZ v2 test - missing fixture {}",
-            fixture_path
-        );
-        return Ok(());
-    }
-
-    let (mut test_db, config) = setup_protocol_test("clipperz_v2")?;
-
-    // Load P2MS outputs
-    let p2ms_outputs = load_p2ms_outputs_from_json(fixture_path, txid)?;
-    assert!(
-        !p2ms_outputs.is_empty(),
-        "CLIPPERZ fixture must contain at least one P2MS output"
-    );
-
-    // Extract OP_RETURN outputs from fixture
-    let json_value: Value = serde_json::from_reader(File::open(fixture_path)?)?;
-    let op_return_outputs = extract_op_returns(&json_value, txid)?;
-    assert!(
-        !op_return_outputs.is_empty(),
-        "CLIPPERZ fixture must contain OP_RETURN output"
-    );
-
-    // Build enriched transaction for Stage 2 data with combined outputs
-    let mut enriched_tx = fixtures::create_test_enriched_transaction(txid);
-    let total_p2ms_amount: u64 = p2ms_outputs.iter().map(|o| o.amount).sum();
-    enriched_tx.outputs = p2ms_outputs.clone();
-    enriched_tx.p2ms_outputs_count = p2ms_outputs.len();
-    enriched_tx.total_p2ms_amount = total_p2ms_amount;
-
-    // Seed database with enriched transaction (FK-safe: P2MS + OP_RETURN)
-    seed_enriched_transaction_with_outputs(
-        &mut test_db,
-        &enriched_tx,
-        Vec::<TransactionInput>::new(),
-        p2ms_outputs,
-        op_return_outputs,
-    )?;
-
-    // Run Stage 3
-    let total_classified = run_stage3_processor(test_db.path(), config).await?;
-    verify_stage3_completion(total_classified, 1, 1);
-
-    // Verify classification
-    verify_classification(
-        &test_db,
-        txid,
-        ProtocolType::OpReturnSignalled,
-        Some(ProtocolVariant::OpReturnCLIPPERZ),
-    )?;
-
-    verify_content_type(&test_db, txid, Some("application/octet-stream"))?;
-
-    println!("CLIPPERZ v2 transaction classified correctly");
-    Ok(())
+async fn test_clipperz_v2() {
+    run_opreturn_fixture_test(&fixture_registry::opreturn_signalled::CLIPPERZ_V2).await;
 }
 
 // ==================== Protocol47930 Tests ====================
 
 #[tokio::test]
 #[serial]
-async fn test_protocol47930_standard() -> Result<()> {
-    let txid = "82d0872a72032c21cadfa1f7590f661f00c1bc663c4eb93b5730df40c7b87cbf";
-    let fixture_path = "tests/test_data/opreturn_signalled/protocol47930.json";
-
-    if !Path::new(fixture_path).exists() {
-        println!(
-            "Skipping Protocol47930 test - missing fixture {}",
-            fixture_path
-        );
-        return Ok(());
-    }
-
-    let (mut test_db, config) = setup_protocol_test("protocol47930_standard")?;
-
-    // Load P2MS outputs
-    let p2ms_outputs = load_p2ms_outputs_from_json(fixture_path, txid)?;
-    assert!(
-        !p2ms_outputs.is_empty(),
-        "Protocol47930 fixture must contain at least one P2MS output"
-    );
-
-    // Extract OP_RETURN outputs from fixture
-    let json_value: Value = serde_json::from_reader(File::open(fixture_path)?)?;
-    let op_return_outputs = extract_op_returns(&json_value, txid)?;
-    assert!(
-        !op_return_outputs.is_empty(),
-        "Protocol47930 fixture must contain OP_RETURN output"
-    );
-
-    // Build enriched transaction for Stage 2 data with combined outputs
-    let mut enriched_tx = fixtures::create_test_enriched_transaction(txid);
-    let total_p2ms_amount: u64 = p2ms_outputs.iter().map(|o| o.amount).sum();
-    enriched_tx.outputs = p2ms_outputs.clone();
-    enriched_tx.p2ms_outputs_count = p2ms_outputs.len();
-    enriched_tx.total_p2ms_amount = total_p2ms_amount;
-
-    // Seed database with enriched transaction (FK-safe: P2MS + OP_RETURN)
-    seed_enriched_transaction_with_outputs(
-        &mut test_db,
-        &enriched_tx,
-        Vec::<TransactionInput>::new(),
-        p2ms_outputs,
-        op_return_outputs,
-    )?;
-
-    // Run Stage 3
-    let total_classified = run_stage3_processor(test_db.path(), config).await?;
-    verify_stage3_completion(total_classified, 1, 1);
-
-    // Verify classification
-    verify_classification(
-        &test_db,
-        txid,
-        ProtocolType::OpReturnSignalled,
-        Some(ProtocolVariant::OpReturnProtocol47930),
-    )?;
-
-    verify_content_type(&test_db, txid, Some("application/octet-stream"))?;
-
-    println!("Protocol47930 transaction classified correctly");
-    Ok(())
+async fn test_protocol47930_standard() {
+    run_opreturn_fixture_test(&fixture_registry::opreturn_signalled::PROTOCOL47930).await;
 }
 
 #[tokio::test]

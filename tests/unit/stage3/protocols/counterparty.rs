@@ -28,21 +28,44 @@ use serial_test::serial;
 
 // Import standardised test utilities
 use crate::common::database::TestDatabase;
-use crate::common::db_seeding::{create_test_inputs, seed_enriched_transaction_simple};
+use crate::common::db_seeding::seed_enriched_transaction_simple;
+use crate::common::fixture_registry::{self, ProtocolFixture};
 use crate::common::fixtures;
 use crate::common::protocol_test_base::{
-    get_classification_metadata, load_p2ms_outputs_from_json, run_stage3_processor,
+    get_classification_metadata, load_transaction_from_json, run_stage3_processor,
     setup_protocol_test, verify_classification, verify_complete_output_coverage,
     verify_content_type, verify_output_spendability, verify_stage3_completion,
+    TransactionLoadOptions,
 };
 use crate::common::test_output::TestOutputFormatter;
+
+/// Run a counterparty test using fixture registry metadata
+async fn run_counterparty_fixture_test(fixture: &ProtocolFixture) {
+    let expected_variant = fixture.variant.map(|v| match v {
+        "CounterpartyTransfer" => ProtocolVariant::CounterpartyTransfer,
+        "CounterpartyIssuance" => ProtocolVariant::CounterpartyIssuance,
+        "CounterpartyOracle" => ProtocolVariant::CounterpartyOracle,
+        _ => panic!("Unknown variant: {}", v),
+    });
+
+    let result = test_data::run_counterparty_test_from_json(
+        fixture.path,
+        fixture.txid,
+        fixture.description,
+        expected_variant,
+        fixture.content_type,
+    )
+    .await;
+
+    if let Err(e) = result {
+        println!("⚠️  Test error: {}", e);
+    }
+}
 
 /// Counterparty protocol test data creation
 mod test_data {
     use super::*;
     use data_carry_research::types::TransactionOutput;
-    use std::fs;
-    use std::path::Path;
 
     /// Get the actual message type from classification metadata
     pub fn get_counterparty_message_type(
@@ -66,22 +89,6 @@ mod test_data {
         Err(anyhow::anyhow!(
             "Failed to extract Counterparty message type"
         ))
-    }
-
-    /// Extract the first input txid from a JSON fixture
-    pub fn get_first_input_txid(json_path: &str) -> Option<String> {
-        if !Path::new(json_path).exists() {
-            return None;
-        }
-
-        let content = fs::read_to_string(json_path).ok()?;
-        let tx: serde_json::Value = serde_json::from_str(&content).ok()?;
-        tx["vin"]
-            .as_array()?
-            .first()?
-            .get("txid")?
-            .as_str()
-            .map(|s| s.to_string())
     }
 
     /// Analyse and display detailed P2MS output information for Counterparty
@@ -322,8 +329,28 @@ mod test_data {
 
         let (mut test_db, _config) = setup_protocol_test(test_name)?;
 
-        // Extract first input TXID for display
-        let input_txid_opt = get_first_input_txid(json_path);
+        // Load transaction data using unified helper (with inputs and burn patterns)
+        let (tx, inputs) = match load_transaction_from_json(
+            json_path,
+            txid,
+            TransactionLoadOptions {
+                include_inputs: true,
+                burn_patterns: Some(fixtures::counterparty_burn_patterns()),
+                ..Default::default()
+            },
+        ) {
+            Ok(result) => result,
+            Err(e) => {
+                println!(
+                    "⚠️  Skipping test - no valid transaction data in {}: {}",
+                    json_path, e
+                );
+                return Ok(());
+            }
+        };
+
+        // Extract first input TXID for display (from inputs if available)
+        let input_txid_opt = inputs.first().map(|i| i.txid.clone());
 
         // Print test header
         if let Some(ref input_txid) = input_txid_opt {
@@ -348,26 +375,18 @@ mod test_data {
             );
         }
 
-        // Load P2MS outputs from JSON
-        let p2ms_outputs = load_p2ms_outputs_from_json(json_path, txid)?;
-
-        if p2ms_outputs.is_empty() {
-            println!("⚠️  Skipping test - no P2MS outputs found in {}", json_path);
-            return Ok(());
-        }
-
         // Display P2MS outputs analysis
-        println!("║ P2MS Outputs Found: {}", p2ms_outputs.len());
+        println!("║ P2MS Outputs Found: {}", tx.outputs.len());
         println!("║");
 
         // Show individual P2MS output analysis
-        for (i, output) in p2ms_outputs.iter().enumerate() {
+        for (i, output) in tx.outputs.iter().enumerate() {
             print!("{}", analyse_counterparty_p2ms_output(output, i));
         }
         println!("║");
 
         // Show data extraction
-        print!("{}", show_counterparty_data_extraction(&p2ms_outputs));
+        print!("{}", show_counterparty_data_extraction(&tx.outputs));
         println!("║");
 
         // Use production code to extract and decrypt data
@@ -378,25 +397,11 @@ mod test_data {
         let classifier = CounterpartyClassifier;
 
         // Extract raw data using unified extraction method
-        for output in &p2ms_outputs {
+        for output in &tx.outputs {
             if let Some(chunk) = classifier.extract_raw_data_chunk(output) {
                 raw_data.extend_from_slice(&chunk);
             }
         }
-
-        // Create enriched transaction and insert into database first
-        let mut tx = fixtures::create_test_enriched_transaction(txid);
-        tx.outputs = p2ms_outputs.clone();
-        tx.p2ms_outputs_count = tx.outputs.len();
-        tx.burn_patterns_detected = fixtures::counterparty_burn_patterns();
-
-        // Create transaction inputs with actual input TXID from JSON
-        // Create inputs using helper
-        let input_txid = input_txid_opt
-            .clone()
-            .or_else(|| tx.outputs.first().map(|_| txid.to_string()))
-            .unwrap_or_else(|| "00".repeat(32));
-        let inputs = create_test_inputs(txid, &input_txid);
 
         // Seed database with enriched transaction (FK-safe)
         seed_enriched_transaction_simple(&mut test_db, &tx, inputs)?;
@@ -475,41 +480,13 @@ mod modern_format {
     #[tokio::test]
     #[serial]
     async fn test_counterparty_modern_1of3_multi_output() {
-        // Source: Modern enhanced issuance format (Type 22, post-2022)
-        // Block: 913691 (verified via Bitcoin Core RPC)
-        // Message Type: Type 22 Enhanced Issuance
-        let result = test_data::run_counterparty_test_from_json(
-            "tests/test_data/counterparty/counterparty_modern_1of3_tx.json",
-            "a63ee2b1e64d98784ba39c9e6738bc923fd88a808d618dd833254978247d66ea",
-            "counterparty_modern_1of3",
-            Some(ProtocolVariant::CounterpartyIssuance),
-            Some("application/octet-stream"), // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_counterparty_fixture_test(&fixture_registry::counterparty::MODERN_1OF3).await;
     }
 
     #[tokio::test]
     #[serial]
     async fn test_counterparty_modern_broadcast() {
-        // Source: Electrum-Counterparty decoder example #12: "Broadcast - jpja.net"
-        // Block: 327522 (verified via Bitcoin Core RPC)
-        // Message Type: Type 30 Broadcast
-        let result = test_data::run_counterparty_test_from_json(
-            "tests/test_data/counterparty/counterparty_modern_broadcast_tx.json",
-            "21c2cd5b369c2e7a350bf92ad43c31e5abb0aa85ccba11368b08f9f4abb8e0af",
-            "counterparty_modern_broadcast",
-            Some(ProtocolVariant::CounterpartyOracle),
-            Some("application/octet-stream"), // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_counterparty_fixture_test(&fixture_registry::counterparty::MODERN_BROADCAST).await;
     }
 }
 
@@ -520,41 +497,13 @@ mod legacy_format {
     #[tokio::test]
     #[serial]
     async fn test_counterparty_legacy_1of2_send() {
-        // Source: Electrum-Counterparty decoder example #0: "Classic send - 501 JPGOLD"
-        // Block: 305807 (verified via Bitcoin Core RPC)
-        // Message Type: Type 0 Send
-        let result = test_data::run_counterparty_test_from_json(
-            "tests/test_data/counterparty/counterparty_legacy_1of2_send_tx.json",
-            "da3ed1efda82824cb24ea081ef2a8f532a7dd9cd1ebc5efa873498c3958c864e",
-            "counterparty_legacy_send",
-            Some(ProtocolVariant::CounterpartyTransfer),
-            Some("application/octet-stream"), // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_counterparty_fixture_test(&fixture_registry::counterparty::LEGACY_1OF2_SEND).await;
     }
 
     #[tokio::test]
     #[serial]
     async fn test_counterparty_legacy_1of2_issuance() {
-        // Source: Electrum-Counterparty decoder example #9: "Issuance - OLGA"
-        // Block: 305451 (verified via Bitcoin Core RPC)
-        // Message Type: Type 20 Issuance
-        let result = test_data::run_counterparty_test_from_json(
-            "tests/test_data/counterparty/counterparty_legacy_1of2_issuance_tx.json",
-            "e5e9f6a63ede5315994cf2d8a5f8fe760f1f37f6261e5fbb1263bed54114768a",
-            "counterparty_legacy_issuance",
-            Some(ProtocolVariant::CounterpartyIssuance),
-            Some("application/octet-stream"), // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_counterparty_fixture_test(&fixture_registry::counterparty::LEGACY_1OF2_ISSUANCE).await;
     }
 }
 
@@ -565,61 +514,19 @@ mod message_types {
     #[tokio::test]
     #[serial]
     async fn test_counterparty_type_0_send() {
-        // Source: Electrum-Counterparty decoder example #1: "Classic send - 0.2 XCP"
-        // Block: 290929 (verified via Bitcoin Core RPC)
-        // Message Type: Type 0 Send
-        let result = test_data::run_counterparty_test_from_json(
-            "tests/test_data/counterparty/counterparty_type0_send_tx.json",
-            "585f50f12288cd9044705483672fbbddb71dff8198b390b40ab3de30db0a88dd",
-            "counterparty_type0_send",
-            Some(ProtocolVariant::CounterpartyTransfer),
-            Some("application/octet-stream"), // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_counterparty_fixture_test(&fixture_registry::counterparty::TYPE0_SEND).await;
     }
 
     #[tokio::test]
     #[serial]
     async fn test_counterparty_type_20_issuance() {
-        // Source: Electrum-Counterparty decoder example #20: "Issuance with STAMP image"
-        // Block: 783427 (verified via Bitcoin Core RPC)
-        // Message Type: Type 20 Issuance
-        let result = test_data::run_counterparty_test_from_json(
-            "tests/test_data/counterparty/counterparty_type20_issuance_tx.json",
-            "31a96a3bd86600b4af3c81bc960b15e89e506f855e93fbbda6f701963b1936ac",
-            "counterparty_type20_issuance",
-            Some(ProtocolVariant::CounterpartyIssuance),
-            Some("application/octet-stream"), // Binary protocol message (issuance data)
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_counterparty_fixture_test(&fixture_registry::counterparty::TYPE20_ISSUANCE).await;
     }
 
     #[tokio::test]
     #[serial]
     async fn test_counterparty_type_30_broadcast() {
-        // Source: Electrum-Counterparty decoder example #14: "Broadcast - OLGA image"
-        // Block: 369466 (verified via Bitcoin Core RPC)
-        // Message Type: Type 30 Broadcast
-        let result = test_data::run_counterparty_test_from_json(
-            "tests/test_data/counterparty/counterparty_type30_broadcast_tx.json",
-            "627ae48d6b4cffb2ea734be1016dedef4cee3f8ffefaea5602dd58c696de6b74",
-            "counterparty_type30_broadcast",
-            Some(ProtocolVariant::CounterpartyOracle),
-            Some("application/octet-stream"), // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_counterparty_fixture_test(&fixture_registry::counterparty::TYPE30_BROADCAST).await;
     }
 }
 
@@ -630,21 +537,7 @@ mod historical_transactions {
     #[tokio::test]
     #[serial]
     async fn test_counterparty_salvation_ownership_transfer() {
-        // Source: Electrum-Counterparty decoder example #11: "Issuance - transfer SALVATION ownership"
-        // Block: 368602 (verified via Bitcoin Core RPC)
-        // Message Type: Type 20 Issuance (ownership transfer)
-        let result = test_data::run_counterparty_test_from_json(
-            "tests/test_data/counterparty/counterparty_salvation_transfer_tx.json",
-            "541e640fbb527c35e0ee32d724efa4a5506c4c52acfba1ebc3b45949780c08a8",
-            "counterparty_salvation_transfer",
-            Some(ProtocolVariant::CounterpartyIssuance),
-            Some("application/octet-stream"), // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_counterparty_fixture_test(&fixture_registry::counterparty::SALVATION_TRANSFER).await;
     }
 }
 
@@ -655,21 +548,7 @@ mod advanced_features {
     #[tokio::test]
     #[serial]
     async fn test_counterparty_subasset_issuance() {
-        // Source: Electrum-Counterparty decoder example #17: "Subasset issuance"
-        // Block: 778561 (verified via Bitcoin Core RPC)
-        // Message Type: Type 21 Subasset Issuance
-        let result = test_data::run_counterparty_test_from_json(
-            "tests/test_data/counterparty/counterparty_subasset_tx.json",
-            "793566ef1644a14c2658aed6b3c2df41bc519941f121f9cff82825f48911e451",
-            "counterparty_subasset",
-            Some(ProtocolVariant::CounterpartyIssuance),
-            Some("application/octet-stream"), // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_counterparty_fixture_test(&fixture_registry::counterparty::SUBASSET).await;
     }
 }
 
@@ -680,46 +559,12 @@ mod edge_cases {
     #[tokio::test]
     #[serial]
     async fn test_counterparty_olga_lock() {
-        // Source: Electrum-Counterparty decoder example #10: "Issuance - lock OLGA"
-        // Block: 305455 (verified via Bitcoin Core RPC)
-        // Message Type: Type 20 Issuance (asset locking)
-        let result = test_data::run_counterparty_test_from_json(
-            "tests/test_data/counterparty/counterparty_olga_lock_tx.json",
-            "34da6ecf10c66ed659054aa6c71900c807875cb57b96abea4cee4f7a831ed690",
-            "counterparty_olga_lock",
-            Some(ProtocolVariant::CounterpartyIssuance),
-            Some("application/octet-stream"), // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_counterparty_fixture_test(&fixture_registry::counterparty::OLGA_LOCK).await;
     }
 
     #[tokio::test]
     #[serial]
     async fn test_counterparty_mixed_pubkey_format() {
-        // Test case for transaction with mixed compressed/uncompressed pubkeys
-        // This transaction has:
-        // - First two pubkeys: Compressed (33 bytes) - used for data storage
-        // - Third pubkey: Uncompressed (65 bytes) - used for validation
-        // The fix ensures we only validate the first two pubkeys for compression
-        //
-        // Block: 800081 (verified via Bitcoin Core RPC)
-        // Message Type: Type 30 Broadcast
-        // Special: All 6 P2MS outputs have mixed pubkey formats (2 compressed, 1 uncompressed)
-        let result = test_data::run_counterparty_test_from_json(
-            "tests/test_data/counterparty/9b4afd1d54dc88b50dbda166e837fb4ce110f4185b432c6155a403ca0fb2eb75.json",
-            "9b4afd1d54dc88b50dbda166e837fb4ce110f4185b432c6155a403ca0fb2eb75",
-            "counterparty_mixed_pubkey_format",
-            Some(ProtocolVariant::CounterpartyOracle),
-            Some("application/octet-stream"), // Binary protocol message
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_counterparty_fixture_test(&fixture_registry::counterparty::MIXED_PUBKEY_FORMAT).await;
     }
 }

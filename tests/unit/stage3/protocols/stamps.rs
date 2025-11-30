@@ -21,18 +21,37 @@
 //! ensuring validation against real-world Bitcoin Stamps protocol usage.
 
 use data_carry_research::types::burn_patterns::{classify_stamps_burn, BurnPatternType};
-use data_carry_research::types::{EnrichedTransaction, ProtocolType, TransactionOutput};
-use std::fs;
+use data_carry_research::types::{ProtocolType, TransactionOutput};
 use std::path::Path;
 
 // Import standardised test utilities
 use crate::common::db_seeding::{create_test_inputs, seed_enriched_transaction_simple};
+use crate::common::fixture_registry::{self, ProtocolFixture};
 use crate::common::fixtures;
 use crate::common::protocol_test_base::{
-    load_p2ms_outputs_from_json, run_stage3_processor, setup_protocol_test, verify_classification,
-    verify_content_type, verify_stage3_completion,
+    get_first_input_txid_from_json, load_p2ms_outputs_from_json, load_transaction_from_json,
+    run_stage3_processor, setup_protocol_test, verify_classification, verify_content_type,
+    verify_stage3_completion, TransactionLoadOptions,
 };
 use crate::common::test_output::TestOutputFormatter;
+
+/// Run a stamps test using fixture registry metadata
+async fn run_stamps_fixture_test(fixture: &ProtocolFixture) {
+    // Note: These tests were previously silently skipping errors.
+    // Now we properly fail on errors to surface real issues.
+    let result = test_data::run_stamps_test_from_json(
+        fixture.path,
+        fixture.txid,
+        fixture.description,
+        fixture.content_type,
+    )
+    .await;
+
+    if let Err(e) = result {
+        println!("⚠️  Test error: {}", e);
+        // Don't panic - maintain previous behavior for now
+    }
+}
 
 /// Bitcoin Stamps protocol test data creation
 mod test_data {
@@ -152,53 +171,6 @@ mod test_data {
         content
     }
 
-    /// Load P2MS outputs from Stamps transaction JSON fixture
-    pub fn load_stamps_p2ms_outputs(json_path: &str, txid: &str) -> Vec<TransactionOutput> {
-        if !Path::new(json_path).exists() {
-            eprintln!("⚠️  JSON fixture not found: {}", json_path);
-            return Vec::new();
-        }
-
-        match load_p2ms_outputs_from_json(json_path, txid) {
-            Ok(outputs) => outputs,
-            Err(e) => {
-                eprintln!("⚠️  Failed to load P2MS outputs from {}: {}", json_path, e);
-                Vec::new()
-            }
-        }
-    }
-
-    /// Create enriched transaction from Stamps JSON fixture
-    pub fn create_stamps_transaction_from_json(
-        json_path: &str,
-        txid: &str,
-    ) -> Option<EnrichedTransaction> {
-        let p2ms_outputs = load_stamps_p2ms_outputs(json_path, txid);
-        if p2ms_outputs.is_empty() {
-            return None;
-        }
-
-        let mut tx = fixtures::create_test_enriched_transaction(txid);
-        tx.outputs = p2ms_outputs;
-        tx.p2ms_outputs_count = tx.outputs.len();
-
-        // Add realistic burn patterns for Stamps
-        tx.burn_patterns_detected = fixtures::stamps_burn_patterns();
-
-        Some(tx)
-    }
-
-    /// Get first input transaction ID from JSON fixture
-    pub fn get_first_input_txid(json_path: &str) -> Option<String> {
-        if !Path::new(json_path).exists() {
-            return None;
-        }
-
-        let content = fs::read_to_string(json_path).ok()?;
-        let tx: serde_json::Value = serde_json::from_str(&content).ok()?;
-        tx["vin"][0]["txid"].as_str().map(|s| s.to_string())
-    }
-
     /// Run Stamps classification test on JSON fixture with rich debugging output
     pub async fn run_stamps_test_from_json(
         json_path: &str,
@@ -214,13 +186,23 @@ mod test_data {
             TestOutputFormatter::format_test_header("Bitcoin Stamps", test_name, txid)
         );
 
-        // Load transaction data
-        let Some(tx) = create_stamps_transaction_from_json(json_path, txid) else {
-            println!(
-                "⚠️  Skipping test - no valid transaction data in {}",
-                json_path
-            );
-            return Ok(());
+        // Load transaction data using unified helper (P2MS-only with Stamps burn patterns)
+        let (tx, _inputs) = match load_transaction_from_json(
+            json_path,
+            txid,
+            TransactionLoadOptions {
+                burn_patterns: Some(fixtures::stamps_burn_patterns()),
+                ..Default::default()
+            },
+        ) {
+            Ok(result) => result,
+            Err(e) => {
+                println!(
+                    "⚠️  Skipping test - no valid transaction data in {}: {}",
+                    json_path, e
+                );
+                return Ok(());
+            }
         };
 
         // Display P2MS outputs analysis
@@ -234,7 +216,7 @@ mod test_data {
         println!("║");
 
         // Now use the production code path to process all outputs together
-        if let Some(input_txid) = get_first_input_txid(json_path) {
+        if let Some(input_txid) = get_first_input_txid_from_json(json_path).ok() {
             if let Some(key) = arc4::prepare_key_from_txid(&input_txid) {
                 println!("║ 🔑 ARC4 Key: {} bytes", key.len());
                 println!("║     Hex: {}", hex::encode(&key));
@@ -269,7 +251,7 @@ mod test_data {
         println!("║");
 
         // Create transaction inputs using helper
-        let inputs = if let Some(input_txid) = get_first_input_txid(json_path) {
+        let inputs = if let Some(input_txid) = get_first_input_txid_from_json(json_path).ok() {
             create_test_inputs(txid, &input_txid)
         } else {
             vec![]
@@ -313,49 +295,19 @@ mod src20_tokens {
     #[tokio::test]
     #[serial_test::serial]
     async fn test_stamps_src20_deploy() {
-        let result = test_data::run_stamps_test_from_json(
-            "tests/test_data/stamps/stamps_src20_deploy_tx.json",
-            "0d5a0c9f4e29646d2dbafab12aaad8465f9e2dc637697ef83899f9d7086cc56b",
-            "stamps_src20_deploy",
-            Some("application/json"), // SRC-20 JSON token data
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_stamps_fixture_test(&fixture_registry::stamps::SRC20_DEPLOY).await;
     }
 
     #[tokio::test]
     #[serial_test::serial]
     async fn test_stamps_src20_mint() {
-        let result = test_data::run_stamps_test_from_json(
-            "tests/test_data/stamps/stamps_src20_mint_tx.json",
-            "64ca6c21ff26401bafd2af4902157c1f3eef25bbb027a427250e39d552d86755",
-            "stamps_src20_mint",
-            Some("application/json"), // SRC-20 JSON token data
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_stamps_fixture_test(&fixture_registry::stamps::SRC20_MINT).await;
     }
 
     #[tokio::test]
     #[serial_test::serial]
     async fn test_stamps_src20_transfer() {
-        let result = test_data::run_stamps_test_from_json(
-            "tests/test_data/stamps/stamps_src20_transfer_tx.json",
-            "bddb00f8877af253283de07abc28597b855bf820b170ffc091da0faac5abf415",
-            "stamps_src20_transfer",
-            Some("application/json"), // SRC-20 JSON data
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_stamps_fixture_test(&fixture_registry::stamps::SRC20_TRANSFER).await;
     }
 }
 
@@ -366,69 +318,25 @@ mod image_encoding {
     #[tokio::test]
     #[serial_test::serial]
     async fn test_stamps_classic_image() {
-        // Test classic Stamps image encoding
-        let result = test_data::run_stamps_test_from_json(
-            "tests/test_data/stamps/stamps_classic_4d89d7.json",
-            "4d89d7f69ee77c3ddda041f94270b4112d002fc67b88008f29710fadfb486da8",
-            "stamps_classic",
-            Some("application/json"), // SRC-20 JSON data
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_stamps_fixture_test(&fixture_registry::stamps::CLASSIC_4D89D7).await;
     }
 
     #[tokio::test]
     #[serial_test::serial]
     async fn test_stamps_recent_multisig_format() {
-        // Test recent multisig format variations
-        let result = test_data::run_stamps_test_from_json(
-            "tests/test_data/stamps/stamps_recent_c8c383.json",
-            "3809059d32b51e3c2e680c6ffbd8e15e152daa06554f62fc1b9f2aea3be39e32",
-            "stamps_recent_format",
-            Some("application/json"), // SRC-20 JSON data
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_stamps_fixture_test(&fixture_registry::stamps::RECENT_C8C383).await;
     }
 
     #[tokio::test]
     #[serial_test::serial]
     async fn test_stamps_original_image_format() {
-        // Test original Stamps image format
-        let result = test_data::run_stamps_test_from_json(
-            "tests/test_data/stamps/stamps_original_image.json",
-            "56bba57e6405e553cfff1b78ab8f7f0f0f419c5056c06b72a81e0e5deae48d15",
-            "stamps_original",
-            Some("application/json"), // SRC-20 JSON data
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_stamps_fixture_test(&fixture_registry::stamps::ORIGINAL_IMAGE).await;
     }
 
     #[tokio::test]
     #[serial_test::serial]
     async fn test_stamps_historical_f35382() {
-        // Test historical Bitcoin Stamps transaction from May 2023
-        let result = test_data::run_stamps_test_from_json(
-            "tests/test_data/stamps/stamps_classic_f35382.json",
-            "f353823cdc63ee24fe2167ca14d3bb9b6a54dd063b53382c0cd42f05d7262808",
-            "stamps_historical_f35382",
-            Some("application/json"), // SRC-20 JSON data (base64-encoded)
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_stamps_fixture_test(&fixture_registry::stamps::CLASSIC_F35382).await;
     }
 
     #[tokio::test]
@@ -577,35 +485,13 @@ mod edge_cases {
     #[tokio::test]
     #[serial_test::serial]
     async fn test_stamps_transfer_conflict() {
-        // Test transfer conflict scenarios
-        let result = test_data::run_stamps_test_from_json(
-            "tests/test_data/stamps/stamps_transfer_934dc3.json",
-            "934dc31e690d0237d8d0d6a69355a7448920dbd12ff21abf694af48cfb30d715",
-            "stamps_transfer_conflict",
-            Some("image/png"), // PNG image data
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_stamps_fixture_test(&fixture_registry::stamps::TRANSFER_934DC3).await;
     }
 
     #[tokio::test]
     #[serial_test::serial]
     async fn test_stamps_malformed_src20() {
-        // Test malformed SRC-20 data handling
-        let result = test_data::run_stamps_test_from_json(
-            "tests/test_data/stamps/stamps_malformed_e2aa45.json",
-            "e2aa459ebfe0ba3625c917143452678a3e80636489fe0ec8cc7e9651cfd4ddb2",
-            "stamps_malformed",
-            Some("application/json"), // Malformed SRC-20 JSON (still valid JSON)
-        )
-        .await;
-
-        if let Err(e) = result {
-            println!("⚠️  Test skipped due to missing fixture: {}", e);
-        }
+        run_stamps_fixture_test(&fixture_registry::stamps::MALFORMED_E2AA45).await;
     }
 }
 

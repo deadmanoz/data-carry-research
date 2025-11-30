@@ -322,6 +322,9 @@ pub mod analysis_test_setup;
 /// Common assertion helpers for protocol tests
 pub mod assertion_helpers;
 
+/// Fixture registry for protocol classification tests
+pub mod fixture_registry;
+
 /// JSON fixture loading utilities
 pub mod json_fixtures {
     use serde::de::DeserializeOwned;
