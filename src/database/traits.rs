@@ -1,7 +1,9 @@
 //! Database trait abstractions for modular database operations.
 //!
-//! This module defines the core traits that abstract database operations
-//! across different stages of the processing pipeline.
+//! This module defines traits that group database operations by pipeline stage.
+//! These traits provide:
+//! - API documentation: Clear grouping of related methods
+//! - Organisational clarity: Stage1, Stage2, Stage3, Statistics operations
 
 #![allow(dead_code)]
 
@@ -9,12 +11,6 @@ use crate::errors::AppResult;
 use crate::types::{
     ClassificationResult, EnrichedTransaction, TransactionInput, TransactionOutput,
 };
-
-/// Core database connection and transaction management
-pub trait DatabaseConnection {
-    /// Get a reference to the underlying SQLite connection
-    fn connection(&self) -> &rusqlite::Connection;
-}
 
 /// Stage 1 database operations - P2MS detection and storage
 pub trait Stage1Operations {
@@ -179,22 +175,4 @@ pub trait StatisticsOperations {
     fn get_enriched_transaction_stats(
         &self,
     ) -> AppResult<crate::database::EnrichedTransactionStats>;
-}
-
-/// Combined database interface that includes all operations
-pub trait DatabaseInterface:
-    DatabaseConnection + Stage1Operations + Stage2Operations + Stage3Operations + StatisticsOperations
-{
-    /// Create a new database instance with Schema V2 (Production-Ready)
-    ///
-    /// **Required**: All databases must use Schema V2. Schema V1 has been removed.
-    ///
-    /// Schema V2 features:
-    /// - Extracted P2MS metadata columns (5-10x query speedup)
-    /// - Spending chain tracking for UTXO lifetime analysis
-    /// - Block normalisation with stub approach
-    /// - Unified burn patterns storage
-    fn new_v2(database_path: &str) -> AppResult<Self>
-    where
-        Self: Sized;
 }

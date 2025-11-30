@@ -1,7 +1,7 @@
 //! Stage 3 database operations - Protocol classification.
 
-use crate::database::connection::DatabaseConnection;
 use crate::database::traits::Stage3Operations;
+use crate::database::Database;
 use crate::errors::{AppError, AppResult};
 use crate::types::{ClassificationResult, EnrichedTransaction, TransactionOutput};
 use rusqlite::params;
@@ -10,7 +10,7 @@ use tracing::debug;
 /// Sentinel value used when content types are missing in the database.
 pub const NO_MIME_TYPE_SENTINEL: &str = "__NO_MIME_TYPE__";
 
-impl Stage3Operations for DatabaseConnection {
+impl Stage3Operations for Database {
     fn get_unclassified_transactions_for_stage3(
         &self,
         limit: usize,
@@ -468,9 +468,9 @@ impl Stage3Operations for DatabaseConnection {
     }
 }
 
-impl DatabaseConnection {
+impl Database {
     /// Get burn patterns for a specific transaction (helper method)
-    fn get_burn_patterns_for_transaction(
+    pub(crate) fn get_burn_patterns_for_transaction(
         &self,
         txid: &str,
     ) -> AppResult<Vec<crate::types::burn_patterns::BurnPattern>> {

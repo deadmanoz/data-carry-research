@@ -7,16 +7,16 @@
 //! 2. **transaction_outputs**: All P2MS outputs with `is_spent = 0`
 //! 3. **p2ms_outputs**: Extracted P2MS metadata (required_sigs, total_pubkeys, pubkeys_json)
 
-use crate::database::connection::DatabaseConnection;
-use crate::database::helpers::ensure_blocks_exist; // Shared helper from database::helpers
+use crate::database::helpers::ensure_blocks_exist;
 use crate::database::traits::{Stage1Checkpoint, Stage1Operations};
+use crate::database::Database;
 use crate::errors::AppResult;
 use crate::types::TransactionOutput;
 use rusqlite::params;
 use std::collections::HashSet;
 use tracing::debug;
 
-impl Stage1Operations for DatabaseConnection {
+impl Stage1Operations for Database {
     fn insert_p2ms_batch(&mut self, batch: &[TransactionOutput]) -> AppResult<()> {
         // Redirect to the new generic method - table names will be migrated separately
         self.insert_transaction_output_batch(batch)

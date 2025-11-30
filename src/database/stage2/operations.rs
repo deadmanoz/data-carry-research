@@ -1,15 +1,15 @@
 //! Stage 2 database operations - Transaction enrichment.
 
-use crate::database::connection::DatabaseConnection;
-use crate::database::helpers::ensure_blocks_exist; // Shared helper from database::helpers
+use crate::database::helpers::ensure_blocks_exist;
 use crate::database::traits::Stage2Operations;
+use crate::database::Database;
 use crate::errors::{AppError, AppResult};
 use crate::types::{EnrichedTransaction, TransactionInput, TransactionOutput};
 use rusqlite::params;
 use std::collections::HashSet;
 use tracing::debug;
 
-impl Stage2Operations for DatabaseConnection {
+impl Stage2Operations for Database {
     fn get_unprocessed_transactions(&self, limit: usize) -> AppResult<Vec<String>> {
         let mut stmt = self
             .connection()

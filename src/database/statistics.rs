@@ -1,7 +1,7 @@
 //! Statistics and reporting operations.
 
-use crate::database::connection::DatabaseConnection;
 use crate::database::traits::StatisticsOperations;
+use crate::database::Database;
 use crate::errors::{AppError, AppResult};
 use crate::utils::math::{safe_percentage, safe_ratio, safe_ratio_u64};
 
@@ -46,7 +46,7 @@ impl EnrichedTransactionStats {
     }
 }
 
-impl StatisticsOperations for DatabaseConnection {
+impl StatisticsOperations for Database {
     fn get_database_stats(&self) -> AppResult<DatabaseStats> {
         let total_outputs: usize = self
             .connection()
