@@ -63,6 +63,23 @@ impl TestOutputFormatter {
         )
     }
 
+    /// Create test header without transaction ID (for synthetic tests)
+    ///
+    /// Use this for tests that don't have a real transaction ID, such as
+    /// synthetic pattern tests that verify classification logic directly.
+    ///
+    /// # Arguments
+    /// * `protocol_name` - Protocol name (e.g., "DataStorage")
+    /// * `test_name` - Specific test name (e.g., "datastorage_compressed")
+    pub fn format_test_header_simple(protocol_name: &str, test_name: &str) -> String {
+        format!(
+            "\n╔══════════════════════════════════════════════════════════════\n\
+             ║ {} Test: {}\n\
+             ╟──────────────────────────────────────────────────────────────\n",
+            protocol_name, test_name
+        )
+    }
+
     /// Create standardised test footer with classification results
     ///
     /// # Arguments

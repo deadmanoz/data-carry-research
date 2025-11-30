@@ -27,33 +27,11 @@ use serial_test::serial;
 // Import standardised test utilities
 use crate::common::fixtures;
 use crate::common::protocol_test_base::setup_protocol_test;
+use crate::common::test_output::TestOutputFormatter;
 
 /// Data Storage protocol test data creation
 mod test_data {
     use super::*;
-
-    /// Create formatted test header
-    pub fn create_test_header(test_name: &str, description: &str) -> String {
-        format!(
-            "\n╔══════════════════════════════════════════════════════════════╗\n\
-             ║ DataStorage Test: {:<44} ║\n\
-             ╠══════════════════════════════════════════════════════════════╣\n\
-             ║ {:<61} ║\n\
-             ╟──────────────────────────────────────────────────────────────╢\n",
-            test_name, description
-        )
-    }
-
-    /// Create formatted test footer
-    pub fn create_test_footer(classification: &str, detected_format: &str) -> String {
-        format!(
-            "║                                                               ║\n\
-             ║ Classification: ✅ {:<44} ║\n\
-             ║   Format: {:<53} ║\n\
-             ╚══════════════════════════════════════════════════════════════╝\n",
-            classification, detected_format
-        )
-    }
 
     /// Detect embedded format from magic bytes
     fn detect_format(data: &[u8]) -> Option<&'static str> {
@@ -323,7 +301,7 @@ mod basic_classification {
         // Display test header
         print!(
             "{}",
-            test_data::create_test_header(test_name, "Compressed Proof-of-Burn (0x03 + all 0xFF)")
+            TestOutputFormatter::format_test_header_simple("DataStorage", test_name)
         );
 
         // Test compressed proof-of-burn pattern (0x03 + all 0xFF)
@@ -361,7 +339,7 @@ mod basic_classification {
 
         print!(
             "{}",
-            test_data::create_test_footer("DataStorage", "Proof-of-Burn (0x03 + 0xFF)")
+            TestOutputFormatter::format_test_footer("DataStorage", "Pattern-based detection")
         );
 
         Ok(())
@@ -377,10 +355,7 @@ mod basic_classification {
         // Display test header
         print!(
             "{}",
-            test_data::create_test_header(
-                test_name,
-                "Uncompressed Proof-of-Burn (0x04 + all 0xFF)"
-            )
+            TestOutputFormatter::format_test_header_simple("DataStorage", test_name)
         );
 
         // Test uncompressed proof-of-burn pattern (0x04 + all 0xFF)
@@ -414,7 +389,7 @@ mod basic_classification {
 
         print!(
             "{}",
-            test_data::create_test_footer("DataStorage", "Proof-of-Burn (0x04 + 0xFF)")
+            TestOutputFormatter::format_test_footer("DataStorage", "Pattern-based detection")
         );
 
         Ok(())
@@ -430,7 +405,7 @@ mod basic_classification {
         // Display test header
         print!(
             "{}",
-            test_data::create_test_header(test_name, "Normal Pubkey (should NOT classify)")
+            TestOutputFormatter::format_test_header_simple("DataStorage", test_name)
         );
 
         // Test normal pubkey (should not be classified as data storage)
@@ -477,7 +452,7 @@ mod edge_cases {
         // Display test header
         print!(
             "{}",
-            test_data::create_test_header(test_name, "Partial Burn Pattern (should NOT classify)")
+            TestOutputFormatter::format_test_header_simple("DataStorage", test_name)
         );
 
         // Test partial burn pattern (not all 0xFF)
@@ -519,7 +494,7 @@ mod edge_cases {
 
         print!(
             "{}",
-            test_data::create_test_header(test_name, "Wrong Prefix (should NOT classify)")
+            TestOutputFormatter::format_test_header_simple("DataStorage", test_name)
         );
 
         // Test wrong prefix (0x01 is invalid for compressed keys, should be 0x02/0x03)
@@ -558,7 +533,7 @@ mod edge_cases {
 
         print!(
             "{}",
-            test_data::create_test_header(test_name, "Empty Pubkeys (should NOT classify)")
+            TestOutputFormatter::format_test_header_simple("DataStorage", test_name)
         );
 
         // Test transaction with no pubkeys
@@ -595,7 +570,7 @@ mod archive_formats {
 
         print!(
             "{}",
-            test_data::create_test_header(test_name, "GZIP Archive Detection (0x1f 0x8b 0x08)")
+            TestOutputFormatter::format_test_header_simple("DataStorage", test_name)
         );
 
         // GZIP magic: 0x1f 0x8b 0x08 (DEFLATE)
@@ -633,7 +608,7 @@ mod archive_formats {
 
         print!(
             "{}",
-            test_data::create_test_footer("DataStorage", "GZIP Archive")
+            TestOutputFormatter::format_test_footer("DataStorage", "Pattern-based detection")
         );
 
         Ok(())
@@ -648,7 +623,7 @@ mod archive_formats {
 
         print!(
             "{}",
-            test_data::create_test_header(test_name, "ZLIB Compression Detection (0x78 0x5e)")
+            TestOutputFormatter::format_test_header_simple("DataStorage", test_name)
         );
 
         // ZLIB moderate compression: 0x78 0x5e
@@ -689,7 +664,7 @@ mod archive_formats {
 
         print!(
             "{}",
-            test_data::create_test_footer("DataStorage", "ZLIB Compression")
+            TestOutputFormatter::format_test_footer("DataStorage", "Pattern-based detection")
         );
 
         Ok(())
@@ -704,7 +679,7 @@ mod archive_formats {
 
         print!(
             "{}",
-            test_data::create_test_header(test_name, "BZIP2 Archive Detection (BZh9)")
+            TestOutputFormatter::format_test_header_simple("DataStorage", test_name)
         );
 
         // BZIP2 magic: BZh9 (0x42 0x5a 0x68 0x39)
@@ -741,7 +716,7 @@ mod archive_formats {
 
         print!(
             "{}",
-            test_data::create_test_footer("DataStorage", "BZIP2 Archive")
+            TestOutputFormatter::format_test_footer("DataStorage", "Pattern-based detection")
         );
 
         Ok(())
@@ -756,10 +731,7 @@ mod archive_formats {
 
         print!(
             "{}",
-            test_data::create_test_header(
-                test_name,
-                "TAR Archive Detection (multi-output, offset 257)"
-            )
+            TestOutputFormatter::format_test_header_simple("DataStorage", test_name)
         );
 
         // TAR requires magic "ustar\0" or "ustar  " at offset 257
@@ -826,7 +798,7 @@ mod archive_formats {
 
         print!(
             "{}",
-            test_data::create_test_footer("DataStorage", "TAR Archive (offset 257)")
+            TestOutputFormatter::format_test_footer("DataStorage", "Pattern-based detection")
         );
 
         Ok(())
@@ -841,7 +813,7 @@ mod archive_formats {
 
         print!(
             "{}",
-            test_data::create_test_header(test_name, "PNG Image Detection (0x89 0x50 0x4E 0x47)")
+            TestOutputFormatter::format_test_header_simple("DataStorage", test_name)
         );
 
         // PNG magic: 89 50 4E 47 0D 0A 1A 0A
@@ -878,7 +850,7 @@ mod archive_formats {
 
         print!(
             "{}",
-            test_data::create_test_footer("DataStorage", "PNG Image")
+            TestOutputFormatter::format_test_footer("DataStorage", "Pattern-based detection")
         );
 
         Ok(())
@@ -893,7 +865,7 @@ mod archive_formats {
 
         print!(
             "{}",
-            test_data::create_test_header(test_name, "PDF Document Detection (%PDF)")
+            TestOutputFormatter::format_test_header_simple("DataStorage", test_name)
         );
 
         // PDF magic: %PDF (0x25 0x50 0x44 0x46)
@@ -930,7 +902,7 @@ mod archive_formats {
 
         print!(
             "{}",
-            test_data::create_test_footer("DataStorage", "PDF Document")
+            TestOutputFormatter::format_test_footer("DataStorage", "Pattern-based detection")
         );
 
         Ok(())
@@ -955,10 +927,7 @@ mod real_transactions {
 
         print!(
             "{}",
-            test_data::create_test_header(
-                test_name,
-                &format!("Linpyro Transaction 1 ({}...)", &txid[..12])
-            )
+            TestOutputFormatter::format_test_header("DataStorage", test_name, txid)
         );
 
         let p2ms_outputs =
@@ -1017,7 +986,7 @@ mod real_transactions {
 
         print!(
             "{}",
-            test_data::create_test_footer("DataStorage", "GZIP Archive (Linpyro)")
+            TestOutputFormatter::format_test_footer("DataStorage", "Pattern-based detection")
         );
 
         Ok(())
@@ -1035,10 +1004,7 @@ mod real_transactions {
 
         print!(
             "{}",
-            test_data::create_test_header(
-                test_name,
-                &format!("Linpyro Transaction 2 ({}...)", &txid[..12])
-            )
+            TestOutputFormatter::format_test_header("DataStorage", test_name, txid)
         );
 
         let p2ms_outputs =
@@ -1096,7 +1062,7 @@ mod real_transactions {
 
         print!(
             "{}",
-            test_data::create_test_footer("DataStorage", "GZIP Archive (Linpyro)")
+            TestOutputFormatter::format_test_footer("DataStorage", "Pattern-based detection")
         );
 
         Ok(())
@@ -1115,10 +1081,7 @@ mod real_transactions {
 
         print!(
             "{}",
-            test_data::create_test_header(
-                test_name,
-                &format!("WikiLeaks Python Script 1 ({}...)", &txid[..12])
-            )
+            TestOutputFormatter::format_test_header("DataStorage", test_name, txid)
         );
 
         let p2ms_outputs = load_p2ms_outputs_from_json(
@@ -1197,7 +1160,7 @@ mod real_transactions {
 
         print!(
             "{}",
-            test_data::create_test_footer("DataStorage", "Embedded Data (Python script)")
+            TestOutputFormatter::format_test_footer("DataStorage", "Pattern-based detection")
         );
 
         Ok(())
@@ -1216,10 +1179,7 @@ mod real_transactions {
 
         print!(
             "{}",
-            test_data::create_test_header(
-                test_name,
-                &format!("WikiLeaks Python Script 2 ({}...)", &txid[..12])
-            )
+            TestOutputFormatter::format_test_header("DataStorage", test_name, txid)
         );
 
         let p2ms_outputs = load_p2ms_outputs_from_json(
@@ -1298,7 +1258,7 @@ mod real_transactions {
 
         print!(
             "{}",
-            test_data::create_test_footer("DataStorage", "Embedded Data (Python script)")
+            TestOutputFormatter::format_test_footer("DataStorage", "Pattern-based detection")
         );
 
         Ok(())
@@ -1317,10 +1277,7 @@ mod real_transactions {
 
         print!(
             "{}",
-            test_data::create_test_header(
-                test_name,
-                &format!("Null Data (all zeros) ({}...)", &txid[..12])
-            )
+            TestOutputFormatter::format_test_header("DataStorage", test_name, txid)
         );
 
         let p2ms_outputs = load_p2ms_outputs_from_json(
@@ -1369,7 +1326,7 @@ mod real_transactions {
 
         print!(
             "{}",
-            test_data::create_test_footer("DataStorage", "Null Data (empty padding)")
+            TestOutputFormatter::format_test_footer("DataStorage", "Pattern-based detection")
         );
 
         Ok(())
@@ -1389,10 +1346,7 @@ mod real_transactions {
 
         print!(
             "{}",
-            test_data::create_test_header(
-                test_name,
-                &format!("URL Embedding ({}...)", &txid[..12])
-            )
+            TestOutputFormatter::format_test_header("DataStorage", test_name, txid)
         );
 
         let p2ms_outputs =
@@ -1453,7 +1407,7 @@ mod real_transactions {
 
         print!(
             "{}",
-            test_data::create_test_footer("DataStorage", "File Metadata (URL reference)")
+            TestOutputFormatter::format_test_footer("DataStorage", "Pattern-based detection")
         );
 
         Ok(())
@@ -1474,10 +1428,7 @@ mod real_transactions {
 
         print!(
             "{}",
-            test_data::create_test_header(
-                test_name,
-                &format!("ASCII Personal Message ({}...)", &txid[..12])
-            )
+            TestOutputFormatter::format_test_header("DataStorage", test_name, txid)
         );
 
         let p2ms_outputs = load_p2ms_outputs_from_json(
@@ -1552,7 +1503,7 @@ mod real_transactions {
 
         print!(
             "{}",
-            test_data::create_test_footer("DataStorage", "Embedded Data (ASCII message)")
+            TestOutputFormatter::format_test_footer("DataStorage", "Pattern-based detection")
         );
 
         Ok(())
@@ -1577,10 +1528,7 @@ mod bitcoin_whitepaper {
 
         print!(
             "{}",
-            test_data::create_test_header(
-                test_name,
-                "Bitcoin Whitepaper PDF (TXID-based detection)"
-            )
+            TestOutputFormatter::format_test_header_simple("DataStorage", test_name)
         );
 
         // Create a minimal transaction with the whitepaper TXID
@@ -1686,10 +1634,7 @@ mod bitcoin_whitepaper {
 
         print!(
             "{}",
-            test_data::create_test_header(
-                test_name,
-                "Non-Whitepaper TXID (should NOT match artifact detection)"
-            )
+            TestOutputFormatter::format_test_header_simple("DataStorage", test_name)
         );
 
         // Create a transaction with a different TXID that has PDF-like content
