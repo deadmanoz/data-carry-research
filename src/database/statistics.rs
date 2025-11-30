@@ -46,41 +46,6 @@ impl EnrichedTransactionStats {
     }
 }
 
-/// Statistics for Stage 3 protocol classifications
-#[derive(Debug)]
-pub struct ClassificationStats {
-    pub total_classified: usize,
-    #[allow(dead_code)]
-    pub bitcoin_stamps: usize,
-    #[allow(dead_code)]
-    pub counterparty: usize,
-    #[allow(dead_code)]
-    pub ascii_identifier_protocols: usize,
-    #[allow(dead_code)]
-    pub omni_layer: usize,
-    #[allow(dead_code)]
-    pub chancecoin: usize,
-    #[allow(dead_code)]
-    pub ppk: usize,
-    #[allow(dead_code)]
-    pub opreturn_signalled: usize,
-    #[allow(dead_code)]
-    pub data_storage: usize,
-    #[allow(dead_code)]
-    pub likely_data_storage: usize,
-    #[allow(dead_code)]
-    pub likely_legitimate: usize,
-    #[allow(dead_code)]
-    pub unknown: usize,
-    pub definitive_signatures: usize,
-}
-
-impl ClassificationStats {
-    pub fn definitive_signature_rate(&self) -> f64 {
-        safe_percentage(self.definitive_signatures, self.total_classified)
-    }
-}
-
 impl StatisticsOperations for DatabaseConnection {
     fn get_database_stats(&self) -> AppResult<DatabaseStats> {
         let total_outputs: usize = self
@@ -175,65 +140,6 @@ impl StatisticsOperations for DatabaseConnection {
             total_fees_analysed: total_fees,
             coinbase_transactions: coinbase_enriched,
             regular_transactions: total_enriched - coinbase_enriched,
-        })
-    }
-
-    fn get_classification_stats(&self) -> AppResult<ClassificationStats> {
-        // Helper to count classifications by protocol name
-        let count_by_protocol = |protocol: &str| -> AppResult<usize> {
-            self.connection()
-                .query_row(
-                    "SELECT COUNT(*) FROM transaction_classifications WHERE protocol = ?",
-                    rusqlite::params![protocol],
-                    |row| row.get(0),
-                )
-                .map_err(AppError::Database)
-        };
-
-        let total_classified: usize = self
-            .connection()
-            .query_row(
-                "SELECT COUNT(*) FROM transaction_classifications",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(AppError::Database)?;
-
-        let stamps_count = count_by_protocol("BitcoinStamps")?;
-        let counterparty_count = count_by_protocol("Counterparty")?;
-        let ascii_identifier_protocols_count = count_by_protocol("AsciiIdentifierProtocols")?;
-        let omni_count = count_by_protocol("OmniLayer")?;
-        let chancecoin_count = count_by_protocol("Chancecoin")?;
-        let ppk_count = count_by_protocol("PPk")?;
-        let opreturn_signalled_count = count_by_protocol("OpReturnSignalled")?;
-        let datastorage_count = count_by_protocol("DataStorage")?;
-        let likely_data_storage_count = count_by_protocol("LikelyDataStorage")?;
-        let likely_legitimate_count = count_by_protocol("LikelyLegitimateMultisig")?;
-        let unknown_count = count_by_protocol("Unknown")?;
-
-        let signatures_found: usize = self
-            .connection()
-            .query_row(
-                "SELECT COUNT(*) FROM transaction_classifications WHERE protocol_signature_found = 1",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(AppError::Database)?;
-
-        Ok(ClassificationStats {
-            total_classified,
-            bitcoin_stamps: stamps_count,
-            counterparty: counterparty_count,
-            ascii_identifier_protocols: ascii_identifier_protocols_count,
-            omni_layer: omni_count,
-            chancecoin: chancecoin_count,
-            ppk: ppk_count,
-            opreturn_signalled: opreturn_signalled_count,
-            data_storage: datastorage_count,
-            likely_data_storage: likely_data_storage_count,
-            likely_legitimate: likely_legitimate_count,
-            unknown: unknown_count,
-            definitive_signatures: signatures_found,
         })
     }
 }

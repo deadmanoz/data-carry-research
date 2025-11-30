@@ -179,9 +179,6 @@ pub trait StatisticsOperations {
     fn get_enriched_transaction_stats(
         &self,
     ) -> AppResult<crate::database::EnrichedTransactionStats>;
-
-    /// Get classification statistics
-    fn get_classification_stats(&self) -> AppResult<crate::database::ClassificationStats>;
 }
 
 /// Combined database interface that includes all operations

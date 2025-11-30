@@ -1,4 +1,4 @@
-use crate::database::traits::{Stage3Operations, StatisticsOperations};
+use crate::database::traits::Stage3Operations;
 use crate::database::Database;
 use crate::errors::{AppError, AppResult};
 use crate::processor::{
@@ -244,7 +244,7 @@ impl Stage3Processor {
                     // Schema V2 FK Ordering:
                     // STEP 1: Insert transaction classification (FK parent)
                     self.database
-                        .insert_classification_results_batch(&[classification.clone()])?;
+                        .insert_classification_results_batch(std::slice::from_ref(&classification))?;
 
                     // STEP 2: Insert output classifications (FK child)
                     if !output_classifications.is_empty() {
@@ -363,22 +363,40 @@ impl Stage3Processor {
             info!("Errors encountered: {}", results.errors_encountered);
         }
 
-        // Get additional database statistics
-        match self.database.get_classification_stats() {
-            Ok(stats) => {
-                info!("");
-                info!("Database Classification Statistics:");
-                info!("  Total classified: {}", stats.total_classified);
-                info!(
-                    "  Definitive signatures: {} ({:.1}%)",
-                    stats.definitive_signatures,
-                    stats.definitive_signature_rate()
-                );
-            }
-            Err(e) => {
-                debug!("Could not retrieve classification stats: {}", e);
-            }
-        }
+        // Log additional classification statistics
+        let total_classified: i64 = self
+            .database
+            .connection()
+            .query_row(
+                "SELECT COUNT(*) FROM transaction_classifications",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
+
+        let signatures_found: i64 = self
+            .database
+            .connection()
+            .query_row(
+                "SELECT COUNT(*) FROM transaction_classifications WHERE protocol_signature_found = 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
+
+        let signature_rate = if total_classified > 0 {
+            (signatures_found as f64 / total_classified as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        info!("");
+        info!("Database Classification Statistics:");
+        info!("  Total classified: {}", total_classified);
+        info!(
+            "  Definitive signatures: {} ({:.1}%)",
+            signatures_found, signature_rate
+        );
 
         Ok(())
     }

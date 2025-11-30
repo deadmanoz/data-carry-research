@@ -20,7 +20,7 @@ pub use connection::DatabaseConnection;
 pub use helpers::*; // Export helper functions for use across stages
 pub use query_helper::QueryHelper; // Export QueryHelper trait for analysis modules
 pub use schema_v2::setup_schema_v2; // Schema V2 setup function
-pub use statistics::{ClassificationStats, DatabaseStats, EnrichedTransactionStats};
+pub use statistics::{DatabaseStats, EnrichedTransactionStats};
 pub use traits::*;
 
 use crate::errors::AppResult;
@@ -254,10 +254,6 @@ impl StatisticsOperations for Database {
 
     fn get_enriched_transaction_stats(&self) -> AppResult<EnrichedTransactionStats> {
         self.connection.get_enriched_transaction_stats()
-    }
-
-    fn get_classification_stats(&self) -> AppResult<ClassificationStats> {
-        self.connection.get_classification_stats()
     }
 }
 
