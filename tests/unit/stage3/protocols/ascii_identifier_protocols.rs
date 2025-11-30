@@ -257,16 +257,12 @@ mod test_data {
         println!("╟──────────────────────────────────────────────────────────────");
 
         // Run Stage 3
-        let results = run_stage3_processor(test_db.path(), config).await?;
+        let total_classified = run_stage3_processor(test_db.path(), config).await?;
 
         // Verify results
-        verify_stage3_completion(&results, 1, 1);
+        verify_stage3_completion(total_classified, 1, 1);
 
-        println!("║ ✅ Classified: {}/{}", results.total_classified, 1);
-        println!(
-            "║ ASCII ID Protocols: {}",
-            results.ascii_identifier_protocols
-        );
+        println!("║ ✅ Classified: {}/{}", total_classified, 1);
         println!("║");
 
         // Verify AsciiIdentifierProtocols classification
@@ -506,19 +502,30 @@ async fn test_ascii_identifier_false_positive() {
 
     // Run Stage 3
     use crate::common::protocol_test_base::run_stage3_processor;
-    let results = run_stage3_processor(test_db.path(), config)
+    use data_carry_research::database::Database;
+
+    let total_classified = run_stage3_processor(test_db.path(), config)
         .await
         .expect("Stage 3 processing failed");
 
-    println!("║ ✅ Classified: {}", results.total_classified);
-    println!(
-        "║ ASCII ID Protocols: {}",
-        results.ascii_identifier_protocols
-    );
+    println!("║ ✅ Classified: {}", total_classified);
     println!("║");
 
+    // Query for AsciiIdentifierProtocols classifications
+    let db = Database::new_v2(test_db.path()).unwrap();
+    let ascii_id_count: i64 = db
+        .connection()
+        .query_row(
+            "SELECT COUNT(*) FROM transaction_classifications WHERE protocol = 'AsciiIdentifierProtocols'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+
+    println!("║ ASCII ID Protocols: {}", ascii_id_count);
+
     // Verify it was NOT classified as AsciiIdentifierProtocols
-    if results.ascii_identifier_protocols > 0 {
+    if ascii_id_count > 0 {
         panic!(
             "❌ False positive! FOOBAR was classified as AsciiIdentifierOther, but it's not on the allowlist"
         );
@@ -526,7 +533,7 @@ async fn test_ascii_identifier_false_positive() {
 
     // Should be classified as something else (likely DataStorage or Unknown)
     assert!(
-        results.total_classified > 0,
+        total_classified > 0,
         "Transaction should still be classified (just not as AsciiIdentifierOther)"
     );
 

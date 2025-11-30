@@ -431,8 +431,8 @@ mod test_data {
         // (No need to insert again - they're handled by the batch insert)
 
         // Run Stage 3 processing
-        let stats = run_stage3_processor(test_db.path(), config).await?;
-        verify_stage3_completion(&stats, 1, 1);
+        let total_classified = run_stage3_processor(test_db.path(), config).await?;
+        verify_stage3_completion(total_classified, 1, 1);
 
         // Verify classification
         let classification_details =

@@ -116,8 +116,8 @@ async fn test_clipperz_v1() -> Result<()> {
     )?;
 
     // Run Stage 3
-    let stats = run_stage3_processor(test_db.path(), config).await?;
-    verify_stage3_completion(&stats, 1, 1);
+    let total_classified = run_stage3_processor(test_db.path(), config).await?;
+    verify_stage3_completion(total_classified, 1, 1);
 
     // Verify classification
     verify_classification(
@@ -181,8 +181,8 @@ async fn test_clipperz_v2() -> Result<()> {
     )?;
 
     // Run Stage 3
-    let stats = run_stage3_processor(test_db.path(), config).await?;
-    verify_stage3_completion(&stats, 1, 1);
+    let total_classified = run_stage3_processor(test_db.path(), config).await?;
+    verify_stage3_completion(total_classified, 1, 1);
 
     // Verify classification
     verify_classification(
@@ -248,8 +248,8 @@ async fn test_protocol47930_standard() -> Result<()> {
     )?;
 
     // Run Stage 3
-    let stats = run_stage3_processor(test_db.path(), config).await?;
-    verify_stage3_completion(&stats, 1, 1);
+    let total_classified = run_stage3_processor(test_db.path(), config).await?;
+    verify_stage3_completion(total_classified, 1, 1);
 
     // Verify classification
     verify_classification(
@@ -325,8 +325,8 @@ async fn test_generic_ascii_prvcy() -> Result<()> {
     )?;
 
     // Run Stage 3
-    let stats = run_stage3_processor(test_db.path(), config).await?;
-    verify_stage3_completion(&stats, 1, 1);
+    let total_classified = run_stage3_processor(test_db.path(), config).await?;
+    verify_stage3_completion(total_classified, 1, 1);
 
     // Verify classification
     verify_classification(

@@ -5,7 +5,6 @@
 //! all protocol test files (Counterparty, Omni Layer, Bitcoin Stamps, Data Storage).
 
 use anyhow::Result;
-use data_carry_research::database::traits::StatisticsOperations;
 use data_carry_research::database::Database;
 use data_carry_research::processor::stage3::Stage3Processor;
 use data_carry_research::types::{
@@ -459,18 +458,19 @@ pub fn get_first_input_txid_from_json(json_path: &str) -> Result<String> {
 
 /// Standard Stage 3 processor runner
 ///
-/// Runs Stage 3 processing and returns classification stats.
+/// Runs Stage 3 processing and returns total classification count.
 /// Use this for consistent test execution across protocols.
-pub async fn run_stage3_processor(
-    db_path: &str,
-    config: Stage3Config,
-) -> Result<data_carry_research::database::ClassificationStats> {
+pub async fn run_stage3_processor(db_path: &str, config: Stage3Config) -> Result<usize> {
     let mut processor = Stage3Processor::new(db_path, config)?;
     processor.run().await?;
 
     let db = Database::new_v2(db_path)?;
-    let stats = db.get_classification_stats()?;
-    Ok(stats)
+    let total_classified: i64 = db.connection().query_row(
+        "SELECT COUNT(*) FROM transaction_classifications",
+        [],
+        |row| row.get(0),
+    )?;
+    Ok(total_classified as usize)
 }
 
 /// Verify Stage 3 processing completed successfully
@@ -478,21 +478,21 @@ pub async fn run_stage3_processor(
 /// Standard assertions for Stage 3 test completion.
 /// Checks that processing ran without errors and classified expected number of transactions.
 pub fn verify_stage3_completion(
-    stats: &data_carry_research::database::ClassificationStats,
+    total_classified: usize,
     expected_total: usize,
     expected_protocol_count: usize,
 ) {
     assert_eq!(
-        stats.total_classified, expected_total,
+        total_classified, expected_total,
         "Expected {} total classifications, got {}",
-        expected_total, stats.total_classified
+        expected_total, total_classified
     );
 
     assert!(
-        stats.total_classified >= expected_protocol_count,
+        total_classified >= expected_protocol_count,
         "Expected at least {} protocol classifications, got {}",
         expected_protocol_count,
-        stats.total_classified
+        total_classified
     );
 }
 

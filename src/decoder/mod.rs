@@ -1059,9 +1059,10 @@ impl ProtocolDecoder {
 
         // Parse the payload into structured data using our new parsing infrastructure
         let parsed_message = match message_type.parse_payload(&payload) {
-            Ok(parsed) => Some(serde_json::to_value(parsed).map_err(|e| {
-                DecoderError::Io(std::io::Error::other(e))
-            })?),
+            Ok(parsed) => Some(
+                serde_json::to_value(parsed)
+                    .map_err(|e| DecoderError::Io(std::io::Error::other(e)))?,
+            ),
             Err(parse_err) => {
                 info!(
                     "Failed to parse Counterparty payload for {}: {}",
@@ -1386,8 +1387,7 @@ impl ProtocolDecoder {
         }
 
         // Write metadata JSON
-        let json_str = serde_json::to_string_pretty(&metadata)
-            .map_err(std::io::Error::other)?;
+        let json_str = serde_json::to_string_pretty(&metadata).map_err(std::io::Error::other)?;
         std::fs::write(&output_path, json_str)?;
 
         info!(

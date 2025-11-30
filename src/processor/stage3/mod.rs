@@ -244,7 +244,9 @@ impl Stage3Processor {
                     // Schema V2 FK Ordering:
                     // STEP 1: Insert transaction classification (FK parent)
                     self.database
-                        .insert_classification_results_batch(std::slice::from_ref(&classification))?;
+                        .insert_classification_results_batch(std::slice::from_ref(
+                            &classification,
+                        ))?;
 
                     // STEP 2: Insert output classifications (FK child)
                     if !output_classifications.is_empty() {

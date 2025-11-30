@@ -187,12 +187,12 @@ mod test_data {
         println!("╟──────────────────────────────────────────────────────────────");
 
         // Run Stage 3
-        let results = run_stage3_processor(test_db.path(), config).await?;
+        let total_classified = run_stage3_processor(test_db.path(), config).await?;
 
         // Verify results
-        verify_stage3_completion(&results, 1, 1);
+        verify_stage3_completion(total_classified, 1, 1);
 
-        println!("║ ✅ Classified: {}/{}", results.total_classified, 1);
+        println!("║ ✅ Classified: {}/{}", total_classified, 1);
         println!("║");
 
         // Verify Chancecoin classification

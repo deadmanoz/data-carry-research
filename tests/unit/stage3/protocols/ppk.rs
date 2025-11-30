@@ -22,6 +22,7 @@
 //! All tests use authentic Bitcoin mainnet transaction data from JSON fixtures,
 //! ensuring validation against real-world PPk protocol usage.
 
+use data_carry_research::database::Database;
 use data_carry_research::types::{
     EnrichedTransaction, ProtocolType, ProtocolVariant, TransactionOutput,
 };
@@ -106,7 +107,7 @@ mod test_data {
         seed_enriched_transaction_simple(&mut test_db, &tx, Vec::new())?;
 
         // Run Stage 3 processor
-        let stats = run_stage3_processor(test_db.path(), config).await?;
+        let total_classified = run_stage3_processor(test_db.path(), config).await?;
 
         // Verify classification occurred
         let expected_count = match expected_variant {
@@ -117,7 +118,7 @@ mod test_data {
             _ => panic!("Invalid PPk variant: {:?}", expected_variant),
         };
 
-        verify_stage3_completion(&stats, expected_count, expected_count);
+        verify_stage3_completion(total_classified, expected_count, expected_count);
 
         // Verify protocol classification
         verify_classification(
@@ -281,11 +282,20 @@ async fn test_ppk_no_marker_negative() {
     seed_enriched_transaction_simple(&mut test_db, &tx, Vec::new()).unwrap();
 
     // Run Stage 3 processor
-    let stats = run_stage3_processor(test_db.path(), config).await.unwrap();
+    let _total_classified = run_stage3_processor(test_db.path(), config).await.unwrap();
 
-    // Verify NO PPk classification occurred
+    // Verify NO PPk classification occurred using direct SQL query
+    let db = Database::new_v2(test_db.path()).unwrap();
+    let ppk_count: i64 = db
+        .connection()
+        .query_row(
+            "SELECT COUNT(*) FROM transaction_classifications WHERE protocol = 'PPk'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
     assert_eq!(
-        stats.ppk, 0,
+        ppk_count, 0,
         "PPk should not classify transaction without marker"
     );
 

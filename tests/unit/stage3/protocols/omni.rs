@@ -493,8 +493,8 @@ mod test_data {
         display_rich_analysis(json_path, &tx)?;
 
         // Run Stage 3 processing
-        let stats = run_stage3_processor(test_db.path(), config).await?;
-        verify_stage3_completion(&stats, 1, 1);
+        let total_classified = run_stage3_processor(test_db.path(), config).await?;
+        verify_stage3_completion(total_classified, 1, 1);
 
         // Verify classification
         verify_classification(&test_db, txid, ProtocolType::OmniLayer, expected_variant)?;

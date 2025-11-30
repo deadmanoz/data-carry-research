@@ -279,8 +279,8 @@ mod test_data {
         seed_enriched_transaction_simple(&mut test_db, &tx, inputs)?;
 
         // Run Stage 3 processing
-        let stats = run_stage3_processor(test_db.path(), config).await?;
-        verify_stage3_completion(&stats, 1, 1);
+        let total_classified = run_stage3_processor(test_db.path(), config).await?;
+        verify_stage3_completion(total_classified, 1, 1);
 
         // Verify classification and get details
         let classification_details = verify_classification(

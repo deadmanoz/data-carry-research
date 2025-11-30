@@ -1,14 +1,11 @@
-use data_carry_research::database::traits::{
-    Stage1Operations, Stage2Operations, Stage3Operations, StatisticsOperations,
-};
-use data_carry_research::database::{ClassificationStats, Database};
+use data_carry_research::database::traits::{Stage1Operations, Stage2Operations, Stage3Operations};
+use data_carry_research::database::Database;
 use data_carry_research::processor::stage3::Stage3Processor;
 use data_carry_research::types::burn_patterns::{BurnPattern, BurnPatternType};
 use data_carry_research::types::{
     ClassificationDetails, ClassificationResult, EnrichedTransaction, OutputClassificationData,
     OutputClassificationDetails, ProtocolType, ProtocolVariant, Stage3Config, TransactionInput,
 };
-use data_carry_research::utils::math::safe_percentage;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // Import common test utilities
@@ -83,18 +80,17 @@ async fn test_stage3_database_schema_creation() {
     // Create database and verify Stage 3 schema exists
     let db = Database::new_v2(&db_path).unwrap();
 
-    // Test that we can count classification stats (which will fail if schema doesn't exist)
-    let stats_result = db.get_classification_stats();
-    assert!(
-        stats_result.is_ok(),
-        "Should be able to get classification stats even if empty"
-    );
+    // Test that schema exists by querying transaction_classifications table
+    let total_classified: i64 = db
+        .connection()
+        .query_row(
+            "SELECT COUNT(*) FROM transaction_classifications",
+            [],
+            |row| row.get(0),
+        )
+        .expect("Schema should exist - transaction_classifications table must be queryable");
 
-    let stats = stats_result.unwrap();
-    assert_eq!(
-        stats.total_classified, 0,
-        "Should start with 0 classifications"
-    );
+    assert_eq!(total_classified, 0, "Should start with 0 classifications");
 }
 
 #[tokio::test]
@@ -131,14 +127,35 @@ async fn test_stage3_classification_insertion_and_retrieval() {
     db.insert_classification_results_batch(&[classification])
         .unwrap();
 
-    // Verify it was inserted
-    let stats = db.get_classification_stats().unwrap();
-    assert_eq!(stats.total_classified, 1);
-    assert_eq!(stats.bitcoin_stamps, 1);
-    assert_eq!(stats.counterparty, 0);
-    assert_eq!(stats.omni_layer, 0);
-    assert_eq!(stats.unknown, 0);
-    assert_eq!(stats.definitive_signatures, 1);
+    // Verify it was inserted using direct SQL queries
+    let conn = db.connection();
+
+    let total: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM transaction_classifications",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(total, 1);
+
+    let stamps: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM transaction_classifications WHERE protocol = 'BitcoinStamps'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(stamps, 1);
+
+    let signatures: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM transaction_classifications WHERE protocol_signature_found = 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(signatures, 1);
 }
 
 #[tokio::test]
@@ -222,29 +239,53 @@ async fn test_stage3_batch_classification_insertion() {
     db.insert_classification_results_batch(&classifications)
         .unwrap();
 
-    // Verify results
-    let stats = db.get_classification_stats().unwrap();
-    assert_eq!(stats.total_classified, 3);
-    assert_eq!(stats.bitcoin_stamps, 1);
-    assert_eq!(stats.counterparty, 1);
-    assert_eq!(stats.omni_layer, 0);
-    assert_eq!(stats.unknown, 1);
-    assert_eq!(stats.definitive_signatures, 2); // Stamps + Counterparty
+    // Verify results using direct SQL queries
+    let conn = db.connection();
 
-    // Test percentage calculations (with reasonable tolerance for floating point)
-    assert!(
-        (safe_percentage(stats.bitcoin_stamps, stats.total_classified) - 33.333333333333336).abs()
-            < 0.000001
-    );
-    assert!(
-        (safe_percentage(stats.counterparty, stats.total_classified) - 33.333333333333336).abs()
-            < 0.000001
-    );
-    assert!(
-        (safe_percentage(stats.unknown, stats.total_classified) - 33.333333333333336).abs()
-            < 0.000001
-    );
-    assert!((stats.definitive_signature_rate() - 66.66666666666667).abs() < 0.000001);
+    let total: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM transaction_classifications",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(total, 3);
+
+    let stamps: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM transaction_classifications WHERE protocol = 'BitcoinStamps'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(stamps, 1);
+
+    let counterparty: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM transaction_classifications WHERE protocol = 'Counterparty'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(counterparty, 1);
+
+    let unknown: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM transaction_classifications WHERE protocol = 'Unknown'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(unknown, 1);
+
+    let signatures: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM transaction_classifications WHERE protocol_signature_found = 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(signatures, 2); // Stamps + Counterparty
 }
 
 #[tokio::test]
@@ -258,76 +299,6 @@ async fn test_stage3_processor_creation() {
         processor.is_ok(),
         "Stage3Processor should be created successfully"
     );
-}
-
-#[tokio::test]
-async fn test_stage3_classification_stats_calculations() {
-    // Test ClassificationStats percentage calculations
-    let stats = ClassificationStats {
-        total_classified: 100,
-        bitcoin_stamps: 25,
-        counterparty: 35,
-        ascii_identifier_protocols: 0,
-        omni_layer: 15,
-        chancecoin: 0,
-        ppk: 0,
-        opreturn_signalled: 0,
-        data_storage: 0,
-        likely_data_storage: 0,
-        likely_legitimate: 0,
-        unknown: 25,
-        definitive_signatures: 75,
-    };
-
-    assert_eq!(
-        safe_percentage(stats.bitcoin_stamps, stats.total_classified),
-        25.0
-    );
-    assert_eq!(
-        safe_percentage(stats.counterparty, stats.total_classified),
-        35.0
-    );
-    assert_eq!(
-        safe_percentage(stats.omni_layer, stats.total_classified),
-        15.0
-    );
-    assert_eq!(safe_percentage(stats.unknown, stats.total_classified), 25.0);
-    assert_eq!(stats.definitive_signature_rate(), 75.0);
-
-    // Test with zero totals
-    let empty_stats = ClassificationStats {
-        total_classified: 0,
-        bitcoin_stamps: 0,
-        counterparty: 0,
-        ascii_identifier_protocols: 0,
-        omni_layer: 0,
-        chancecoin: 0,
-        ppk: 0,
-        opreturn_signalled: 0,
-        data_storage: 0,
-        likely_data_storage: 0,
-        likely_legitimate: 0,
-        unknown: 0,
-        definitive_signatures: 0,
-    };
-
-    assert_eq!(
-        safe_percentage(empty_stats.bitcoin_stamps, empty_stats.total_classified),
-        0.0
-    );
-    assert_eq!(
-        safe_percentage(empty_stats.counterparty, empty_stats.total_classified),
-        0.0
-    );
-    assert_eq!(
-        safe_percentage(empty_stats.omni_layer, empty_stats.total_classified),
-        0.0
-    );
-    assert_eq!(
-        safe_percentage(empty_stats.unknown, empty_stats.total_classified),
-        0.0
-    );
-    assert_eq!(empty_stats.definitive_signature_rate(), 0.0);
 }
 
 #[tokio::test]

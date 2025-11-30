@@ -15,6 +15,39 @@ use data_carry_research::database::traits::{
     Stage2Operations, Stage3Operations, StatisticsOperations,
 };
 use data_carry_research::database::Database;
+
+/// Helper to count total classifications via direct SQL
+fn count_total_classifications(db: &Database) -> i64 {
+    db.connection()
+        .query_row(
+            "SELECT COUNT(*) FROM transaction_classifications",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0)
+}
+
+/// Helper to count classifications by protocol via direct SQL
+fn count_classifications_by_protocol(db: &Database, protocol: &str) -> i64 {
+    db.connection()
+        .query_row(
+            "SELECT COUNT(*) FROM transaction_classifications WHERE protocol = ?",
+            [protocol],
+            |row| row.get(0),
+        )
+        .unwrap_or(0)
+}
+
+/// Helper to count definitive signatures via direct SQL
+fn count_definitive_signatures(db: &Database) -> i64 {
+    db.connection()
+        .query_row(
+            "SELECT COUNT(*) FROM transaction_classifications WHERE protocol_signature_found = 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0)
+}
 use data_carry_research::processor::stage3::Stage3Processor;
 use data_carry_research::types::burn_patterns::{BurnPattern, BurnPatternType};
 use data_carry_research::types::{
@@ -85,8 +118,8 @@ async fn test_stage3_database_schema_creation() {
     assert!(std::path::Path::new(&db_path).exists());
 
     // Basic database operation should work
-    let stats = db.get_classification_stats().unwrap();
-    assert_eq!(stats.total_classified, 0);
+    let total = count_total_classifications(&db);
+    assert_eq!(total, 0);
 }
 
 #[tokio::test]
@@ -123,14 +156,13 @@ async fn test_stage3_classification_insertion_and_retrieval() {
     // Retrieve and verify via stats (individual classification retrieval not exposed in DB API)
     // This is appropriate since core tests should test the infrastructure, not the classification logic
 
-    // Verify statistics
-    let stats = db.get_classification_stats().unwrap();
-    assert_eq!(stats.total_classified, 1);
-    assert_eq!(stats.counterparty, 1);
-    assert_eq!(stats.bitcoin_stamps, 0);
-    assert_eq!(stats.omni_layer, 0);
-    assert_eq!(stats.unknown, 0);
-    assert_eq!(stats.definitive_signatures, 1);
+    // Verify statistics via direct SQL
+    assert_eq!(count_total_classifications(&db), 1);
+    assert_eq!(count_classifications_by_protocol(&db, "Counterparty"), 1);
+    assert_eq!(count_classifications_by_protocol(&db, "BitcoinStamps"), 0);
+    assert_eq!(count_classifications_by_protocol(&db, "OmniLayer"), 0);
+    assert_eq!(count_classifications_by_protocol(&db, "Unknown"), 0);
+    assert_eq!(count_definitive_signatures(&db), 1);
 }
 
 #[tokio::test]
@@ -187,14 +219,13 @@ async fn test_stage3_batch_classification_insertion() {
     // Batch insert classifications
     db.insert_classification_results_batch(&results).unwrap();
 
-    // Verify all classifications were inserted
-    let stats = db.get_classification_stats().unwrap();
-    assert_eq!(stats.total_classified, 3);
-    assert_eq!(stats.counterparty, 2); // txids 0, 2
-    assert_eq!(stats.bitcoin_stamps, 1); // txid 1
-    assert_eq!(stats.omni_layer, 0);
-    assert_eq!(stats.unknown, 0);
-    assert_eq!(stats.definitive_signatures, 3);
+    // Verify all classifications were inserted via direct SQL
+    assert_eq!(count_total_classifications(&db), 3);
+    assert_eq!(count_classifications_by_protocol(&db, "Counterparty"), 2); // txids 0, 2
+    assert_eq!(count_classifications_by_protocol(&db, "BitcoinStamps"), 1); // txid 1
+    assert_eq!(count_classifications_by_protocol(&db, "OmniLayer"), 0);
+    assert_eq!(count_classifications_by_protocol(&db, "Unknown"), 0);
+    assert_eq!(count_definitive_signatures(&db), 3);
 }
 
 #[tokio::test]
@@ -288,26 +319,35 @@ async fn test_stage3_classification_stats_calculations() {
             .unwrap();
     }
 
-    // Verify statistics calculations
-    let stats = db.get_classification_stats().unwrap();
-    assert_eq!(stats.total_classified, 6);
-    assert_eq!(stats.counterparty, 2);
-    assert_eq!(stats.bitcoin_stamps, 1);
-    assert_eq!(stats.omni_layer, 1);
-    assert_eq!(stats.opreturn_signalled, 1);
-    assert_eq!(stats.unknown, 1);
-    assert_eq!(stats.definitive_signatures, 4); // counterparty_1, stamps_1, omni_1, protocol47930_1
+    // Verify statistics calculations via direct SQL
+    let total = count_total_classifications(&db);
+    let counterparty = count_classifications_by_protocol(&db, "Counterparty");
+    let stamps = count_classifications_by_protocol(&db, "BitcoinStamps");
+    let omni = count_classifications_by_protocol(&db, "OmniLayer");
+    let opreturn = count_classifications_by_protocol(&db, "OpReturnSignalled");
+    let unknown = count_classifications_by_protocol(&db, "Unknown");
+    let chancecoin = count_classifications_by_protocol(&db, "Chancecoin");
+    let datastorage = count_classifications_by_protocol(&db, "DataStorage");
+    let definitive = count_definitive_signatures(&db);
+
+    assert_eq!(total, 6);
+    assert_eq!(counterparty, 2);
+    assert_eq!(stamps, 1);
+    assert_eq!(omni, 1);
+    assert_eq!(opreturn, 1);
+    assert_eq!(unknown, 1);
+    assert_eq!(definitive, 4); // counterparty_1, stamps_1, omni_1, protocol47930_1
 
     println!("Classification stats test results:");
-    println!("  Total: {}", stats.total_classified);
-    println!("  Bitcoin Stamps: {}", stats.bitcoin_stamps);
-    println!("  Counterparty: {}", stats.counterparty);
-    println!("  Omni Layer: {}", stats.omni_layer);
-    println!("  Chancecoin: {}", stats.chancecoin);
-    println!("  OP_RETURN Signalled: {}", stats.opreturn_signalled);
-    println!("  Data Storage: {}", stats.data_storage);
-    println!("  Unknown: {}", stats.unknown);
-    println!("  Definitive: {}", stats.definitive_signatures);
+    println!("  Total: {}", total);
+    println!("  Bitcoin Stamps: {}", stamps);
+    println!("  Counterparty: {}", counterparty);
+    println!("  Omni Layer: {}", omni);
+    println!("  Chancecoin: {}", chancecoin);
+    println!("  OP_RETURN Signalled: {}", opreturn);
+    println!("  Data Storage: {}", datastorage);
+    println!("  Unknown: {}", unknown);
+    println!("  Definitive: {}", definitive);
 }
 
 #[tokio::test]
@@ -345,18 +385,16 @@ async fn test_stage3_unclassified_transaction_counting() {
 
     // Check unclassified count by calculating total enriched minus classified
     let enriched_stats = db.get_enriched_transaction_stats().unwrap();
-    let classification_stats = db.get_classification_stats().unwrap();
-    let unclassified_count =
-        enriched_stats.total_enriched_transactions - classification_stats.total_classified;
+    let total_classified = count_total_classifications(&db) as usize;
+    let unclassified_count = enriched_stats.total_enriched_transactions - total_classified;
     assert_eq!(unclassified_count, 2); // unclassified_1 and unclassified_2
 
-    // Verify overall stats
-    let stats = db.get_classification_stats().unwrap();
-    assert_eq!(stats.total_classified, 1);
-    assert_eq!(stats.counterparty, 1);
+    // Verify overall stats via direct SQL
+    assert_eq!(total_classified, 1);
+    assert_eq!(count_classifications_by_protocol(&db, "Counterparty"), 1);
 
     println!("Unclassified transaction counting test results:");
     println!("  Total enriched transactions: {}", txids.len());
-    println!("  Classified transactions: {}", stats.total_classified);
+    println!("  Classified transactions: {}", total_classified);
     println!("  Unclassified transactions: {}", unclassified_count);
 }
