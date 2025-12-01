@@ -460,9 +460,7 @@ pub fn try_counterparty_verbose(
     let first_input_txid = tx_data.first_input_txid()?;
 
     // Use existing Counterparty extraction logic
-    let classifier = crate::processor::stage3::counterparty::CounterpartyClassifier::new(
-        &crate::types::Stage3Config::default(),
-    );
+    let classifier = crate::processor::stage3::counterparty::CounterpartyClassifier::new();
 
     // Try multi-output extraction first
     if let Some(raw_data) = classifier.extract_multi_output_raw_data(&p2ms_outputs) {

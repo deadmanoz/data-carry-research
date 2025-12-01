@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use thiserror::Error;
 
 /// Application-wide error type - single point of truth

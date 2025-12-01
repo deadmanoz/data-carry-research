@@ -52,7 +52,7 @@ impl Stage3Processor {
         let database = Database::new(database_path)?;
 
         // Initialise classification engine
-        let classifier = ProtocolClassificationEngine::new(&config);
+        let classifier = ProtocolClassificationEngine::new();
 
         // Initialise shared components
         let progress_tracker = StandardProgressTracker::new();
@@ -410,8 +410,14 @@ pub struct ProtocolClassificationEngine {
     classifiers: ProtocolClassifiers,
 }
 
+impl Default for ProtocolClassificationEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProtocolClassificationEngine {
-    pub fn new(_config: &Stage3Config) -> Self {
+    pub fn new() -> Self {
         Self {
             cache: HashMap::new(),
             classifiers: ProtocolClassifiers::new(),
@@ -780,8 +786,7 @@ mod tests {
 
     #[test]
     fn test_classification_engine() {
-        let config = Stage3Config::default();
-        let mut engine = ProtocolClassificationEngine::new(&config);
+        let mut engine = ProtocolClassificationEngine::new();
         let database = create_test_database();
 
         // Test Stamps classification

@@ -5,8 +5,6 @@
 //! - API documentation: Clear grouping of related methods
 //! - Organisational clarity: Stage1, Stage2, Stage3, Statistics operations
 
-#![allow(dead_code)]
-
 use crate::errors::AppResult;
 use crate::types::{
     ClassificationResult, EnrichedTransaction, TransactionInput, TransactionOutput,

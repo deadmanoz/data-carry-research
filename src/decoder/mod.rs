@@ -11,8 +11,6 @@
 //! - Priority logic with transport metadata
 //! - Clean separation of concerns for extensibility
 
-#![allow(dead_code)]
-
 use crate::config::BitcoinRpcConfig;
 use crate::rpc::BitcoinRpcClient;
 use std::path::PathBuf;

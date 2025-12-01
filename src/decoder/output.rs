@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::config::output_paths;
 use crate::types::content_detection::{DocumentFormat, ImageFormat};
 use std::fs;

@@ -11,8 +11,6 @@
 //! - `Stage3Operations` - Protocol classification
 //! - `StatisticsOperations` - Statistics and reporting
 
-#![allow(dead_code)]
-
 pub mod helpers; // Shared database helper functions
 pub mod query_helper; // Query helper utilities for common patterns
 pub mod schema;

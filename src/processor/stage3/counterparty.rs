@@ -6,7 +6,7 @@ use crate::types::counterparty::{
     CounterpartyMessageType, CounterpartyP2msData, MultisigPattern, COUNTERPARTY_PREFIX,
 };
 use crate::types::stamps::validation as stamps_validation;
-use crate::types::{ClassificationResult, EnrichedTransaction, ProtocolType, Stage3Config};
+use crate::types::{ClassificationResult, EnrichedTransaction, ProtocolType};
 use std::collections::HashSet;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::debug;
@@ -16,10 +16,11 @@ use super::{ProtocolSpecificClassifier, SpendabilityAnalyser};
 use crate::shared::PubkeyExtractor;
 
 /// Counterparty classifier with comprehensive P2MS data extraction and ARC4 decryption
+#[derive(Default)]
 pub struct CounterpartyClassifier;
 
 impl CounterpartyClassifier {
-    pub fn new(_config: &Stage3Config) -> Self {
+    pub fn new() -> Self {
         Self
     }
 }

@@ -38,9 +38,7 @@ pub fn try_counterparty_verbose(
     };
 
     // Use existing Counterparty extraction logic
-    let classifier = crate::processor::stage3::counterparty::CounterpartyClassifier::new(
-        &crate::types::Stage3Config::default(),
-    );
+    let classifier = crate::processor::stage3::counterparty::CounterpartyClassifier::new();
 
     // Try multi-output extraction first
     if let Some((raw_data, mut output_debug_infos)) =

@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::errors::{AppError, AppResult};
 use std::time::Instant;
 use tracing::{info, warn};

@@ -19,7 +19,7 @@ use crate::rpc::BitcoinRpcClient;
 use crate::types::counterparty::COUNTERPARTY_PREFIX;
 use crate::types::stamps::validation::{self, StampsProcessingResult};
 use crate::types::stamps::StampsTransport;
-use crate::types::{Stage3Config, TransactionOutput};
+use crate::types::TransactionOutput;
 use anyhow::{Context, Result};
 
 /// Result of ARC4 deobfuscation analysis
@@ -152,7 +152,7 @@ fn try_counterparty_path(
     p2ms_outputs: &[TransactionOutput],
     input_txid: &str,
 ) -> Option<CounterpartyArc4> {
-    let classifier = CounterpartyClassifier::new(&Stage3Config::default());
+    let classifier = CounterpartyClassifier::new();
 
     // Try multi-output extraction first
     if let Some(raw_data) = classifier.extract_multi_output_raw_data(p2ms_outputs) {
