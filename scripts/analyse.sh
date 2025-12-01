@@ -75,10 +75,20 @@ fi
 # All remaining args are passed through
 EXTRA_ARGS=("$@")
 
+# Process EXTRA_ARGS to handle specific flags like --plotly
+PROCESSED_EXTRA_ARGS=()
+for arg in "${EXTRA_ARGS[@]}"; do
+    if [[ "$arg" == "--plotly" ]]; then
+        PROCESSED_EXTRA_ARGS+=("--format" "plotly")
+    else
+        PROCESSED_EXTRA_ARGS+=("$arg")
+    fi
+done
+
 # Use default DB if none provided
 if [[ -z "$DB_PATH" ]]; then
     DB_PATH="$DEFAULT_DB"
 fi
 
 # All analysis commands use --release for optimal performance
-RUST_LOG=off cargo run --quiet --release -- analyse "$COMMAND" --database-path "$DB_PATH" ${EXTRA_ARGS[@]+ "${EXTRA_ARGS[@]}"}
+RUST_LOG=off cargo run --quiet --release -- analyse "$COMMAND" --database-path "$DB_PATH" ${PROCESSED_EXTRA_ARGS[@]+ "${PROCESSED_EXTRA_ARGS[@]}"}
