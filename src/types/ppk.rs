@@ -5,7 +5,7 @@
 //! naming and identity system built on Bitcoin.
 //!
 //! This module provides the SINGLE SOURCE OF TRUTH for PPk protocol detection.
-//! Both Stage 3 classification and Stage 4 decoding use these functions.
+//! Both Stage 3 classification and decoder use these functions.
 
 use crate::types::script_metadata::parse_p2ms_script;
 use crate::types::{ProtocolVariant, TransactionOutput};
@@ -54,7 +54,7 @@ impl OdinIdentifier {
 
 /// Detect PPk protocol variant from transaction outputs
 ///
-/// This is the ONLY function Stage 3 and Stage 4 should call.
+/// This is the ONLY function Stage 3 and decoder should call.
 /// Returns None if no PPk marker found OR no variant matches.
 pub fn detect_ppk_variant(
     op_return_outputs: &[TransactionOutput],

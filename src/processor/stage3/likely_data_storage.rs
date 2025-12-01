@@ -38,7 +38,7 @@ impl LikelyDataStorageClassifier {
 
     /// Check if a transaction shows likely data storage patterns
     ///
-    /// Uses shared detection module to ensure consistency with Stage 4 (decoder).
+    /// Uses shared detection module to ensure consistency with decoder.
     pub fn classify(
         &self,
         tx: &EnrichedTransaction,
@@ -58,7 +58,7 @@ impl LikelyDataStorageClassifier {
             .cloned()
             .collect();
 
-        // Single call to unified detection logic (shared with Stage 4)
+        // Single call to unified detection logic (shared with decoder)
         if let Some(result) = detect(&p2ms_outputs) {
             debug!(
                 "Transaction {} classified as LikelyDataStorage ({}): {}",
@@ -149,7 +149,7 @@ impl LikelyDataStorageClassifier {
                 classification_method: method,
                 additional_metadata: None,
                 // Content type is None because LikelyDataStorage performs PATTERN DETECTION only.
-                // Actual data extraction and content type detection occurs in Stage 4 (decoder).
+                // Actual data extraction and content type detection occurs in the decoder.
                 // This is intentional and architecturally correct.
                 content_type: None,
             },

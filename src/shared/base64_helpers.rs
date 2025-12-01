@@ -1,7 +1,7 @@
 //! Base64 detection helpers
 //!
 //! This module provides utilities for detecting base64-encoded data,
-//! used by both Stage 3 classification and Stage 4 decoding.
+//! used by both Stage 3 classification and decoder.
 
 /// Check if data appears to be base64-encoded
 ///

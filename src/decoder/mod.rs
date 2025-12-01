@@ -35,7 +35,7 @@ use crate::types::StampsVariant;
 use base64::Engine;
 
 // Use the shared lenient base64 decoder from types::stamps::validation
-// This ensures consistent decoding behaviour across Stage 3 classification and Stage 4 decoding
+// This ensures consistent decoding behaviour across Stage 3 classification and decoder
 use crate::types::stamps::validation::BASE64_LENIENT;
 
 pub mod arc4_tool;
@@ -646,7 +646,7 @@ impl ProtocolDecoder {
         // Reference for handle_payload closure
         let cleaned_data_ref = cleaned_data.as_slice();
 
-        // Shared payload handler keeps Stage 3 and Stage 4 aligned
+        // Shared payload handler keeps Stage 3 and decoder aligned
         let handle_payload = |payload: Vec<u8>| -> DecoderResult<Option<DecodedData>> {
             let (variant, content_type, image_format) = detect_content_type_from_payload(&payload);
 

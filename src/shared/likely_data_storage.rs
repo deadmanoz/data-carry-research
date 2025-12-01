@@ -1,7 +1,7 @@
 //! Shared LikelyDataStorage detection logic
 //!
 //! This module provides unified protocol detection for LikelyDataStorage patterns that
-//! can be used by both Stage 3 (classification) and Stage 4 (decoding).
+//! can be used by both Stage 3 (classification) and decoder.
 //!
 //! The detection logic is database-agnostic and operates purely on TransactionOutput data,
 //! using full secp256k1 EC point validation to distinguish data storage from legitimate multisig.

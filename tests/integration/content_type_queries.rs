@@ -391,7 +391,7 @@ fn test_valid_none_cases_in_database() {
         .unwrap()
         .as_secs();
 
-    // LikelyDataStorage - NULL content_type (Stage 4 will extract)
+    // LikelyDataStorage - NULL content_type (decoder will extract)
     let lds_result = ClassificationResult {
         txid: "lds_tx".to_string(),
         protocol: ProtocolType::LikelyDataStorage,

@@ -36,7 +36,7 @@ pub enum FetchCommands {
         #[arg(long)]
         with_inputs: bool,
 
-        /// Auto-detect protocol using Stage 4 decoder
+        /// Auto-detect protocol using decoder
         #[arg(long)]
         auto_detect: bool,
 

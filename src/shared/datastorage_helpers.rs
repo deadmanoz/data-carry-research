@@ -1,4 +1,4 @@
-//! Shared DataStorage helpers used by both Stage 3 classification and Stage 4 decoding.
+//! Shared DataStorage helpers used by both Stage 3 classification and decoder.
 //!
 //! These functions are pure, decoder-agnostic utilities that eliminate duplication
 //! between `src/processor/stage3/datastorage.rs` and `src/decoder/datastorage.rs`.

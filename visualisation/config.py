@@ -9,7 +9,7 @@ from pathlib import Path
 # Base output directory for all generated data
 OUTPUT_DATA_BASE = Path("./output_data")
 
-# Decoded blockchain protocol data (Stage 4)
+# Decoded blockchain protocol data (decoder)
 DECODED_DIR = OUTPUT_DATA_BASE / "decoded"
 
 # Fetched raw transactions from Bitcoin Core RPC

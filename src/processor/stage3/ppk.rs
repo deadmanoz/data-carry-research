@@ -4,7 +4,7 @@
 //! Primary detection: marker pubkey 0320a0de...3e12 in position 2 of multisig.
 //!
 //! This classifier delegates to the shared PPk detection module (src/types/ppk.rs)
-//! to ensure consistency with Stage 4 decoder and adhere to DRY principles.
+//! to ensure consistency with decoder and adhere to DRY principles.
 
 use crate::database::{
     traits::{Stage1Operations, Stage3Operations},

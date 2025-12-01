@@ -349,7 +349,7 @@ impl Stage2Operations for Database {
         // For Class B transactions, the sender is the address that contributed the most input value.
         //
         // NOTE: This logic is duplicated in src/rpc/client.rs::get_sender_address_from_largest_input()
-        // for Stage 4 RPC-based decoding. Both implementations follow the same algorithm.
+        // for RPC-based decoding. Both implementations follow the same algorithm.
         // Extraction into shared module was evaluated but skipped (different contexts).
 
         let inputs = self.get_transaction_inputs(txid)?;

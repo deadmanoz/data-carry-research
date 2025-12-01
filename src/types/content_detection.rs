@@ -11,7 +11,7 @@
 //!
 //! 2. **Type Safety**: Enum-based `ContentType` instead of string matching for robustness
 //!
-//! 3. **Shared Logic**: Single source of truth used by both Stage 3 classification and Stage 4 decoding
+//! 3. **Shared Logic**: Single source of truth used by both Stage 3 classification and decoder
 //!
 //! 4. **MIME Type Mapping**: Every content type maps to a standard MIME type string
 //!

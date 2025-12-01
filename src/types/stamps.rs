@@ -495,7 +495,7 @@ pub mod validation {
 
     /// Extract payload bytes from Bitcoin Stamps decrypted data
     ///
-    /// This is the CANONICAL extraction function used by both Stage 3 and Stage 4.
+    /// This is the CANONICAL extraction function used by both Stage 3 and decoder.
     /// It handles the differences between Pure and Counterparty-embedded stamps:
     ///
     /// **Pure Bitcoin Stamps - offset 0** (no length prefix):
@@ -792,7 +792,7 @@ pub mod validation {
     ///
     /// **Usage locations**:
     /// - Stage 3 classification (stamps.rs) - content type detection
-    /// - Stage 4 decoder (decoder/mod.rs) - image extraction
+    /// - Decoder (decoder/mod.rs) - image extraction
     /// - Variant detection (stamps.rs validation) - format identification
     pub const BASE64_LENIENT: GeneralPurpose = GeneralPurpose::new(
         &alphabet::STANDARD,
@@ -883,7 +883,7 @@ pub mod validation {
     /// - `Data` → MUST return (Some(Data), Some(content_type), None)
     /// - `Unknown` → MUST return (Some(Unknown), None, None)
     ///
-    /// Used by Stage 3 classifier and Stage 4 decoder to ensure identical detection logic.
+    /// Used by Stage 3 classifier and decoder to ensure identical detection logic.
     pub(crate) fn detect_content_type_from_payload(
         payload: &[u8],
     ) -> (

@@ -154,14 +154,14 @@ impl AppConfig {
 /// Output path constants for organised data storage
 ///
 /// This module provides centralised path constants for all generated outputs:
-/// - `decoded/`: Blockchain protocol data extraction (Stage 4)
+/// - `decoded/`: Blockchain protocol data extraction (decoder)
 /// - `fetched/`: Raw transaction JSON from Bitcoin Core RPC
-/// - `plots/`: Visualisation outputs (Stage 6)
-/// - `analysis/`: Statistical analysis exports (Stage 6)
+/// - `plots/`: Visualisation outputs (analysis)
+/// - `analysis/`: Statistical analysis exports (analysis)
 pub mod output_paths {
     use std::path::PathBuf;
 
-    /// Base directory for all decoded protocol data (Stage 4)
+    /// Base directory for all decoded protocol data (decoder)
     pub const DECODED_BASE: &str = "./output_data/decoded";
 
     /// Base directory for fetched raw transactions from Bitcoin Core RPC
