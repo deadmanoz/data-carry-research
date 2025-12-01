@@ -1,32 +1,4 @@
-//! Schema Version 2 - Production-Ready Bitcoin P2MS Analysis
-//!
-//! ## Key Improvements Over Schema V1
-//!
-//! 1. **P2MS Metadata Extraction**: Multisig parameters (required_sigs, total_pubkeys)
-//!    extracted to dedicated columns in `p2ms_outputs` table. Eliminates expensive
-//!    `json_extract()` calls in queries (5-10x speedup).
-//!
-//! 2. **Spending Chain Tracking**: New columns `is_spent`, `spent_in_txid`,
-//!    `spent_at_height` enable UTXO lifetime analysis, address reuse detection,
-//!    and spending pattern analysis.
-//!
-//! 3. **Block Normalisation**: Dedicated `blocks` table with height, hash, timestamp.
-//!    Enables block-level analysis and temporal queries.
-//!
-//! 4. **Unified Burn Patterns**: Single source of truth in `burn_patterns` table.
-//!    Eliminates duplication across enriched_transactions, transaction_classifications,
-//!    and classification metadata JSON.
-//!
-//! 5. **Classification Column Extraction**: Frequently queried classification fields
-//!    (protocol_signature_found, classification_method, content_type) extracted to
-//!    columns for faster queries and proper indexing.
-//!
-//! 6. **Spendability in Classifications**: Spendability analysis fields moved to
-//!    `p2ms_output_classifications` where they semantically belong (computed during
-//!    classification, not structural data).
-//!
-//! 7. **Clear Semantics**: `is_spent` replaces `is_utxo` for clearer meaning
-//!    (0 = unspent/UTXO, 1 = spent).
+//! Database Schema - Production-Ready Bitcoin P2MS Analysis
 //!
 //! ## Stage Population Strategy
 //!
@@ -38,13 +10,13 @@ use crate::errors::{AppError, AppResult};
 use rusqlite::Connection;
 use tracing::debug;
 
-/// Initialise the complete Schema V2 for all stages
-pub fn setup_schema_v2(connection: &Connection) -> AppResult<()> {
+/// Initialise the database schema
+pub fn setup_schema(connection: &Connection) -> AppResult<()> {
     connection
         .execute_batch(
             r#"
         -- ═══════════════════════════════════════════════════════════════════════════
-        -- SCHEMA VERSION 2 - Production-Ready Bitcoin P2MS Analysis
+        -- DATABASE SCHEMA - Production-Ready Bitcoin P2MS Analysis
         -- ═══════════════════════════════════════════════════════════════════════════
 
         PRAGMA user_version = 2;
@@ -345,7 +317,6 @@ pub fn setup_schema_v2(connection: &Connection) -> AppResult<()> {
 
         -- TRIGGER 2: Enforce P2MS-Only Classification
         -- Prevents classifying non-P2MS outputs
-        -- Updated from Schema V1 to reference p2ms_outputs table (cleaner)
         CREATE TRIGGER IF NOT EXISTS enforce_p2ms_only_classification
         BEFORE INSERT ON p2ms_output_classifications
         FOR EACH ROW
@@ -360,6 +331,6 @@ pub fn setup_schema_v2(connection: &Connection) -> AppResult<()> {
         )
         .map_err(AppError::Database)?;
 
-    debug!("Schema V2 initialised with all tables, indexes, and triggers");
+    debug!("Schema initialised with all tables, indexes, and triggers");
     Ok(())
 }

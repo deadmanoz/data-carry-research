@@ -54,7 +54,7 @@ fn insert_test_enriched_transaction(
     db: &mut Database,
     txid: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Schema V2: Insert stub block for FK constraint (height 0)
+    // Insert stub block for FK constraint (height 0)
     let conn = db.connection();
     conn.execute("INSERT OR IGNORE INTO blocks (height) VALUES (0)", [])
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
@@ -78,7 +78,7 @@ async fn test_stage3_database_schema_creation() {
     let db_path = create_unique_test_db_path("integration");
 
     // Create database and verify Stage 3 schema exists
-    let db = Database::new_v2(&db_path).unwrap();
+    let db = Database::new(&db_path).unwrap();
 
     // Test that schema exists by querying transaction_classifications table
     let total_classified: i64 = db
@@ -97,7 +97,7 @@ async fn test_stage3_database_schema_creation() {
 async fn test_stage3_classification_insertion_and_retrieval() {
     let db_path = create_unique_test_db_path("integration");
 
-    let mut db = Database::new_v2(&db_path).unwrap();
+    let mut db = Database::new(&db_path).unwrap();
 
     // First, create the required enriched transaction
     insert_test_enriched_transaction(&mut db, "test_tx_123").unwrap();
@@ -162,7 +162,7 @@ async fn test_stage3_classification_insertion_and_retrieval() {
 async fn test_stage3_batch_classification_insertion() {
     let db_path = create_unique_test_db_path("integration");
 
-    let mut db = Database::new_v2(&db_path).unwrap();
+    let mut db = Database::new(&db_path).unwrap();
 
     // First, create the required enriched transactions
     insert_test_enriched_transaction(&mut db, "stamps_tx").unwrap();
@@ -305,7 +305,7 @@ async fn test_stage3_processor_creation() {
 async fn test_stage3_unclassified_transaction_counting() {
     let db_path = create_unique_test_db_path("integration");
 
-    let db = Database::new_v2(&db_path).unwrap();
+    let db = Database::new(&db_path).unwrap();
 
     // Initially should have 0 unclassified transactions
     let count = db.count_unclassified_transactions_for_stage3().unwrap();
@@ -387,7 +387,7 @@ fn test_protocol_and_variant_enums() {
 #[tokio::test]
 async fn test_no_null_spendability_in_database() {
     let db_path = create_unique_test_db_path("integration");
-    let mut db = Database::new_v2(&db_path).unwrap();
+    let mut db = Database::new(&db_path).unwrap();
 
     // Create test transactions for each protocol that was missing spendability
     let test_cases = vec![

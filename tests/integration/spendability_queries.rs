@@ -25,9 +25,9 @@ use crate::common::create_unique_test_db_path;
 fn test_spendability_schema_support() {
     // Create a unique test database
     let db_path = create_unique_test_db_path("spendability");
-    let mut db = Database::new_v2(&db_path).unwrap();
+    let mut db = Database::new(&db_path).unwrap();
 
-    // Schema V2: Insert stub block for FK constraint (height 780000)
+    // Insert stub block for FK constraint (height 780000)
     let conn = db.connection();
     conn.execute("INSERT OR IGNORE INTO blocks (height) VALUES (780000)", [])
         .unwrap();
@@ -88,7 +88,7 @@ fn test_spendability_schema_support() {
 
     // Insert test classifications with different spendability scenarios
 
-    // Schema V2: Insert transaction classifications FIRST (FK constraint requirement)
+    // Insert transaction classifications FIRST (FK constraint requirement)
     let tx_classifications = vec![
         ClassificationResult::new(
             "spendable_tx1".to_string(),
@@ -212,7 +212,7 @@ fn test_spendability_schema_support() {
 #[test]
 fn test_overall_spendability_query() {
     let db_path = create_unique_test_db_path("spendability_overall");
-    let mut db = Database::new_v2(&db_path).unwrap();
+    let mut db = Database::new(&db_path).unwrap();
 
     // Setup test data with both spendable and unspendable categories
     // After breaking change: ALL output classifications MUST have spendability evaluated
@@ -277,7 +277,7 @@ fn test_overall_spendability_query() {
 #[test]
 fn test_per_protocol_spendability_no_join() {
     let db_path = create_unique_test_db_path("spendability_protocol");
-    let mut db = Database::new_v2(&db_path).unwrap();
+    let mut db = Database::new(&db_path).unwrap();
 
     // Setup test data with evaluated spendability
     // After breaking change: ALL output classifications MUST have spendability evaluated
@@ -392,7 +392,7 @@ fn test_per_protocol_spendability_no_join() {
 #[test]
 fn test_reason_distribution_query() {
     let db_path = create_unique_test_db_path("spendability_reason");
-    let mut db = Database::new_v2(&db_path).unwrap();
+    let mut db = Database::new(&db_path).unwrap();
 
     // Setup test data with different reasons
     insert_test_transactions(
@@ -454,9 +454,9 @@ fn test_reason_distribution_query() {
 #[test]
 fn test_key_count_aggregations() {
     let db_path = create_unique_test_db_path("spendability_keycounts");
-    let mut db = Database::new_v2(&db_path).unwrap();
+    let mut db = Database::new(&db_path).unwrap();
 
-    // Schema V2: Insert stub block for FK constraint (height 780000)
+    // Insert stub block for FK constraint (height 780000)
     let conn = db.connection();
     conn.execute("INSERT OR IGNORE INTO blocks (height) VALUES (780000)", [])
         .unwrap();
@@ -495,7 +495,7 @@ fn test_key_count_aggregations() {
     db.insert_enriched_transactions_batch(&[(tx, Vec::new(), outputs)])
         .unwrap();
 
-    // Schema V2: Insert transaction classification BEFORE output classification (FK requirement)
+    // Insert transaction classification BEFORE output classification (FK requirement)
     let tx_classification = ClassificationResult::new(
         "dummy".to_string(),
         ProtocolType::BitcoinStamps,
@@ -575,7 +575,7 @@ fn test_key_count_aggregations() {
 #[test]
 fn test_transaction_level_aggregation() {
     let db_path = create_unique_test_db_path("spendability_txlevel");
-    let mut db = Database::new_v2(&db_path).unwrap();
+    let mut db = Database::new(&db_path).unwrap();
 
     // Setup: 3 transactions, 2 with at least one spendable output, 1 with none
     insert_test_transactions(
@@ -628,7 +628,7 @@ fn test_sql_constant_reusability() {
     // by using them directly in test queries
 
     let db_path = create_unique_test_db_path("spendability_sql_constants");
-    let mut db = Database::new_v2(&db_path).unwrap();
+    let mut db = Database::new(&db_path).unwrap();
 
     insert_test_transactions(
         &mut db,
@@ -678,7 +678,7 @@ fn test_sql_constant_reusability() {
 
 // Helper function to insert test transactions with spendability data
 fn insert_test_transactions(db: &mut Database, data: &[(&str, bool, &str, ProtocolType)]) {
-    // Schema V2: Insert stub block for FK constraint (height 780000)
+    // Insert stub block for FK constraint (height 780000)
     {
         let conn = db.connection();
         conn.execute("INSERT OR IGNORE INTO blocks (height) VALUES (780000)", [])
@@ -719,7 +719,7 @@ fn insert_test_transactions(db: &mut Database, data: &[(&str, bool, &str, Protoc
         db.insert_enriched_transactions_batch(&[(tx, Vec::new(), outputs)])
             .unwrap();
 
-        // Schema V2: Insert transaction classification BEFORE output classification (FK requirement)
+        // Insert transaction classification BEFORE output classification (FK requirement)
         let tx_classification = ClassificationResult::new(
             txid.to_string(),
             protocol.clone(),

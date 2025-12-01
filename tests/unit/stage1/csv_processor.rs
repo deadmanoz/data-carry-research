@@ -253,7 +253,7 @@ fn test_checkpoint_persistence() {
     let db_path = temp_dir.path().join("checkpoint_test.db");
 
     let mut database =
-        Database::new_v2(&db_path.to_string_lossy()).expect("Failed to create database");
+        Database::new(&db_path.to_string_lossy()).expect("Failed to create database");
 
     // Save a checkpoint
     database
@@ -279,7 +279,7 @@ fn test_checkpoint_update() {
     let db_path = temp_dir.path().join("checkpoint_update_test.db");
 
     let mut database =
-        Database::new_v2(&db_path.to_string_lossy()).expect("Failed to create database");
+        Database::new(&db_path.to_string_lossy()).expect("Failed to create database");
 
     // Save initial checkpoint
     database
@@ -309,7 +309,7 @@ fn test_checkpoint_clear() {
     let db_path = temp_dir.path().join("checkpoint_clear_test.db");
 
     let mut database =
-        Database::new_v2(&db_path.to_string_lossy()).expect("Failed to create database");
+        Database::new(&db_path.to_string_lossy()).expect("Failed to create database");
 
     // Save checkpoint
     database
@@ -351,9 +351,9 @@ fn test_checkpoint_resume() {
 
     // Phase 1: Process partially (simulate crash after 50 records)
     {
-        // Use Schema V2 to match CSV processor requirement
+        // Use production schema to match CSV processor requirement
         let mut database =
-            Database::new_v2(&db_path.to_string_lossy()).expect("Failed to create database");
+            Database::new(&db_path.to_string_lossy()).expect("Failed to create database");
 
         // Simulate a checkpoint at line 50 (after processing 50 records, next line is 51)
         database
@@ -394,8 +394,8 @@ fn test_checkpoint_resume() {
     );
 
     // Verify checkpoint is cleared after successful completion
-    // Use Schema V2 to match the database created by CSV processor
-    let database = Database::new_v2(&db_path.to_string_lossy()).expect("Failed to open database");
+    // Use production schema to match the database created by CSV processor
+    let database = Database::new(&db_path.to_string_lossy()).expect("Failed to open database");
     assert!(
         database
             .get_checkpoint_enhanced()
@@ -430,8 +430,8 @@ fn test_checkpoint_saves_during_processing() {
     let _ = processor.process_csv().expect("Failed to process CSV");
 
     // Verify checkpoint was cleared at the end (successful completion)
-    // Use Schema V2 to match the database created by CSV processor
-    let database = Database::new_v2(&db_path.to_string_lossy()).expect("Failed to open database");
+    // Use production schema to match the database created by CSV processor
+    let database = Database::new(&db_path.to_string_lossy()).expect("Failed to open database");
     assert!(
         database
             .get_checkpoint_enhanced()

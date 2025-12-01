@@ -216,7 +216,7 @@ impl Stage2Operations for Database {
                         ])
                         .map_err(AppError::Database)?;
 
-                    // 2.2b: UPSERT p2ms_outputs for multisig outputs (Schema V2 Trigger Compliance)
+                    // 2.2b: UPSERT p2ms_outputs for multisig outputs (Trigger Compliance)
                     //
                     // CRITICAL: Stage 3's enforce_p2ms_only_classification trigger requires ALL
                     // P2MS outputs to exist in p2ms_outputs table before classification.

@@ -23,8 +23,8 @@ use crate::common::create_unique_test_db_path;
 async fn test_stage2_database_schema_creation() -> Result<()> {
     let db_path = create_unique_test_db_path("stage2");
 
-    // Initialise database with Schema V2 - this should create all Stage 2 tables
-    let db = Database::new_v2(&db_path)?;
+    // Initialise database - this should create all Stage 2 tables
+    let db = Database::new(&db_path)?;
 
     // Indirect verification: stats query should succeed on empty DB
     let stats = db.get_enriched_transaction_stats()?;
@@ -236,7 +236,7 @@ fn test_fee_analysis_comprehensive() {
 #[tokio::test]
 async fn test_stage2_database_operations() -> Result<()> {
     let db_path = create_unique_test_db_path("stage2");
-    let mut db = Database::new_v2(&db_path)?;
+    let mut db = Database::new(&db_path)?;
 
     // Create test enriched transaction
     let enriched_tx = EnrichedTransaction {

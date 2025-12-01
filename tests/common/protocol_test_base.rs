@@ -40,7 +40,7 @@ pub fn create_protocol_test_config(db_path: &str) -> Stage3Config {
 pub fn setup_protocol_test(test_name: &str) -> Result<(TestDatabase, Stage3Config)> {
     let test_db = TestDatabase::new(test_name)?;
 
-    // Schema V2: Insert stub blocks for common test heights (FK constraint satisfaction)
+    // Insert stub blocks for common test heights (FK constraint satisfaction)
     // Height 0: Most protocol tests
     // Height 330000: Chancecoin, ASCII identifier protocols
     // Height 400000: Legitimate P2MS tests and others
@@ -648,7 +648,7 @@ pub async fn run_stage3_processor(db_path: &str, config: Stage3Config) -> Result
     let mut processor = Stage3Processor::new(db_path, config)?;
     processor.run().await?;
 
-    let db = Database::new_v2(db_path)?;
+    let db = Database::new(db_path)?;
     let total_classified: i64 = db.connection().query_row(
         "SELECT COUNT(*) FROM transaction_classifications",
         [],
@@ -954,7 +954,7 @@ pub fn seed_stage3_test_data(
     conn: &Connection,
     tx: &data_carry_research::types::EnrichedTransaction,
 ) -> Result<()> {
-    // Schema V2: Insert stub block for FK constraint FIRST
+    // Insert stub block for FK constraint FIRST
     conn.execute(
         "INSERT OR IGNORE INTO blocks (height) VALUES (?1)",
         [tx.height],
@@ -1010,7 +1010,7 @@ pub fn seed_stage3_test_data(
         ],
     )?;
 
-    // Schema V2: Insert p2ms_outputs for P2MS outputs (required by burn_patterns FK and classification trigger)
+    // Insert p2ms_outputs for P2MS outputs (required by burn_patterns FK and classification trigger)
     // CRITICAL: Must preserve real multisig metadata from TransactionOutput.metadata for protocol detection
     for output in &tx.outputs {
         if output.script_type == "multisig" {

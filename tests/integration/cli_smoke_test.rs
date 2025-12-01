@@ -1,8 +1,8 @@
-//! CLI Smoke Test for Schema V2
+//! CLI Smoke Tests
 //!
-//! This integration test verifies that all CLI analysis commands work correctly
-//! with Schema V2 databases. It creates a fully seeded test database and runs
-//! each analysis command to ensure they produce valid output without errors.
+//! This integration test verifies that all CLI analysis commands work correctly.
+//! It creates a fully seeded test database and runs each analysis command to
+//! ensure they produce valid output without errors.
 
 use data_carry_research::analysis::{AnalysisEngine, OutputFormat, ReportFormatter};
 use data_carry_research::database::traits::{Stage2Operations, Stage3Operations};
@@ -18,7 +18,7 @@ use crate::common::create_unique_test_db_path;
 /// Create a fully populated test database for CLI smoke testing
 fn create_populated_test_db() -> (Database, String) {
     let db_path = create_unique_test_db_path("cli_smoke");
-    let mut db = Database::new_v2(&db_path).unwrap();
+    let mut db = Database::new(&db_path).unwrap();
 
     // Insert stub blocks for various heights
     let conn = db.connection();
@@ -128,7 +128,7 @@ fn create_populated_test_db() -> (Database, String) {
         let p2ms_output =
             crate::common::fixtures::create_test_p2ms_output_with_height(txid, 0, "dummy", height);
 
-        // CRITICAL Schema V2 seeding order:
+        // CRITICAL FK seeding order:
         // 1. Insert into transaction_outputs (enables p2ms_outputs trigger)
         // 2. Insert into p2ms_outputs (enables burn_patterns FK)
         // 3. Insert enriched_transactions (can now insert burn_patterns)
@@ -472,7 +472,7 @@ fn test_cli_error_handling_nonexistent_db() {
 fn test_cli_error_handling_empty_db() {
     // Test that CLI commands handle empty database gracefully
     let db_path = create_unique_test_db_path("cli_empty");
-    let _db = Database::new_v2(&db_path).unwrap();
+    let _db = Database::new(&db_path).unwrap();
 
     let engine = AnalysisEngine::new(&db_path).unwrap();
 

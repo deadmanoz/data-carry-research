@@ -48,8 +48,8 @@ impl Stage3Processor {
         config.validate().map_err(AppError::Config)?;
         ConfigValidator::validate_batch_config(config.batch_size, config.get_progress_interval())?;
 
-        // Initialise database with Schema V2 - required for Stage 3 operations
-        let database = Database::new_v2(database_path)?;
+        // Initialise database for Stage 3 operations
+        let database = Database::new(database_path)?;
 
         // Initialise classification engine
         let classifier = ProtocolClassificationEngine::new(&config);
@@ -203,7 +203,7 @@ impl Stage3Processor {
     ///
     /// # Architecture
     ///
-    /// This method implements the correct FK ordering for Schema V2:
+    /// This method implements the correct FK ordering:
     /// 1. Call classifier.classify_transaction() to get (tx_classification, output_classifications)
     /// 2. Insert transaction classification (satisfies FK parent requirement)
     /// 3. Insert output classifications in batch (FK child rows)
@@ -241,7 +241,7 @@ impl Stage3Processor {
                         ProtocolType::Unknown => results.unknown_classified += 1,
                     }
 
-                    // Schema V2 FK Ordering:
+                    // FK Ordering:
                     // STEP 1: Insert transaction classification (FK parent)
                     self.database
                         .insert_classification_results_batch(std::slice::from_ref(
@@ -690,7 +690,7 @@ mod tests {
     fn create_test_database() -> Database {
         let temp_dir = tempdir().unwrap();
         let temp_path = temp_dir.path().join("test.db");
-        Database::new_v2(temp_path.to_str().unwrap()).unwrap()
+        Database::new(temp_path.to_str().unwrap()).unwrap()
     }
 
     fn create_test_transaction(

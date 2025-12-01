@@ -218,7 +218,7 @@ async fn test_enriched_transaction_batch_insertion() -> Result<()> {
 #[tokio::test]
 async fn test_unprocessed_transaction_queries() -> Result<()> {
     let db_path = create_unique_test_db_path("unprocessed_queries");
-    let mut db = Database::new_v2(&db_path)?;
+    let mut db = Database::new(&db_path)?;
 
     // First, add some P2MS outputs (Stage 1 data)
     for txid in ["tx1", "tx2", "tx3"] {
@@ -260,7 +260,7 @@ async fn test_unprocessed_transaction_queries() -> Result<()> {
 #[tokio::test]
 async fn test_p2ms_outputs_for_transaction() -> Result<()> {
     let db_path = create_unique_test_db_path("p2ms_outputs");
-    let mut db = Database::new_v2(&db_path)?;
+    let mut db = Database::new(&db_path)?;
 
     // Add multiple P2MS outputs for the same transaction
     let txid = "test_transaction";
@@ -329,7 +329,7 @@ async fn test_p2ms_outputs_for_transaction() -> Result<()> {
 #[tokio::test]
 async fn test_coinbase_transaction_handling() -> Result<()> {
     let db_path = create_unique_test_db_path("coinbase_handling");
-    let mut db = Database::new_v2(&db_path)?;
+    let mut db = Database::new(&db_path)?;
 
     // Create coinbase enriched transaction
     let mut coinbase_tx = create_test_enriched_transaction();
@@ -359,7 +359,7 @@ async fn test_coinbase_transaction_handling() -> Result<()> {
 #[tokio::test]
 async fn test_burn_pattern_statistics() -> Result<()> {
     let db_path = create_unique_test_db_path("burn_pattern_stats");
-    let mut db = Database::new_v2(&db_path)?;
+    let mut db = Database::new(&db_path)?;
 
     // Create transactions with different burn pattern counts
     let transactions = [
@@ -412,7 +412,7 @@ async fn test_burn_pattern_statistics() -> Result<()> {
 #[tokio::test]
 async fn test_fee_analysis_statistics() -> Result<()> {
     let db_path = create_unique_test_db_path("fee_analysis_stats");
-    let mut db = Database::new_v2(&db_path)?;
+    let mut db = Database::new(&db_path)?;
 
     let test_fees = [1000u64, 2000, 3000, 4000, 5000];
 
@@ -441,7 +441,7 @@ async fn test_fee_analysis_statistics() -> Result<()> {
 #[tokio::test]
 async fn test_database_performance_batch_operations() -> Result<()> {
     let db_path = create_unique_test_db_path("batch_performance");
-    let mut db = Database::new_v2(&db_path)?;
+    let mut db = Database::new(&db_path)?;
 
     use std::time::Instant;
 
@@ -489,7 +489,7 @@ async fn test_database_performance_batch_operations() -> Result<()> {
 #[tokio::test]
 async fn test_transaction_input_storage() -> Result<()> {
     let db_path = create_unique_test_db_path("input_storage");
-    let mut db = Database::new_v2(&db_path)?;
+    let mut db = Database::new(&db_path)?;
 
     // Create enriched transaction with transaction inputs
     let mut tx = create_test_enriched_transaction();
@@ -513,7 +513,7 @@ async fn test_transaction_input_storage() -> Result<()> {
 #[tokio::test]
 async fn test_database_error_handling() -> Result<()> {
     let db_path = create_unique_test_db_path("error_handling");
-    let mut db = Database::new_v2(&db_path)?;
+    let mut db = Database::new(&db_path)?;
 
     // Test duplicate transaction insertion (should handle gracefully)
     let tx = create_test_enriched_transaction();

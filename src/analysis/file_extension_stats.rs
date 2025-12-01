@@ -184,7 +184,7 @@ mod tests {
     use super::*;
 
     fn setup_db() -> Database {
-        Database::new_v2(":memory:").expect("failed to create in-memory database")
+        Database::new(":memory:").expect("failed to create in-memory database")
     }
 
     #[test]
@@ -235,7 +235,7 @@ mod tests {
         )
         .unwrap();
 
-        // Insert stub blocks to satisfy FK constraint (Schema V2 requirement)
+        // Insert stub blocks to satisfy FK constraint
         conn.execute("INSERT INTO blocks (height) VALUES (1)", [])
             .unwrap();
         conn.execute("INSERT INTO blocks (height) VALUES (2)", [])

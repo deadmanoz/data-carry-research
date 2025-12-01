@@ -378,7 +378,7 @@ mod tests {
     #[test]
     fn test_analyser_creation() {
         // Test that analyser can be instantiated
-        let db = Database::new_v2(":memory:").unwrap();
+        let db = Database::new(":memory:").unwrap();
         let result = SpendabilityStatsAnalyser::analyse_spendability(&db);
         if let Err(e) = &result {
             eprintln!("Error: {}", e);

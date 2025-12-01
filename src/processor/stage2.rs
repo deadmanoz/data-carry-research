@@ -45,8 +45,8 @@ impl Stage2Processor {
         // Validate configuration using shared validator
         ConfigValidator::validate_batch_config(batch_size, progress_interval)?;
 
-        // Initialise database with Schema V2 - required for Stage 2 operations
-        let database = Database::new_v2(database_path)?;
+        // Initialise database for Stage 2 operations
+        let database = Database::new(database_path)?;
 
         // Initialise RPC client with connection test
         let rpc_client = BitcoinRpcClient::new(rpc_config)

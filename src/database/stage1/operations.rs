@@ -1,8 +1,6 @@
 //! Stage 1 database operations - P2MS detection and storage.
 //!
-//! ## Schema V2 Changes
-//!
-//! Stage 1 now performs a two-table atomic insert:
+//! Stage 1 performs a two-table atomic insert:
 //! 1. **Stub blocks**: Inserts height-only rows into `blocks` (NULL hash/timestamp)
 //! 2. **transaction_outputs**: All P2MS outputs with `is_spent = 0`
 //! 3. **p2ms_outputs**: Extracted P2MS metadata (required_sigs, total_pubkeys, pubkeys_json)
@@ -22,9 +20,9 @@ impl Stage1Operations for Database {
         self.insert_transaction_output_batch(batch)
     }
 
-    /// Insert a batch of TransactionOutput records (Schema V2 two-table atomic insert).
+    /// Insert a batch of TransactionOutput records (two-table atomic insert).
     ///
-    /// ## Schema V2 Behaviour
+    /// ## Behaviour
     ///
     /// 1. **Stub blocks**: Ensures blocks table has height-only rows (satisfies FK)
     /// 2. **transaction_outputs**: Inserts ALL outputs with `is_spent = 0` (0 = unspent/UTXO)
@@ -39,7 +37,7 @@ impl Stage1Operations for Database {
             ensure_blocks_exist(tx, &heights_vec)?;
 
             // 2. Insert into transaction_outputs
-            // Schema V2: Uses is_spent = 0 (0 = unspent/UTXO) instead of is_utxo = 1
+            // Uses is_spent = 0 (0 = unspent/UTXO)
             let mut outputs_stmt = tx.prepare_cached(
                 r#"INSERT OR IGNORE INTO transaction_outputs
                    (txid, vout, height, amount, script_hex, script_type, script_size,
@@ -132,9 +130,7 @@ impl Stage1Operations for Database {
         }
     }
 
-    /// Get P2MS outputs for a transaction (Schema V2 with JOIN to p2ms_outputs).
-    ///
-    /// ## Schema V2 Behaviour
+    /// Get P2MS outputs for a transaction (with JOIN to p2ms_outputs).
     ///
     /// Joins `transaction_outputs` and `p2ms_outputs` to reconstruct TransactionOutput
     /// with metadata containing MultisigInfo (required_sigs, total_pubkeys, pubkeys).
@@ -229,11 +225,10 @@ impl Stage1Operations for Database {
         )?;
 
         let mut rows = stmt.query_map([], |row| {
-            // Schema V2: created_at is INTEGER (unix timestamp), convert to String
-            // Schema V1: created_at is DATETIME STRING - handle both
+            // created_at is INTEGER (unix timestamp), convert to String
             let created_at: String = match row.get::<_, i64>(4) {
-                Ok(timestamp) => timestamp.to_string(), // Schema V2: INTEGER timestamp
-                Err(_) => row.get::<_, String>(4)?,     // Schema V1: DATETIME string (fallback)
+                Ok(timestamp) => timestamp.to_string(),
+                Err(_) => row.get::<_, String>(4)?, // Fallback for legacy format
             };
 
             Ok(Stage1Checkpoint {

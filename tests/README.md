@@ -30,7 +30,7 @@ tests/
 │   │   └── client.rs
 │   ├── stage1/                      # Stage 1 P2MS extraction tests
 │   │   ├── csv_processor.rs
-│   │   └── schema_v2_operations.rs
+│   │   └── schema_operations.rs
 │   ├── stage2/                      # Transaction enrichment tests
 │   │   └── database_operations.rs
 │   └── stage3/                      # Protocol classification tests
@@ -345,7 +345,7 @@ Test individual components:
 
 - **Analysis Tests** (`unit/analysis/`): Statistics, content type, spendability analysis
 - **RPC Tests** (`unit/rpc/`): Bitcoin Core RPC client functionality
-- **Stage 1 Tests** (`unit/stage1/`): P2MS extraction, Schema V2 operations
+- **Stage 1 Tests** (`unit/stage1/`): P2MS extraction, schema operations
 - **Stage 2 Tests** (`unit/stage2/`): Transaction enrichment, database operations
 - **Stage 3 Tests** (`unit/stage3/`): Protocol classification
   - **Protocol Tests** (`unit/stage3/protocols/`): Individual protocol classifiers

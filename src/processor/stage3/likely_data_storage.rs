@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn test_high_output_count_detection() {
         let classifier = LikelyDataStorageClassifier::new();
-        let db = Database::new_v2(":memory:").unwrap();
+        let db = Database::new(":memory:").unwrap();
 
         // Create 6 outputs with different valid pubkeys
         let pubkeys = [
@@ -248,7 +248,7 @@ mod tests {
     #[test]
     fn test_no_classification_for_normal_transaction() {
         let classifier = LikelyDataStorageClassifier::new();
-        let db = Database::new_v2(":memory:").unwrap();
+        let db = Database::new(":memory:").unwrap();
 
         // Create a normal 2-output transaction with different pubkeys
         let outputs = vec![
@@ -290,7 +290,7 @@ mod tests {
     #[test]
     fn test_dust_amount_detection() {
         let classifier = LikelyDataStorageClassifier::new();
-        let db = Database::new_v2(":memory:").unwrap();
+        let db = Database::new(":memory:").unwrap();
 
         // Create outputs with dust-level amounts (800 sats, matching Oct 2024+ pattern)
         let pubkey1 = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";

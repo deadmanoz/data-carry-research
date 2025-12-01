@@ -1,12 +1,12 @@
-//! Schema V2 Stage 1 Operations Tests
+//! Schema Stage 1 Operations Tests
 //!
-//! Tests for the two-table atomic insert pattern in Schema V2:
+//! Tests for the two-table atomic insert pattern:
 //! 1. Stub blocks insertion
 //! 2. transaction_outputs with is_spent = 0
 //! 3. p2ms_outputs with extracted metadata
 //!
 //! These tests verify that the FK constraints, triggers, and data extraction
-//! work correctly with the new schema design.
+//! work correctly with the schema design.
 
 use anyhow::Result;
 use data_carry_research::database::traits::Stage1Operations;
@@ -45,8 +45,8 @@ fn create_p2ms_output(
 }
 
 #[tokio::test]
-async fn test_schema_v2_initialisation() -> Result<()> {
-    let test_db = TestDatabase::new("schema_v2_init")?;
+async fn test_schema_initialisation() -> Result<()> {
+    let test_db = TestDatabase::new("schema_init")?;
 
     // Verify schema was created by checking table exists via a simple query
     let count: i64 =

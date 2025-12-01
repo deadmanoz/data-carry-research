@@ -253,7 +253,7 @@ mod false_positives {
             .await
             .expect("Stage 3 processing failed");
 
-        let db = Database::new_v2(test_db.path()).unwrap();
+        let db = Database::new(test_db.path()).unwrap();
         let ascii_id_count: i64 = db
             .connection()
             .query_row(

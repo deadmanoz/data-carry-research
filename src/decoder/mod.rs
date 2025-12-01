@@ -27,10 +27,10 @@ use self::protocol_detection::{
 };
 use crate::shared::is_base64_data;
 use crate::types::content_detection::{detect_image_format, DocumentFormat, ImageFormat};
+use crate::types::stamps::classify_json_data;
 use crate::types::stamps::validation::{
     detect_content_type_from_payload, extract_stamps_payload, find_stamp_signature,
 };
-use crate::types::stamps::classify_json_data;
 use crate::types::StampsVariant;
 use base64::Engine;
 

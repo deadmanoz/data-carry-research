@@ -15,7 +15,7 @@
 
 pub mod helpers; // Shared database helper functions
 pub mod query_helper; // Query helper utilities for common patterns
-pub mod schema_v2; // Schema V2 - Production-ready with extracted columns
+pub mod schema;
 mod stage1;
 mod stage2;
 mod stage3;
@@ -25,7 +25,7 @@ pub mod traits;
 // Re-export the main types and traits
 pub use helpers::*; // Export helper functions for use across stages
 pub use query_helper::QueryHelper; // Export QueryHelper trait for analysis modules
-pub use schema_v2::setup_schema_v2; // Schema V2 setup function
+pub use schema::setup_schema;
 pub use stage3::operations::NO_MIME_TYPE_SENTINEL; // Content type sentinel for analysis
 pub use statistics::{DatabaseStats, EnrichedTransactionStats};
 pub use traits::*;
@@ -43,30 +43,26 @@ pub struct Database {
 }
 
 impl Database {
-    /// Create a new database instance with Schema V2 (Production-Ready)
+    /// Create a new database instance
     ///
-    /// **Required**: All databases must use Schema V2. Schema V1 has been removed.
-    ///
-    /// Schema V2 features:
+    /// Schema features:
     /// - Extracted P2MS metadata columns (5-10x query speedup)
     /// - Spending chain tracking for UTXO lifetime analysis
     /// - Block normalisation with stub approach
     /// - Unified burn patterns storage
+    /// - FK constraints requiring proper stage ordering
     ///
     /// ## Stage 1 Requirement
     ///
-    /// Stage 1 operations REQUIRE Schema V2 (stub blocks table). Using Schema V1
-    /// will fail with "no such table: blocks".
-    pub fn new_v2(database_path: &str) -> AppResult<Self> {
+    /// Stage 1 operations require the stub blocks table. The schema must be
+    /// initialised before Stage 1 processing begins.
+    pub fn new(database_path: &str) -> AppResult<Self> {
         let connection = Connection::open(database_path)?;
 
-        // Initialise with Schema V2
-        setup_schema_v2(&connection)?;
+        // Initialise the schema
+        setup_schema(&connection)?;
 
-        info!(
-            "Database initialised at: {} (Schema V2 - Production)",
-            database_path
-        );
+        info!("Database initialised at: {}", database_path);
         Ok(Self { connection })
     }
 
@@ -109,16 +105,16 @@ mod tests {
 
     #[test]
     fn test_database_creation() {
-        let db = Database::new_v2(":memory:").unwrap();
+        let db = Database::new(":memory:").unwrap();
 
-        // Test that the database was created and schema initialised (Schema V2)
+        // Test that the database was created and schema initialised
         let stats = db.get_database_stats().unwrap();
         assert_eq!(stats.total_outputs, 0);
     }
 
     #[test]
     fn test_modular_operations() {
-        let mut db = Database::new_v2(":memory:").unwrap();
+        let mut db = Database::new(":memory:").unwrap();
 
         let batch = vec![
             create_test_output("txid1", 0, 100000),
@@ -146,7 +142,7 @@ mod tests {
 
     #[test]
     fn test_checkpoint_operations() {
-        let mut db = Database::new_v2(":memory:").unwrap();
+        let mut db = Database::new(":memory:").unwrap();
 
         // Initially no checkpoint
         assert!(db.get_last_checkpoint().unwrap().is_none());

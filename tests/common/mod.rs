@@ -49,12 +49,12 @@ pub mod database {
     }
 
     impl TestDatabase {
-        /// Create a new test database with automatic cleanup (Schema V2)
+        /// Create a new test database with automatic cleanup
         ///
-        /// All test databases use Schema V2 (production schema).
+        /// All test databases use the production schema.
         pub fn new(test_name: &str) -> anyhow::Result<Self> {
             let path = super::create_unique_test_db_path(test_name);
-            let db = Database::new_v2(&path)?;
+            let db = Database::new(&path)?;
             Ok(TestDatabase { db, path })
         }
 
@@ -84,7 +84,7 @@ pub mod database {
 
     /// Create a test database and ensure it's properly initialised
     pub fn setup_test_database(db_path: &str) -> anyhow::Result<Database> {
-        let db = Database::new_v2(db_path)?;
+        let db = Database::new(db_path)?;
         Ok(db)
     }
 

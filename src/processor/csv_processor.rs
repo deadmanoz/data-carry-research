@@ -16,14 +16,13 @@ pub struct CsvProcessor {
 }
 
 impl CsvProcessor {
-    /// Create a new CSV processor with Schema V2
+    /// Create a new CSV processor
     ///
-    /// **Schema V2 Requirement**: Stage 1 operations require Schema V2 (stub blocks table).
+    /// Stage 1 operations use the stub blocks table for FK constraint satisfaction.
     pub fn new(config: Stage1Config) -> AppResult<Self> {
-        // Use Schema V2 - required for Stage 1 operations (stub blocks)
-        let database = Database::new_v2(&config.database_path.to_string_lossy())?;
+        let database = Database::new(&config.database_path.to_string_lossy())?;
 
-        info!("CSV Processor initialised (Schema V2)");
+        info!("CSV Processor initialised");
         info!("Source CSV: {}", config.csv_path.display());
         info!("Database: {}", config.database_path.display());
         info!("Batch size: {}", config.batch_size);

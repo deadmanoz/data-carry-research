@@ -15,12 +15,12 @@
 use data_carry_research::database::Database;
 use data_carry_research::errors::AppResult;
 
-/// Create an in-memory test database with Schema V2.
+/// Create an in-memory test database.
 ///
 /// This is the standard way to create a test database for analysis tests.
 /// Uses `:memory:` for fast, isolated tests.
 pub fn create_analysis_test_db() -> AppResult<Database> {
-    Database::new_v2(":memory:")
+    Database::new(":memory:")
 }
 
 /// Seed stub block entries for FK constraints.
@@ -390,7 +390,7 @@ mod tests {
     #[test]
     fn test_create_analysis_test_db() -> AppResult<()> {
         let db = create_analysis_test_db()?;
-        // Verify it's a valid Schema V2 database by checking a table exists
+        // Verify it's a valid database by checking a table exists
         let conn = db.connection();
         let count: i64 = conn.query_row(
             "SELECT COUNT(*) FROM sqlite_master WHERE name = 'blocks'",

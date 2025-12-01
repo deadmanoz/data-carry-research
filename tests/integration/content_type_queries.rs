@@ -22,7 +22,7 @@ use crate::common::create_unique_test_db_path;
 fn test_content_type_schema_and_queries() {
     // Create a unique test database
     let db_path = create_unique_test_db_path("content_type");
-    let mut db = Database::new_v2(&db_path).unwrap();
+    let mut db = Database::new(&db_path).unwrap();
 
     // First, insert enriched transactions (required for foreign key)
     let tx1 = EnrichedTransaction {
@@ -183,7 +183,7 @@ fn test_output_level_content_type_propagation() {
     //! to output-level classifications (Counterparty/Omni fixes from Phase 1)
 
     let db_path = create_unique_test_db_path("output_content_type");
-    let mut db = Database::new_v2(&db_path).unwrap();
+    let mut db = Database::new(&db_path).unwrap();
 
     // Insert enriched transaction
     let tx = EnrichedTransaction {
@@ -351,7 +351,7 @@ fn test_valid_none_cases_in_database() {
     //! StampsUnknown, OmniFailedDeobfuscation) are properly stored with NULL content_type
 
     let db_path = create_unique_test_db_path("valid_none");
-    let mut db = Database::new_v2(&db_path).unwrap();
+    let mut db = Database::new(&db_path).unwrap();
 
     // Insert enriched transactions
     let txs = vec![

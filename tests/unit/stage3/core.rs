@@ -112,7 +112,7 @@ fn insert_test_enriched_transaction(
 async fn test_stage3_database_schema_creation() {
     let db_path = create_unique_test_db_path("schema_creation");
 
-    let db = Database::new_v2(&db_path).unwrap();
+    let db = Database::new(&db_path).unwrap();
 
     // Verify database file was created
     assert!(std::path::Path::new(&db_path).exists());
@@ -125,7 +125,7 @@ async fn test_stage3_database_schema_creation() {
 #[tokio::test]
 async fn test_stage3_classification_insertion_and_retrieval() {
     let db_path = create_unique_test_db_path("classification_insertion");
-    let mut db = Database::new_v2(&db_path).unwrap();
+    let mut db = Database::new(&db_path).unwrap();
 
     // Insert a test transaction
     insert_test_enriched_transaction(&mut db, "test_txid_1").unwrap();
@@ -168,7 +168,7 @@ async fn test_stage3_classification_insertion_and_retrieval() {
 #[tokio::test]
 async fn test_stage3_batch_classification_insertion() {
     let db_path = create_unique_test_db_path("batch_insertion");
-    let mut db = Database::new_v2(&db_path).unwrap();
+    let mut db = Database::new(&db_path).unwrap();
 
     // Insert multiple test transactions
     let txids = vec!["batch_tx_1", "batch_tx_2", "batch_tx_3"];
@@ -240,7 +240,7 @@ async fn test_stage3_processor_creation() {
 #[tokio::test]
 async fn test_stage3_classification_stats_calculations() {
     let db_path = create_unique_test_db_path("stats_calculations");
-    let mut db = Database::new_v2(&db_path).unwrap();
+    let mut db = Database::new(&db_path).unwrap();
 
     // Insert test transactions
     let test_data = vec![
@@ -355,7 +355,7 @@ async fn test_stage3_classification_stats_calculations() {
 #[tokio::test]
 async fn test_stage3_unclassified_transaction_counting() {
     let db_path = create_unique_test_db_path("unclassified_counting");
-    let mut db = Database::new_v2(&db_path).unwrap();
+    let mut db = Database::new(&db_path).unwrap();
 
     // Insert enriched transactions
     let txids = vec!["unclassified_1", "unclassified_2", "classified_1"];

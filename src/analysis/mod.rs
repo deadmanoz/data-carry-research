@@ -121,7 +121,7 @@ impl AnalysisEngine {
     /// # Returns
     /// * `AppResult<Self>` - Configured analysis engine or error
     pub fn new(database_path: &str) -> AppResult<Self> {
-        let database = Database::new_v2(database_path)?;
+        let database = Database::new(database_path)?;
         Ok(Self { database })
     }
 

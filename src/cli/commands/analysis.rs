@@ -525,7 +525,7 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
             let db_path = get_db_path_from_config(database_path, &app_config)?;
             use crate::analysis::ContentTypeAnalyser;
             use crate::database::Database;
-            let db = Database::new_v2(&db_path)?;
+            let db = Database::new(&db_path)?;
 
             // Handle filtering modes
             if let Some(protocol_str) = protocol {

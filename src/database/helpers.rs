@@ -14,7 +14,7 @@ use tracing::debug;
 /// foreign key constraints when inserting transaction outputs or classifications.
 /// Uses INSERT OR IGNORE to safely handle duplicate heights.
 ///
-/// This is critical for Schema V2's FK enforcement - child rows (transaction_outputs,
+/// This is critical for FK enforcement - child rows (transaction_outputs,
 /// burn_patterns, classifications) reference the blocks table.
 ///
 /// # Arguments
@@ -128,7 +128,7 @@ mod tests {
     fn test_ensure_blocks_exist() {
         // Use a separate connection for testing (need mutability)
         let mut conn = Connection::open(":memory:").unwrap();
-        crate::database::schema_v2::setup_schema_v2(&conn).unwrap();
+        crate::database::schema::setup_schema(&conn).unwrap();
 
         let tx = conn.transaction().unwrap();
         let heights = vec![100000, 100001, 100002];
@@ -158,7 +158,7 @@ mod tests {
     fn test_transaction_output_from_row_construction() {
         // This test verifies the helper constructs outputs correctly
         // Full integration testing happens in stage operations tests
-        let db = Database::new_v2(":memory:").unwrap();
+        let db = Database::new(":memory:").unwrap();
         let conn = db.connection();
 
         // Insert a test output

@@ -526,7 +526,7 @@ mod tests {
 
     #[test]
     fn test_value_analysis_empty_database() {
-        let db = Database::new_v2(":memory:").unwrap();
+        let db = Database::new(":memory:").unwrap();
 
         // Create empty fee report for test
         let fee_report = FeeAnalysisReport::default();
@@ -543,7 +543,7 @@ mod tests {
 
     #[test]
     fn test_value_distributions_empty_database() {
-        let db = Database::new_v2(":memory:").unwrap();
+        let db = Database::new(":memory:").unwrap();
 
         // Should not fail on empty database (tests NULL handling)
         let result = ValueAnalysisEngine::analyse_value_distributions(&db);
@@ -559,7 +559,7 @@ mod tests {
     #[test]
     fn test_value_distributions_large_values() {
         // Test that values >= 1B sats are properly counted (tests i64::MAX fix)
-        let db = Database::new_v2(":memory:").unwrap();
+        let db = Database::new(":memory:").unwrap();
         let conn = db.connection();
 
         // Setup minimal schema
@@ -595,7 +595,7 @@ mod tests {
 
     #[test]
     fn test_percentile_calculation_edge_cases() {
-        let db = Database::new_v2(":memory:").unwrap();
+        let db = Database::new(":memory:").unwrap();
         let conn = db.connection();
 
         // Setup minimal schema
@@ -629,7 +629,7 @@ mod tests {
     #[test]
     fn test_bucket_boundaries() {
         // Test that values at bucket boundaries are correctly categorised
-        let db = Database::new_v2(":memory:").unwrap();
+        let db = Database::new(":memory:").unwrap();
         let conn = db.connection();
 
         conn.execute("INSERT INTO blocks (height) VALUES (100000)", [])
@@ -680,7 +680,7 @@ mod tests {
     #[test]
     fn test_single_value_dataset() {
         // Test percentiles with only 1 value
-        let db = Database::new_v2(":memory:").unwrap();
+        let db = Database::new(":memory:").unwrap();
         let conn = db.connection();
 
         conn.execute("INSERT INTO blocks (height) VALUES (100000)", [])
@@ -723,7 +723,7 @@ mod tests {
     #[test]
     fn test_all_values_in_single_bucket() {
         // Test when all outputs fall into one bucket
-        let db = Database::new_v2(":memory:").unwrap();
+        let db = Database::new(":memory:").unwrap();
         let conn = db.connection();
 
         conn.execute("INSERT INTO blocks (height) VALUES (100000)", [])
