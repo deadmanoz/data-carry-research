@@ -47,14 +47,14 @@ use data_carry_research::types::{EnrichedTransaction, TransactionInput, Transact
 ///
 /// # Example
 /// ```rust,ignore
-/// use crate::common::db_seeding::{seed_enriched_transaction_simple, create_test_inputs};
+/// use crate::common::db_seeding::{seed_enriched_transaction, create_test_inputs};
 ///
 /// let tx = fixtures::create_test_enriched_transaction(txid);
 /// let inputs = create_test_inputs(txid, "input_txid_here");
 ///
-/// seed_enriched_transaction_simple(&mut test_db, &tx, inputs)?;
+/// seed_enriched_transaction(&mut test_db, &tx, inputs)?;
 /// ```
-pub fn seed_enriched_transaction_simple(
+pub fn seed_enriched_transaction(
     test_db: &mut TestDatabase,
     tx: &EnrichedTransaction,
     inputs: Vec<TransactionInput>,
@@ -242,7 +242,7 @@ pub fn build_and_seed_from_p2ms(
     let inputs = create_test_inputs(txid, source_txid);
 
     // Seed database (FK-safe)
-    seed_enriched_transaction_simple(test_db, &tx, inputs)?;
+    seed_enriched_transaction(test_db, &tx, inputs)?;
 
     Ok(tx)
 }
@@ -274,7 +274,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seed_enriched_transaction_simple() -> anyhow::Result<()> {
+    fn test_seed_enriched_transaction() -> anyhow::Result<()> {
         let mut test_db = TestDatabase::new("seed_simple_test")?;
         let txid = "test_tx_123";
 
@@ -287,7 +287,7 @@ mod tests {
         let inputs = create_test_inputs(txid, "input_tx");
 
         // Seed database
-        seed_enriched_transaction_simple(&mut test_db, &tx, inputs)?;
+        seed_enriched_transaction(&mut test_db, &tx, inputs)?;
 
         // Verify insertion succeeded (query transaction_outputs table directly)
         use rusqlite::params;

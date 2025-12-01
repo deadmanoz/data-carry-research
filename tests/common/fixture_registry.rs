@@ -90,40 +90,40 @@ pub mod stamps {
         path: "tests/test_data/stamps/stamps_classic_4d89d7.json",
         txid: "4d89d7f69ee77c3ddda041f94270b4112d002fc67b88008f29710fadfb486da8",
         protocol: ProtocolType::BitcoinStamps,
-        variant: Some("StampsClassic"),
+        variant: Some("StampsSRC20"),
         content_type: Some("application/json"),
         input_fixture_path: None,
-        description: "Classic stamp image encoding",
+        description: "SRC-20 JSON stamp",
     };
 
     pub const RECENT_C8C383: ProtocolFixture = ProtocolFixture {
         path: "tests/test_data/stamps/stamps_recent_c8c383.json",
         txid: "3809059d32b51e3c2e680c6ffbd8e15e152daa06554f62fc1b9f2aea3be39e32",
         protocol: ProtocolType::BitcoinStamps,
-        variant: Some("StampsClassic"),
+        variant: Some("StampsSRC20"),
         content_type: Some("application/json"),
         input_fixture_path: None,
-        description: "Recent multisig format variation",
+        description: "SRC-20 stamp with recent multisig format",
     };
 
     pub const ORIGINAL_IMAGE: ProtocolFixture = ProtocolFixture {
         path: "tests/test_data/stamps/stamps_original_image.json",
         txid: "56bba57e6405e553cfff1b78ab8f7f0f0f419c5056c06b72a81e0e5deae48d15",
         protocol: ProtocolType::BitcoinStamps,
-        variant: Some("StampsClassic"),
+        variant: Some("StampsSRC20"),
         content_type: Some("application/json"),
         input_fixture_path: None,
-        description: "Original stamp image format",
+        description: "SRC-20 stamp",
     };
 
     pub const CLASSIC_F35382: ProtocolFixture = ProtocolFixture {
         path: "tests/test_data/stamps/stamps_classic_f35382.json",
         txid: "f353823cdc63ee24fe2167ca14d3bb9b6a54dd063b53382c0cd42f05d7262808",
         protocol: ProtocolType::BitcoinStamps,
-        variant: Some("StampsClassic"),
+        variant: Some("StampsSRC20"),
         content_type: Some("application/json"),
         input_fixture_path: None,
-        description: "Historical Bitcoin Stamps from May 2023",
+        description: "SRC-20 stamp from May 2023",
     };
 
     pub const TRANSFER_934DC3: ProtocolFixture = ProtocolFixture {
@@ -273,7 +273,7 @@ pub mod counterparty {
         variant: Some("CounterpartyOracle"),
         content_type: Some("application/octet-stream"),
         input_fixture_path: None,
-        description: "Mixed compressed/uncompressed pubkeys (Type 30)",
+        description: "Mixed compressed-uncompressed pubkeys (Type 30)",
     };
 
     /// Returns all counterparty fixtures for iteration
@@ -669,6 +669,26 @@ pub mod opreturn_signalled {
     }
 }
 
+/// LikelyLegitimateMultisig fixtures
+pub mod likely_legitimate {
+    use super::*;
+
+    pub const MULTISIG_2OF3_CD27C9: ProtocolFixture = ProtocolFixture {
+        path: "tests/test_data/likely_legitimate/legitimate_multisig_cd27c9.json",
+        txid: "cd27c98d834dd96c4f16d16f33560d99a3a8805a255ef9d9007f803a07d5f457",
+        protocol: ProtocolType::LikelyLegitimateMultisig,
+        variant: Some("LegitimateMultisig"),
+        content_type: None, // LikelyLegitimateMultisig has no content type (not data-carrying)
+        input_fixture_path: None,
+        description: "Real 2-of-3 multisig from block 234568 (May 2013)",
+    };
+
+    /// Returns all likely_legitimate fixtures for iteration
+    pub fn all() -> Vec<&'static ProtocolFixture> {
+        vec![&MULTISIG_2OF3_CD27C9]
+    }
+}
+
 /// DataStorage protocol fixtures
 pub mod datastorage {
     use super::*;
@@ -766,6 +786,7 @@ pub fn all_fixtures() -> Vec<&'static ProtocolFixture> {
     all.extend(ppk::all());
     all.extend(chancecoin::all());
     all.extend(opreturn_signalled::all());
+    all.extend(likely_legitimate::all());
     all.extend(datastorage::all());
     all
 }
@@ -826,12 +847,17 @@ mod tests {
             "Expected 3 opreturn_signalled fixtures"
         );
         assert_eq!(
+            likely_legitimate::all().len(),
+            1,
+            "Expected 1 likely_legitimate fixture"
+        );
+        assert_eq!(
             datastorage::all().len(),
             7,
             "Expected 7 datastorage fixtures"
         );
 
-        // Total: 9 + 11 + 16 + 5 + 7 + 3 + 7 = 58 fixtures
-        assert_eq!(all_fixtures().len(), 58, "Expected 58 total fixtures");
+        // Total: 9 + 11 + 16 + 5 + 7 + 3 + 1 + 7 = 59 fixtures
+        assert_eq!(all_fixtures().len(), 59, "Expected 59 total fixtures");
     }
 }
