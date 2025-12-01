@@ -145,7 +145,6 @@ impl ProtocolTemporalAnalyser {
             weekly_data,
         })
     }
-
 }
 
 impl ProtocolTemporalReport {

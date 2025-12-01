@@ -143,7 +143,6 @@ impl SpendabilityTemporalAnalyser {
             weekly_data,
         })
     }
-
 }
 
 impl SpendabilityTemporalReport {
@@ -159,11 +158,8 @@ impl SpendabilityTemporalReport {
 
         let spendable_pct: Vec<f64> = self.weekly_data.iter().map(|w| w.spendable_pct).collect();
 
-        let unspendable_pct: Vec<f64> = self
-            .weekly_data
-            .iter()
-            .map(|w| w.unspendable_pct)
-            .collect();
+        let unspendable_pct: Vec<f64> =
+            self.weekly_data.iter().map(|w| w.unspendable_pct).collect();
 
         // Create stacked area traces
         // Spendable goes first (from zero)
