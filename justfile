@@ -38,12 +38,9 @@ default:
     @echo "  analyse stamps-weekly-fees   - Bitcoin Stamps weekly fee analysis"
     @echo "  analyse stamps-variant-temporal - Stamps variant distribution over time"
     @echo "  analyse output-counts        - P2MS output count distribution"
+    @echo "  analyse protocol-temporal    - Protocol distribution over time"
+    @echo "  analyse spendability-temporal - Spendability distribution over time"
     @echo "  stats [db]                   - Quick statistics"
-    @echo ""
-    @echo "Visualisation (use: just viz <cmd> [db] [opts...]):"
-    @echo "  viz temporal [db] [opts]     - Temporal distribution plot"
-    @echo "  viz protocols [db] [opts]    - Protocol distribution plot"
-    @echo "  viz stats [db]               - Visualisation statistics"
     @echo ""
     @echo "Utilities:"
     @echo "  setup-config                 - First-time configuration"
@@ -52,9 +49,8 @@ default:
     @echo ""
     @echo "Note: Arguments with spaces require direct script usage:"
     @echo "  ./scripts/analyse.sh value \"./path with spaces.db\" --format json"
-    @echo "  ./scripts/viz.sh temporal \"./custom.db\" --output \"file with spaces.png\""
     @echo ""
-    @echo "Commands accept subcommands: just analyse value, just viz temporal, etc."
+    @echo "Commands accept subcommands: just analyse value, just analyse full, etc."
     @echo "For full command list: just --list"
     @echo "For detailed help: See CLAUDE.md and docs/"
 
@@ -296,26 +292,49 @@ stats-json db_path=default_db_path:
     ./scripts/database_stats.sh "{{db_path}}" --json
 
 # Run analysis commands (umbrella command)
-# Usage: just analyse <command> [db_path] [options...]
-# Commands: burn-patterns, fees, value, value-distributions, classifications, signatures, spendability,
-#           content-types, full, protocol-data-sizes, spendability-data-sizes, content-type-spendability,
-#           comprehensive-data-sizes, multisig-configurations, dust-thresholds, tx-sizes, stamps-weekly-fees,
-#           stamps-variant-temporal, output-counts
-# Examples:
-#   just analyse value                           # Uses default DB
-#   just analyse value ./custom.db --format json
-#   just analyse value-distributions --format json  # Value histogram data for plotting
-#   just analyse content-types --protocol BitcoinStamps
-#   just analyse protocol-data-sizes ./custom.db --format json
-#   just analyse comprehensive-data-sizes        # All data size analyses
-#   just analyse multisig-configurations         # Exhaustive multisig config analysis
-#   just analyse dust-thresholds                 # Bitcoin dust threshold analysis
-#   just analyse tx-sizes                        # Transaction size distribution
-#   just analyse stamps-weekly-fees --format plotly  # Weekly fee analysis for plotting
-#   just analyse stamps-variant-temporal --format plotly  # Variant temporal distribution
-#   just analyse output-counts --format plotly   # P2MS output count distribution
-analyse cmd db_path=default_db_path *args="":
-    ./scripts/analyse.sh "{{cmd}}" "{{db_path}}" {{args}}
+# Usage: just analyse [command] [db_path] [options...]
+# Run 'just analyse' without arguments to see all available commands
+analyse cmd="" db_path=default_db_path *args="":
+    #!/usr/bin/env bash
+    if [ -z "{{cmd}}" ] || [ "{{cmd}}" = "help" ]; then
+        echo "P2MS Analyser - Analysis Commands"
+        echo ""
+        echo "Usage: just analyse <command> [db_path] [options...]"
+        echo "Default database: {{db_path}}"
+        echo ""
+        echo "Commands:"
+        echo "  full                       Comprehensive analysis report"
+        echo "  classifications            Protocol classification statistics"
+        echo "  signatures                 Protocol signature analysis"
+        echo "  value                      Value analysis (satoshis/BTC)"
+        echo "  value-distributions        Value distribution histograms"
+        echo "  burn-patterns              Burn address patterns"
+        echo "  fees                       Transaction fee analysis"
+        echo "  dust-thresholds            Bitcoin dust threshold analysis"
+        echo "  protocol-data-sizes        Data sizes by protocol"
+        echo "  spendability-data-sizes    Data sizes by spendability"
+        echo "  content-type-spendability  Content types with spendability"
+        echo "  comprehensive-data-sizes   All data size analyses"
+        echo "  tx-sizes                   Transaction size distribution"
+        echo "  content-types              Content type distribution"
+        echo "  multisig-configurations    Multisig M-of-N config breakdown"
+        echo "  output-counts              P2MS outputs per transaction"
+        echo "  spendability               Spendability status analysis"
+        echo "  stamps-weekly-fees         Stamps weekly fee analysis"
+        echo "  stamps-variant-temporal    Stamps variant over time"
+        echo "  protocol-temporal          Protocol distribution over time"
+        echo "  spendability-temporal      Spendability distribution over time"
+        echo ""
+        echo "Output formats: --format table|json|plotly (or --plotly)"
+        echo ""
+        echo "Examples:"
+        echo "  just analyse value"
+        echo "  just analyse full ./custom.db"
+        echo "  just analyse content-types --protocol BitcoinStamps"
+        echo "  just analyse stamps-weekly-fees --plotly"
+    else
+        ./scripts/analyse.sh "{{cmd}}" "{{db_path}}" {{args}}
+    fi
 
 # Show schema of database
 schema db_path=default_db_path:
@@ -336,33 +355,3 @@ checkpoints db_path=default_db_path:
 # Inspect specific transaction details
 inspect-tx txid db_path=default_db_path:
     ./scripts/inspect_transaction.sh "{{txid}}" "{{db_path}}"
-
-# ============================================================================
-# === VISUALISATION ===
-# ============================================================================
-
-# Visualisation commands (umbrella command)
-# Usage: just viz <command> [db_path] [options...]
-# Commands: --help, stats, temporal, protocols, spendability, export-protocols, export-spendability
-# Examples:
-#   just viz --help
-#   just viz stats
-#   just viz temporal ./custom.db --bin monthly --output output_data/plots/temporal.png
-viz cmd db_path=default_db_path *args="":
-    #!/usr/bin/env bash
-    # If cmd starts with -, it's a flag (like --help), don't pass db_path
-    if [[ "{{cmd}}" =~ ^- ]]; then
-        ./scripts/viz.sh "{{cmd}}" {{args}}
-    else
-        ./scripts/viz.sh "{{cmd}}" "{{db_path}}" {{args}}
-    fi
-
-# Build complete block time dataset (ONE-TIME operation, requires Bitcoin RPC)
-# Auto-resumes if interrupted - use --no-resume to start fresh
-build-block-times max_height="":
-    #!/usr/bin/env bash
-    if [ -n "{{max_height}}" ]; then
-        .venv/bin/python visualisation/build_block_time_dataset.py --max-height {{max_height}}
-    else
-        .venv/bin/python visualisation/build_block_time_dataset.py
-    fi

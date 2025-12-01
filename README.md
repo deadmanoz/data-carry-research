@@ -248,17 +248,15 @@ just analyse tx-sizes <db>                   # Transaction size distribution
 just analyse stamps-weekly-fees <db>         # Bitcoin Stamps weekly fee analysis
 just analyse output-counts <db>              # P2MS output count distribution
 
-# Visualisation (umbrella command: just viz <subcommand> [db] [options])
-just viz temporal <db>                       # Temporal distribution plots
-just viz protocols <db>                      # Protocol distribution plots
-just viz spendability <db>                   # Spendability visualisation
-just viz stats                               # Visualisation statistics
+# Temporal analysis (Plotly JSON output with --format plotly)
+just analyse stamps-variant-temporal <db>    # Stamps variant distribution over time
+just analyse protocol-temporal <db>          # Protocol distribution over time
+just analyse spendability-temporal <db>      # Spendability distribution over time
 ```
 
 **Note**: For database paths with spaces, use direct script invocation:
 ```bash
 ./scripts/analyse.sh value "./path with spaces.db" --format json
-./scripts/viz.sh temporal "./custom.db" --bin monthly
 ```
 
 **Content Type Detection**: The analyser automatically detects MIME types for embedded data (images, JSON, text, binary)
