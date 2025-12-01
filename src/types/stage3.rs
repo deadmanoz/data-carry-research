@@ -144,6 +144,26 @@ impl ProtocolType {
             ProtocolType::Unknown => "Unknown",
         }
     }
+
+    /// Convert protocol string to display name
+    ///
+    /// Parses a protocol string (e.g., "BitcoinStamps") and returns its
+    /// human-readable display name. Returns the original string if parsing fails.
+    pub fn str_to_display_name(s: &str) -> String {
+        std::str::FromStr::from_str(s)
+            .map(|p: ProtocolType| p.display_name().to_string())
+            .unwrap_or_else(|_| s.to_string())
+    }
+
+    /// Get sort order for a protocol string
+    ///
+    /// Returns the enum variant order for sorting protocols consistently.
+    /// Unknown strings sort to the end (u8::MAX).
+    pub fn str_to_sort_order(s: &str) -> u8 {
+        std::str::FromStr::from_str(s)
+            .map(|p: ProtocolType| p as u8)
+            .unwrap_or(u8::MAX)
+    }
 }
 
 impl std::fmt::Display for ProtocolType {

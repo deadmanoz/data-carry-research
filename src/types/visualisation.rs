@@ -5,6 +5,96 @@
 
 use serde::Serialize;
 
+// ============================================================================
+// Font and Styling Types
+// ============================================================================
+
+/// Plotly font configuration for titles, labels, and annotations
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct PlotlyFont {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub family: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<u32>,
+}
+
+/// Plotly legend configuration
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct PlotlyLegend {
+    /// Legend orientation: "v" (vertical) or "h" (horizontal)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub orientation: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub x: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub y: Option<f64>,
+    /// Horizontal anchor: "left", "center", "right", "auto"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub xanchor: Option<String>,
+}
+
+/// Plotly annotation for adding text boxes and labels to charts
+#[derive(Debug, Clone, Serialize)]
+pub struct PlotlyAnnotation {
+    pub text: String,
+    /// Reference for x position: "paper" (0-1 fraction) or "x" (data coords)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub xref: Option<String>,
+    /// Reference for y position: "paper" (0-1 fraction) or "y" (data coords)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub yref: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub x: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub y: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub xanchor: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub yanchor: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub showarrow: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bgcolor: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bordercolor: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub borderwidth: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub borderpad: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub font: Option<PlotlyFont>,
+}
+
+impl PlotlyAnnotation {
+    /// Create a statistics box annotation (common pattern for summary stats)
+    ///
+    /// Positioned in paper coordinates with monospace font and subtle border.
+    pub fn stats_box(text: &str, x: f64, y: f64) -> Self {
+        Self {
+            text: text.to_string(),
+            xref: Some("paper".to_string()),
+            yref: Some("paper".to_string()),
+            x: Some(x),
+            y: Some(y),
+            xanchor: Some("left".to_string()),
+            yanchor: Some("bottom".to_string()),
+            showarrow: Some(false),
+            bgcolor: Some("rgba(255, 255, 255, 0.8)".to_string()),
+            bordercolor: Some("gray".to_string()),
+            borderwidth: Some(1),
+            borderpad: Some(4),
+            font: Some(PlotlyFont {
+                family: Some("monospace".to_string()),
+                size: Some(10),
+            }),
+        }
+    }
+}
+
+// ============================================================================
+// Chart Types
+// ============================================================================
+
 /// Complete Plotly chart data structure
 ///
 /// Standard format expected by Plotly.js: `{data: [...], layout: {...}}`
@@ -43,9 +133,12 @@ pub struct PlotlyTrace {
     /// Stack group for stacked area charts (e.g., "one")
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stackgroup: Option<String>,
-    /// Fill mode for area charts (e.g., "tonexty")
+    /// Fill mode for area charts (e.g., "tonexty", "tozeroy")
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fill: Option<String>,
+    /// Fill colour for area charts (e.g., "rgba(46, 204, 113, 0.7)")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fillcolor: Option<String>,
 }
 
 /// Plotly marker configuration
@@ -58,6 +151,8 @@ pub struct PlotlyMarker {
 #[derive(Debug, Clone, Serialize)]
 pub struct PlotlyLine {
     pub color: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<f64>,
 }
 
 /// Plotly hover label configuration
@@ -82,12 +177,23 @@ pub struct PlotlyLayout {
     /// Bar mode: "stack", "group", "overlay", "relative"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub barmode: Option<String>,
+    /// Interactive control menus (e.g., linear/log toggle buttons)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updatemenus: Option<Vec<PlotlyUpdateMenu>>,
+    /// Legend configuration (position, orientation)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub legend: Option<PlotlyLegend>,
+    /// Annotations (text boxes, labels, stats boxes)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub annotations: Option<Vec<PlotlyAnnotation>>,
 }
 
 /// Plotly title configuration
 #[derive(Debug, Clone, Serialize)]
 pub struct PlotlyTitle {
     pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub font: Option<PlotlyFont>,
 }
 
 /// Plotly axis configuration
@@ -98,6 +204,12 @@ pub struct PlotlyAxis {
     pub axis_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tickangle: Option<i32>,
+    /// Fixed axis range (e.g., [0, 100] for percentage axes)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub range: Option<Vec<f64>>,
+    /// Suffix to append to tick labels (e.g., "%" for percentages)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ticksuffix: Option<String>,
 }
 
 /// Plotly secondary axis configuration
@@ -108,28 +220,55 @@ pub struct PlotlySecondaryAxis {
     pub side: String,
 }
 
+/// Plotly update menu (buttons for interactive controls)
+#[derive(Debug, Clone, Serialize)]
+pub struct PlotlyUpdateMenu {
+    #[serde(rename = "type")]
+    pub menu_type: String,
+    pub direction: String,
+    pub x: f64,
+    pub y: f64,
+    pub buttons: Vec<PlotlyButton>,
+}
+
+/// Plotly button for update menus
+#[derive(Debug, Clone, Serialize)]
+pub struct PlotlyButton {
+    pub label: String,
+    pub method: String,
+    pub args: Vec<serde_json::Value>,
+}
+
 impl PlotlyLayout {
     /// Create a basic layout with single y-axis
     pub fn basic(title: &str, x_title: &str, y_title: &str) -> Self {
         Self {
             title: PlotlyTitle {
                 text: title.to_string(),
+                font: None,
             },
             xaxis: PlotlyAxis {
                 title: x_title.to_string(),
                 axis_type: None,
                 tickangle: None,
+                range: None,
+                ticksuffix: None,
             },
             yaxis: PlotlyAxis {
                 title: y_title.to_string(),
                 axis_type: None,
                 tickangle: None,
+                range: None,
+                ticksuffix: None,
             },
             yaxis2: None,
             hovermode: "x unified".to_string(),
             hoverlabel: PlotlyHoverLabel { namelength: -1 },
             bargap: None,
             barmode: None,
+            updatemenus: None,
+            legend: None,
+            annotations: None,
         }
     }
 
@@ -138,16 +277,21 @@ impl PlotlyLayout {
         Self {
             title: PlotlyTitle {
                 text: title.to_string(),
+                font: None,
             },
             xaxis: PlotlyAxis {
                 title: x_title.to_string(),
                 axis_type: None,
                 tickangle: None,
+                range: None,
+                ticksuffix: None,
             },
             yaxis: PlotlyAxis {
                 title: y1_title.to_string(),
                 axis_type: None,
                 tickangle: None,
+                range: None,
+                ticksuffix: None,
             },
             yaxis2: Some(PlotlySecondaryAxis {
                 title: y2_title.to_string(),
@@ -158,7 +302,61 @@ impl PlotlyLayout {
             hoverlabel: PlotlyHoverLabel { namelength: -1 },
             bargap: None,
             barmode: None,
+            updatemenus: None,
+            legend: None,
+            annotations: None,
         }
+    }
+
+    /// Add linear/log toggle buttons to the layout
+    pub fn with_log_toggle(mut self) -> Self {
+        self.updatemenus = Some(vec![PlotlyUpdateMenu {
+            menu_type: "buttons".to_string(),
+            direction: "left".to_string(),
+            x: 0.0,
+            y: 1.15,
+            buttons: vec![
+                PlotlyButton {
+                    label: "Linear".to_string(),
+                    method: "relayout".to_string(),
+                    args: vec![serde_json::json!({"yaxis.type": "linear"})],
+                },
+                PlotlyButton {
+                    label: "Log".to_string(),
+                    method: "relayout".to_string(),
+                    args: vec![serde_json::json!({"yaxis.type": "log"})],
+                },
+            ],
+        }]);
+        self
+    }
+
+    /// Add legend configuration
+    ///
+    /// Standard positioning: `with_legend("v", 1.02, 1.0, "left")` for vertical legend on right
+    pub fn with_legend(mut self, orientation: &str, x: f64, y: f64, xanchor: &str) -> Self {
+        self.legend = Some(PlotlyLegend {
+            orientation: Some(orientation.to_string()),
+            x: Some(x),
+            y: Some(y),
+            xanchor: Some(xanchor.to_string()),
+        });
+        self
+    }
+
+    /// Add annotations to the layout
+    pub fn with_annotations(mut self, annotations: Vec<PlotlyAnnotation>) -> Self {
+        self.annotations = Some(annotations);
+        self
+    }
+
+    /// Set title font size
+    pub fn with_title_font_size(mut self, size: u32) -> Self {
+        self.title.font = Some(PlotlyFont {
+            family: None,
+            size: Some(size),
+        });
+        self
     }
 }
 
@@ -182,6 +380,7 @@ impl PlotlyTrace {
             hovertemplate: None,
             stackgroup: None,
             fill: None,
+            fillcolor: None,
         }
     }
 
@@ -197,6 +396,7 @@ impl PlotlyTrace {
             marker: None,
             line: Some(PlotlyLine {
                 color: color.to_string(),
+                width: None,
             }),
             visible: None,
             text: None,
@@ -204,6 +404,40 @@ impl PlotlyTrace {
             hovertemplate: None,
             stackgroup: None,
             fill: None,
+            fillcolor: None,
+        }
+    }
+
+    /// Create a stacked area trace with custom fill colour
+    ///
+    /// Used for charts like spendability distribution where each area needs
+    /// a distinct semi-transparent fill colour.
+    pub fn stacked_area_with_fill(
+        x: Vec<String>,
+        y: Vec<f64>,
+        name: &str,
+        line_color: &str,
+        fill_color: &str,
+    ) -> Self {
+        Self {
+            x,
+            y,
+            name: name.to_string(),
+            trace_type: "scatter".to_string(),
+            mode: Some("lines".to_string()),
+            yaxis: None,
+            marker: None,
+            line: Some(PlotlyLine {
+                color: line_color.to_string(),
+                width: Some(0.0), // No visible line, just the fill
+            }),
+            visible: None,
+            text: None,
+            textposition: None,
+            hovertemplate: None,
+            stackgroup: Some("one".to_string()),
+            fill: Some("tonexty".to_string()),
+            fillcolor: Some(fill_color.to_string()),
         }
     }
 
@@ -225,6 +459,18 @@ impl PlotlyTrace {
     pub fn stacked_area(mut self) -> Self {
         self.stackgroup = Some("one".to_string());
         self.fill = Some("tonexty".to_string());
+        self
+    }
+
+    /// Set custom fill colour for area charts
+    pub fn with_fillcolor(mut self, color: &str) -> Self {
+        self.fillcolor = Some(color.to_string());
+        self
+    }
+
+    /// Set fill to start from zero (for first trace in stacked area)
+    pub fn fill_to_zero(mut self) -> Self {
+        self.fill = Some("tozeroy".to_string());
         self
     }
 }

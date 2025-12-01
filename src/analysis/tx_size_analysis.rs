@@ -394,7 +394,9 @@ impl TxSizeDistributionReport {
             "P2MS Transaction Size Distribution by Protocol",
             "Transaction Size (bytes)",
             "Transaction Count",
-        );
+        )
+        .with_log_toggle()
+        .with_legend("v", 1.02, 1.0, "left");
         // Rotate x-axis labels for readability
         layout.xaxis.tickangle = Some(-45);
         // Stack bars for per-protocol breakdown

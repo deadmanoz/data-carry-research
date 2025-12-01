@@ -47,10 +47,12 @@ pub mod file_extension_stats;
 pub mod multisig_config_stats;
 pub mod p2ms_output_count_analysis;
 pub mod protocol_stats;
+pub mod protocol_temporal;
 pub mod pubkey_validator;
 pub mod reports;
 pub mod signature_analysis;
 pub mod spendability_stats;
+pub mod spendability_temporal;
 pub mod stamps_signature_stats;
 pub mod stamps_transport_stats;
 pub mod stamps_variant_temporal;
@@ -67,12 +69,13 @@ pub use crate::types::analysis_results::{
     GlobalDustStats, GlobalOutputCountDistribution, GlobalTxSizeDistribution,
     GlobalValueDistribution, MultisigConfigReport, MultisigConfiguration, OutputCountBucket,
     OutputCountDistributionReport, OutputCountPercentiles, ProtocolDataSizeReport,
-    ProtocolDustStats, ProtocolOutputCountDistribution, ProtocolTxSizeDistribution,
-    ProtocolValueDistribution, SignatureAnalysisReport, SpendabilityDataSizeReport,
-    SpendabilityStatsReport, StampsFeeSummary, StampsVariantTemporalReport, StampsWeeklyFeeReport,
-    TxSizeBucket, TxSizeDistributionReport, TxSizePercentiles, ValidNoneStats, ValueAnalysisReport,
-    ValueBucket, ValueDistributionReport, ValuePercentiles, VariantFirstSeen, VariantTotal,
-    WeeklyStampsFeeStats, WeeklyVariantStats, UNCLASSIFIED_SENTINEL,
+    ProtocolDustStats, ProtocolOutputCountDistribution, ProtocolTemporalReport, ProtocolTotal,
+    ProtocolTxSizeDistribution, ProtocolValueDistribution, SignatureAnalysisReport,
+    SpendabilityDataSizeReport, SpendabilityStatsReport, SpendabilityTemporalReport,
+    StampsFeeSummary, StampsVariantTemporalReport, StampsWeeklyFeeReport, TxSizeBucket,
+    TxSizeDistributionReport, TxSizePercentiles, ValidNoneStats, ValueAnalysisReport, ValueBucket,
+    ValueDistributionReport, ValuePercentiles, VariantFirstSeen, VariantTotal, WeeklyProtocolStats,
+    WeeklySpendabilityStats, WeeklyStampsFeeStats, WeeklyVariantStats, UNCLASSIFIED_SENTINEL,
 };
 pub use crate::types::visualisation::PlotlyChart;
 pub use burn_detector::BurnPatternDetector;
@@ -86,6 +89,7 @@ pub use file_extension_stats::FileExtensionAnalyser;
 pub use multisig_config_stats::MultisigConfigAnalyser;
 pub use p2ms_output_count_analysis::P2msOutputCountAnalyser;
 pub use protocol_stats::ProtocolStatsAnalyser;
+pub use protocol_temporal::ProtocolTemporalAnalyser;
 pub use pubkey_validator::{
     aggregate_validation_for_outputs, validate_from_metadata, validate_pubkeys,
     PubkeyValidationResult,
@@ -93,6 +97,7 @@ pub use pubkey_validator::{
 pub use reports::{OutputFormat, ReportFormatter};
 pub use signature_analysis::SignatureAnalyser;
 pub use spendability_stats::SpendabilityStatsAnalyser;
+pub use spendability_temporal::SpendabilityTemporalAnalyser;
 pub use stamps_signature_stats::{StampsSignatureAnalyser, StampsSignatureAnalysis};
 pub use stamps_transport_stats::{StampsTransportAnalyser, StampsTransportAnalysis};
 pub use stamps_variant_temporal::StampsVariantTemporalAnalyser;
@@ -411,6 +416,38 @@ impl AnalysisEngine {
     /// * `AppResult<StampsVariantTemporalReport>` - Variant temporal distribution
     pub fn analyse_stamps_variant_temporal(&self) -> AppResult<StampsVariantTemporalReport> {
         StampsVariantTemporalAnalyser::analyse_temporal_distribution(&self.database)
+    }
+
+    /// Analyse protocol distribution over time
+    ///
+    /// Provides temporal analysis of P2MS protocol classifications showing
+    /// how different protocols are distributed across weekly buckets.
+    ///
+    /// **Key Design Decisions**:
+    /// - Output-level aggregation (counts P2MS outputs, not transactions)
+    /// - Fixed 7-day buckets (Thursday-to-Wednesday, based on Unix epoch)
+    /// - Includes total value locked per protocol per week
+    ///
+    /// # Returns
+    /// * `AppResult<ProtocolTemporalReport>` - Protocol temporal distribution
+    pub fn analyse_protocol_temporal(&self) -> AppResult<ProtocolTemporalReport> {
+        ProtocolTemporalAnalyser::analyse_temporal_distribution(&self.database)
+    }
+
+    /// Analyse spendability distribution over time
+    ///
+    /// Provides temporal analysis of P2MS output spendability showing
+    /// the percentage of spendable vs unspendable outputs per week.
+    ///
+    /// **Key Design Decisions**:
+    /// - Output-level aggregation (counts P2MS outputs, not transactions)
+    /// - Fixed 7-day buckets (Thursday-to-Wednesday, based on Unix epoch)
+    /// - Percentage display for clear visualisation
+    ///
+    /// # Returns
+    /// * `AppResult<SpendabilityTemporalReport>` - Spendability temporal distribution
+    pub fn analyse_spendability_temporal(&self) -> AppResult<SpendabilityTemporalReport> {
+        SpendabilityTemporalAnalyser::analyse_temporal_distribution(&self.database)
     }
 
     /// Analyse transaction size distribution across all P2MS transactions

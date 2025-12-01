@@ -14,7 +14,7 @@
 //!
 //! - **Console**: Human-readable summary with variant totals and first appearances
 //! - **JSON**: Raw structured data with all weekly breakdowns
-//! - **Plotly**: Stacked area chart data with `stackgroup: "one"`
+//! - **Plotly**: Stacked bar chart data with `barmode: "stack"`
 
 use crate::database::Database;
 use crate::errors::AppResult;
@@ -24,11 +24,8 @@ use crate::types::analysis_results::{
 use crate::types::visualisation::{
     get_stamps_variant_colour, PlotlyChart, PlotlyLayout, PlotlyTrace,
 };
-use chrono::{TimeZone, Utc};
+use crate::utils::time::{extract_date_from_datetime, week_bucket_dates};
 use std::collections::HashMap;
-
-/// Seconds in a week (7 × 24 × 60 × 60 = 604800)
-const SECONDS_PER_WEEK: i64 = 604_800;
 
 /// Bitcoin Stamps variant temporal distribution analyser
 pub struct StampsVariantTemporalAnalyser;
@@ -94,9 +91,7 @@ impl StampsVariantTemporalAnalyser {
         for row_result in rows {
             let (week_bucket, week_start_ts, variant, output_count, total_sats) = row_result?;
 
-            let week_start_iso = Self::timestamp_to_iso(week_start_ts);
-            let week_end_ts = week_start_ts + SECONDS_PER_WEEK - 1;
-            let week_end_iso = Self::timestamp_to_iso(week_end_ts);
+            let (week_start_iso, week_end_iso) = week_bucket_dates(week_start_ts);
 
             let count = output_count as usize;
             let value = total_sats as u64;
@@ -185,7 +180,7 @@ impl StampsVariantTemporalAnalyser {
         let mut first_appearances: Vec<VariantFirstSeen> = Vec::new();
         for row_result in first_rows {
             let (variant, first_height, first_date_raw, first_txid) = row_result?;
-            let first_date = Self::extract_date_from_datetime(&first_date_raw);
+            let first_date = extract_date_from_datetime(&first_date_raw);
 
             first_appearances.push(VariantFirstSeen {
                 variant,
@@ -237,31 +232,12 @@ impl StampsVariantTemporalAnalyser {
             null_variant_count: null_variant_count as usize,
         })
     }
-
-    /// Convert Unix timestamp to ISO 8601 date string (YYYY-MM-DD)
-    fn timestamp_to_iso(timestamp: i64) -> String {
-        match Utc.timestamp_opt(timestamp, 0) {
-            chrono::LocalResult::Single(dt) => dt.format("%Y-%m-%d").to_string(),
-            _ => String::new(),
-        }
-    }
-
-    /// Extract date portion from datetime string (handles "YYYY-MM-DD HH:MM:SS" format)
-    fn extract_date_from_datetime(datetime_str: &str) -> String {
-        // SQLite datetime() returns "YYYY-MM-DD HH:MM:SS" format
-        // We only want the date part
-        datetime_str
-            .split(' ')
-            .next()
-            .unwrap_or(datetime_str)
-            .to_string()
-    }
 }
 
 impl StampsVariantTemporalReport {
-    /// Convert report to Plotly stacked area chart
+    /// Convert report to Plotly stacked bar chart
     ///
-    /// Creates one trace per variant with stackgroup for proper stacking.
+    /// Creates one trace per variant with barmode="stack" for proper stacking.
     /// Uses variant-specific colours for visual distinction.
     pub fn to_plotly_chart(&self) -> PlotlyChart {
         // Get unique weeks in order
@@ -298,7 +274,7 @@ impl StampsVariantTemporalReport {
                 .collect();
 
             let colour = get_stamps_variant_colour(variant);
-            let trace = PlotlyTrace::line(x_values, y_values, variant, colour).stacked_area();
+            let trace = PlotlyTrace::bar(x_values, y_values, variant, colour);
 
             traces.push(trace);
         }
@@ -307,8 +283,11 @@ impl StampsVariantTemporalReport {
             "Bitcoin Stamps Variant Distribution Over Time",
             "Week",
             "Output Count",
-        );
+        )
+        .with_log_toggle()
+        .with_legend("v", 1.02, 1.0, "left");
         layout.xaxis.axis_type = Some("date".to_string());
+        layout.barmode = Some("stack".to_string());
 
         PlotlyChart {
             data: traces,
@@ -317,34 +296,5 @@ impl StampsVariantTemporalReport {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_timestamp_to_iso() {
-        // Unix epoch (1970-01-01 00:00:00 UTC)
-        assert_eq!(
-            StampsVariantTemporalAnalyser::timestamp_to_iso(0),
-            "1970-01-01"
-        );
-
-        // 2023-01-01 00:00:00 UTC (1672531200)
-        assert_eq!(
-            StampsVariantTemporalAnalyser::timestamp_to_iso(1672531200),
-            "2023-01-01"
-        );
-    }
-
-    #[test]
-    fn test_extract_date_from_datetime() {
-        assert_eq!(
-            StampsVariantTemporalAnalyser::extract_date_from_datetime("2023-01-01 00:00:00"),
-            "2023-01-01"
-        );
-        assert_eq!(
-            StampsVariantTemporalAnalyser::extract_date_from_datetime("2023-12-31"),
-            "2023-12-31"
-        );
-    }
-}
+// Tests for time utilities moved to src/utils/time.rs
+// Tests for chart generation in tests/unit/analysis/stamps_variant_temporal.rs

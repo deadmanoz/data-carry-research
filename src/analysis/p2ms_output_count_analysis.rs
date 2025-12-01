@@ -354,7 +354,8 @@ impl OutputCountDistributionReport {
             "P2MS Output Count Distribution by Protocol",
             "P2MS Outputs per Transaction",
             "Transaction Count",
-        );
+        )
+        .with_legend("v", 1.02, 1.0, "left");
         // Rotate x-axis labels for readability
         layout.xaxis.tickangle = Some(-45);
         // Stack bars for per-protocol breakdown

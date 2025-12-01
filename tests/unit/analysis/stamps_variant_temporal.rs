@@ -580,20 +580,19 @@ fn test_plotly_chart_generation() -> AppResult<()> {
         "Should have 2 traces (one per variant)"
     );
 
-    // All traces should be stacked area
+    // All traces should be bar charts
     for trace in &chart.data {
-        assert_eq!(
-            trace.stackgroup,
-            Some("one".to_string()),
-            "Should have stackgroup"
-        );
-        assert_eq!(trace.fill, Some("tonexty".to_string()), "Should have fill");
-        assert_eq!(trace.trace_type, "scatter", "Should be scatter type");
+        assert_eq!(trace.trace_type, "bar", "Should be bar type");
     }
 
     // Layout should have proper configuration
     assert!(chart.layout.title.text.contains("Bitcoin Stamps Variant"));
     assert_eq!(chart.layout.xaxis.axis_type, Some("date".to_string()));
+    assert_eq!(
+        chart.layout.barmode,
+        Some("stack".to_string()),
+        "Should use stacked bar mode"
+    );
 
     Ok(())
 }

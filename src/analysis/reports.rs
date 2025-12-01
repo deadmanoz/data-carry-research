@@ -9,11 +9,13 @@ use crate::types::analysis_results::{
     BurnPatternAnalysis, ClassificationStatsReport, ComprehensiveDataSizeReport,
     ContentTypeSpendabilityReport, DustAnalysisReport, FeeAnalysisReport, FileExtensionReport,
     FullAnalysisReport, MultisigConfigReport, OutputCountDistributionReport,
-    ProtocolDataSizeReport, SignatureAnalysisReport, SpendabilityDataSizeReport,
-    SpendabilityStatsReport, StampsVariantTemporalReport, StampsWeeklyFeeReport,
-    TxSizeDistributionReport, ValueAnalysisReport, ValueDistributionReport,
+    ProtocolDataSizeReport, ProtocolTemporalReport, SignatureAnalysisReport,
+    SpendabilityDataSizeReport, SpendabilityStatsReport, SpendabilityTemporalReport,
+    StampsVariantTemporalReport, StampsWeeklyFeeReport, TxSizeDistributionReport,
+    ValueAnalysisReport, ValueDistributionReport,
 };
-use crate::types::visualisation::{get_protocol_colour, PlotlyChart};
+use crate::types::visualisation::{get_protocol_colour, PlotlyChart, PlotlyLayout, PlotlyTrace};
+use crate::types::ProtocolType;
 use crate::utils::currency::{format_rate_as_btc, format_sats_as_btc, format_sats_as_btc_f64};
 use serde::Serialize;
 use std::str::FromStr;
@@ -175,7 +177,7 @@ impl ReportFormatter {
                 for protocol_stats in &report.protocol_value_breakdown {
                     output.push_str(&format!(
                         "{:<28} | {:>10} | {:>14} | {:>16} | {:>14} | {:>14} |\n",
-                        Self::format_protocol_name(&protocol_stats.protocol),
+                        ProtocolType::str_to_display_name(&protocol_stats.protocol),
                         Self::format_number(protocol_stats.output_count),
                         format_sats_as_btc(protocol_stats.total_btc_value_sats),
                         format_sats_as_btc_f64(protocol_stats.average_btc_per_output),
@@ -210,7 +212,7 @@ impl ReportFormatter {
                 for protocol_stats in &report.protocol_value_breakdown {
                     output.push_str(&format!(
                         "{:<28} | {:>14} | {:>14} | {:>18} | {:>20} |\n",
-                        Self::format_protocol_name(&protocol_stats.protocol),
+                        ProtocolType::str_to_display_name(&protocol_stats.protocol),
                         format_sats_as_btc(protocol_stats.fee_stats.total_fees_paid_sats),
                         format_sats_as_btc_f64(protocol_stats.fee_stats.average_fee_sats),
                         format_rate_as_btc(protocol_stats.fee_stats.average_fee_per_byte, "byte"),
@@ -242,22 +244,6 @@ impl ReportFormatter {
                 Ok(output)
             }
             OutputFormat::Json | OutputFormat::Plotly => Self::export_json(report),
-        }
-    }
-
-    /// Format protocol name for display (convert internal names to readable format)
-    fn format_protocol_name(protocol: &str) -> String {
-        match protocol {
-            "BitcoinStamps" => "Bitcoin Stamps".to_string(),
-            "Counterparty" => "Counterparty".to_string(),
-            "OmniLayer" => "Omni Layer".to_string(),
-            "LikelyLegitimateMultisig" => "Likely Legitimate Multisig".to_string(),
-            "DataStorage" => "Data Storage".to_string(),
-            "LikelyDataStorage" => "Likely Data Storage".to_string(),
-            "Chancecoin" => "Chancecoin".to_string(),
-            "AsciiIdentifierProtocols" => "ASCII Identifier Protocols".to_string(),
-            "Unknown" => "Unknown".to_string(),
-            _ => protocol.to_string(),
         }
     }
 
@@ -855,9 +841,9 @@ impl ReportFormatter {
     }
 
     /// Export value distributions as Plotly-compatible JSON
+    ///
+    /// Uses typed Plotly structs for type safety and consistency.
     fn export_plotly_value_distributions(report: &ValueDistributionReport) -> AppResult<String> {
-        use serde_json::json;
-
         // Helper to format value with K/M abbreviations or BTC for large values
         let format_value_label = |sats: u64| -> String {
             if sats >= 100_000_000 {
@@ -920,28 +906,24 @@ impl ReportFormatter {
         let mut traces = Vec::new();
 
         // Global distribution trace
-        let global_counts: Vec<usize> = report
+        let global_counts: Vec<f64> = report
             .global_distribution
             .buckets
             .iter()
-            .map(|b| b.count)
+            .map(|b| b.count as f64)
             .collect();
 
-        traces.push(json!({
-            "x": bucket_labels,
-            "y": global_counts,
-            "name": "All P2MS Outputs",
-            "type": "bar",
-            "marker": {
-                "color": "#34495E"
-            }
-        }));
+        traces.push(PlotlyTrace::bar(
+            bucket_labels.clone(),
+            global_counts,
+            "All P2MS Outputs",
+            "#34495E",
+        ));
 
         // Per-protocol traces (sorted by canonical ProtocolType enum order)
         let mut protocol_dists = report.protocol_distributions.clone();
         protocol_dists.sort_by(|a, b| {
             use crate::types::ProtocolType;
-            use std::str::FromStr;
             let a_order = ProtocolType::from_str(&a.protocol)
                 .map(|p| p as u8)
                 .unwrap_or(u8::MAX);
@@ -952,58 +934,53 @@ impl ReportFormatter {
         });
 
         for protocol_dist in &protocol_dists {
-            let protocol_counts: Vec<usize> =
-                protocol_dist.buckets.iter().map(|b| b.count).collect();
+            let protocol_counts: Vec<f64> = protocol_dist
+                .buckets
+                .iter()
+                .map(|b| b.count as f64)
+                .collect();
 
             // Use display_name() for user-facing trace names, fall back to raw string
             let display_name = crate::types::ProtocolType::from_str(&protocol_dist.protocol)
                 .map(|p| p.display_name().to_string())
                 .unwrap_or_else(|_| protocol_dist.protocol.clone());
 
-            traces.push(json!({
-                "x": bucket_labels,
-                "y": protocol_counts,
-                "name": display_name,
-                "type": "bar",
-                "marker": {
-                    // Use raw protocol string for colour lookup (matches get_protocol_colour keys)
-                    "color": get_protocol_colour(&protocol_dist.protocol)
-                },
-                "visible": "legendonly"  // Hidden by default, show in legend
-            }));
+            // Use raw protocol string for colour lookup (matches get_protocol_colour keys)
+            let colour = get_protocol_colour(&protocol_dist.protocol);
+
+            traces.push(
+                PlotlyTrace::bar(
+                    bucket_labels.clone(),
+                    protocol_counts,
+                    &display_name,
+                    colour,
+                )
+                .hidden_by_default(),
+            );
         }
 
-        // Create layout
-        let layout = json!({
-            "title": {
-                "text": "P2MS Output Value Distribution",
-                "font": {"size": 16}
-            },
-            "xaxis": {
-                "title": "Value Range (satoshis)",
-                "type": "category"
-            },
-            "yaxis": {
-                "title": "Number of Outputs",
-                "type": "log"  // Log scale for better visibility
-            },
-            "barmode": "overlay",
-            "legend": {
-                "orientation": "v",
-                "x": 1.02,
-                "y": 1,
-                "xanchor": "left"
-            },
-            "hovermode": "x unified"
-        });
+        // Create layout using typed builders
+        let mut layout = PlotlyLayout::basic(
+            "P2MS Output Value Distribution",
+            "Value Range (satoshis)",
+            "Number of Outputs",
+        )
+        .with_title_font_size(16)
+        .with_legend("v", 1.02, 1.0, "left")
+        .with_log_toggle();
 
-        // Combine into Plotly format
-        let plotly_data = json!({
-            "data": traces,
-            "layout": layout
-        });
+        // Set axis types
+        layout.xaxis.axis_type = Some("category".to_string());
+        layout.yaxis.axis_type = Some("log".to_string());
+        layout.barmode = Some("overlay".to_string());
 
-        serde_json::to_string_pretty(&plotly_data).map_err(|e| {
+        // Create chart
+        let chart = PlotlyChart {
+            data: traces,
+            layout,
+        };
+
+        serde_json::to_string_pretty(&chart).map_err(|e| {
             crate::errors::AppError::Config(format!("Plotly JSON export failed: {}", e))
         })
     }
@@ -1483,7 +1460,7 @@ impl ReportFormatter {
                     for protocol_stats in &report.protocol_breakdown {
                         output.push_str(&format!(
                             "{:<28} │ {:>10} │ {:>6} ({:>4.0}%) │ {:>6} ({:>4.0}%) │ {:>6} ({:>4.0}%) │\n",
-                            Self::format_protocol_name(&protocol_stats.protocol.to_string()),
+                            protocol_stats.protocol.display_name(),
                             Self::format_number(protocol_stats.total_outputs),
                             Self::format_number(protocol_stats.below_non_segwit_threshold.count),
                             protocol_stats.below_non_segwit_threshold.pct_count,
@@ -1912,7 +1889,7 @@ impl ReportFormatter {
                     for dist in &report.protocol_distributions {
                         output.push_str(&format!(
                             "{:<28} │ {:>12} │ {:>10} │ {:>8} B │ {:>10.1} sat/B │\n",
-                            Self::format_protocol_name(&dist.protocol.to_string()),
+                            dist.protocol.display_name(),
                             Self::format_number(dist.total_transactions),
                             Self::format_number(dist.excluded_null_count),
                             Self::format_number(dist.avg_size_bytes.round() as usize),
@@ -2048,7 +2025,7 @@ impl ReportFormatter {
                     for dist in &report.protocol_distributions {
                         output.push_str(&format!(
                             "{:<28} │ {:>12} │ {:>10} │ {:>10.2} │ {:>14} │\n",
-                            Self::format_protocol_name(&dist.protocol.to_string()),
+                            dist.protocol.display_name(),
                             Self::format_number(dist.total_transactions),
                             Self::format_number(dist.total_p2ms_outputs),
                             dist.avg_output_count,
@@ -2065,6 +2042,168 @@ impl ReportFormatter {
                         Self::format_number(report.unclassified_transaction_count)
                     ));
                 }
+
+                Ok(output)
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Protocol Temporal Distribution Formatter
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Format protocol temporal distribution report
+    ///
+    /// Displays temporal analysis of protocol distribution over time:
+    /// - Weekly aggregation with fixed 7-day buckets
+    /// - Per-protocol output counts and values
+    /// - Stacked bar chart data for visualisation
+    pub fn format_protocol_temporal(
+        report: &ProtocolTemporalReport,
+        format: &OutputFormat,
+    ) -> AppResult<String> {
+        match format {
+            OutputFormat::Json => Self::export_json(report),
+            OutputFormat::Plotly => {
+                let chart = report.to_plotly_chart();
+                Self::export_json(&chart)
+            }
+            OutputFormat::Console => {
+                let mut output = String::new();
+
+                // Header
+                output.push_str("\n📊 Protocol Temporal Distribution\n");
+                output.push_str("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n");
+
+                // Handle empty report
+                if report.total_outputs == 0 {
+                    output.push_str("No P2MS outputs found.\n");
+                    return Ok(output);
+                }
+
+                // Summary
+                output.push_str(&format!(
+                    "Total P2MS Outputs: {}\n",
+                    Self::format_number(report.total_outputs)
+                ));
+                output.push_str(&format!(
+                    "Total Value: {}\n",
+                    format_sats_as_btc(report.total_value_sats)
+                ));
+                output.push_str(&format!("Weeks Analysed: {}\n\n", report.week_count));
+
+                // Protocol Totals
+                output.push_str("Protocol Totals:\n");
+                output.push_str(&format!(
+                    "  {:<20} {:>12} {:>16}\n",
+                    "Protocol", "Outputs", "Value (BTC)"
+                ));
+                output.push_str(&format!("  {:-<20} {:->12} {:->16}\n", "", "", ""));
+
+                for total in &report.protocol_totals {
+                    output.push_str(&format!(
+                        "  {:<20} {:>12} {:>16}\n",
+                        total.display_name,
+                        Self::format_number(total.count),
+                        format_sats_as_btc(total.value_sats)
+                    ));
+                }
+                output.push('\n');
+
+                // Note about formats
+                output.push_str(
+                    "Note: Week boundaries are Thursday-to-Wednesday (fixed 7-day buckets).\n",
+                );
+                output.push_str("      For full weekly data, use --format json\n");
+                output.push_str("      For stacked bar chart data, use --format plotly\n");
+
+                Ok(output)
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Spendability Temporal Distribution Formatter
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Format spendability temporal distribution report
+    ///
+    /// Displays temporal analysis of P2MS output spendability:
+    /// - Weekly aggregation with fixed 7-day buckets
+    /// - Spendable vs unspendable percentages
+    /// - Stacked area chart data for visualisation
+    pub fn format_spendability_temporal(
+        report: &SpendabilityTemporalReport,
+        format: &OutputFormat,
+    ) -> AppResult<String> {
+        match format {
+            OutputFormat::Json => Self::export_json(report),
+            OutputFormat::Plotly => {
+                let chart = report.to_plotly_chart();
+                Self::export_json(&chart)
+            }
+            OutputFormat::Console => {
+                let mut output = String::new();
+
+                // Header
+                output.push_str("\n📊 Spendability Temporal Distribution\n");
+                output.push_str("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n");
+
+                // Handle empty report
+                if report.total_outputs == 0 {
+                    output.push_str("No P2MS outputs found.\n");
+                    return Ok(output);
+                }
+
+                // Summary
+                output.push_str(&format!(
+                    "Total P2MS Outputs: {}\n",
+                    Self::format_number(report.total_outputs)
+                ));
+                output.push_str(&format!(
+                    "Spendable: {} ({:.1}%)\n",
+                    Self::format_number(report.spendable_count),
+                    report.overall_spendable_pct
+                ));
+                output.push_str(&format!(
+                    "Unspendable: {} ({:.1}%)\n",
+                    Self::format_number(report.unspendable_count),
+                    100.0 - report.overall_spendable_pct
+                ));
+                output.push_str(&format!("Weeks Analysed: {}\n\n", report.week_count));
+
+                // Recent weeks (last 10)
+                let recent_weeks: Vec<_> = report.weekly_data.iter().rev().take(10).collect();
+
+                if !recent_weeks.is_empty() {
+                    output.push_str("Recent Weeks (last 10):\n");
+                    output.push_str(&format!(
+                        "  {:<12} {:>10} {:>10} {:>12}\n",
+                        "Week", "Spendable", "Unspendable", "Total"
+                    ));
+                    output.push_str(&format!(
+                        "  {:-<12} {:->10} {:->10} {:->12}\n",
+                        "", "", "", ""
+                    ));
+
+                    for week in recent_weeks.iter().rev() {
+                        output.push_str(&format!(
+                            "  {:<12} {:>9.1}% {:>9.1}% {:>12}\n",
+                            week.week_start_iso,
+                            week.spendable_pct,
+                            week.unspendable_pct,
+                            Self::format_number(week.total_count)
+                        ));
+                    }
+                }
+                output.push('\n');
+
+                // Note about formats
+                output.push_str(
+                    "Note: Week boundaries are Thursday-to-Wednesday (fixed 7-day buckets).\n",
+                );
+                output.push_str("      For full weekly data, use --format json\n");
+                output.push_str("      For stacked area chart data, use --format plotly\n");
 
                 Ok(output)
             }

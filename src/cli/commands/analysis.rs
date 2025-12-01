@@ -406,6 +406,56 @@ pub enum AnalysisCommands {
         #[arg(long, short = 'o')]
         output: Option<PathBuf>,
     },
+
+    /// Analyse protocol distribution over time
+    ///
+    /// Shows temporal distribution of P2MS protocols (Bitcoin Stamps, Counterparty, etc.)
+    /// with weekly aggregation. Useful for understanding protocol adoption patterns.
+    ///
+    /// Output formats:
+    /// - console: Human-readable summary with protocol totals
+    /// - json: Full structured data with all weekly breakdowns
+    /// - plotly: Stacked bar chart data for visualisation
+    ///
+    /// Week boundaries are Thursday-to-Wednesday (fixed 7-day buckets).
+    ProtocolTemporal {
+        /// Database path (overrides config.toml)
+        #[arg(long)]
+        database_path: Option<PathBuf>,
+
+        /// Output format (console, json, or plotly)
+        #[arg(long, default_value = "console")]
+        format: String,
+
+        /// Output file path
+        #[arg(long, short = 'o')]
+        output: Option<PathBuf>,
+    },
+
+    /// Analyse spendability distribution over time
+    ///
+    /// Shows temporal distribution of spendable vs unspendable P2MS outputs
+    /// with weekly aggregation. Useful for understanding data vs legitimate multisig patterns.
+    ///
+    /// Output formats:
+    /// - console: Human-readable summary with spendability percentages
+    /// - json: Full structured data with all weekly breakdowns
+    /// - plotly: Stacked area chart data for visualisation
+    ///
+    /// Week boundaries are Thursday-to-Wednesday (fixed 7-day buckets).
+    SpendabilityTemporal {
+        /// Database path (overrides config.toml)
+        #[arg(long)]
+        database_path: Option<PathBuf>,
+
+        /// Output format (console, json, or plotly)
+        #[arg(long, default_value = "console")]
+        format: String,
+
+        /// Output file path
+        #[arg(long, short = 'o')]
+        output: Option<PathBuf>,
+    },
 }
 
 pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
@@ -797,6 +847,36 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
             &app_config,
             |e| e.analyse_output_counts(),
             ReportFormatter::format_output_count_distribution,
+        ),
+
+        AnalysisCommands::ProtocolTemporal {
+            database_path,
+            format,
+            output,
+        } => run_analysis_with_file_output(
+            database_path,
+            format,
+            output,
+            "protocol_temporal.json",
+            "Protocol temporal distribution",
+            &app_config,
+            |e| e.analyse_protocol_temporal(),
+            ReportFormatter::format_protocol_temporal,
+        ),
+
+        AnalysisCommands::SpendabilityTemporal {
+            database_path,
+            format,
+            output,
+        } => run_analysis_with_file_output(
+            database_path,
+            format,
+            output,
+            "spendability_temporal.json",
+            "Spendability temporal distribution",
+            &app_config,
+            |e| e.analyse_spendability_temporal(),
+            ReportFormatter::format_spendability_temporal,
         ),
     }
 }

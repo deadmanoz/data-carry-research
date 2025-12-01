@@ -23,10 +23,7 @@ use crate::types::analysis_results::{
     StampsFeeSummary, StampsWeeklyFeeReport, WeeklyStampsFeeStats,
 };
 use crate::types::visualisation::{PlotlyChart, PlotlyLayout, PlotlyTrace};
-use chrono::{TimeZone, Utc};
-
-/// Seconds in a week (7 × 24 × 60 × 60 = 604800)
-const SECONDS_PER_WEEK: i64 = 604_800;
+use crate::utils::time::{extract_date_from_datetime, timestamp_to_iso, SECONDS_PER_WEEK};
 
 /// Bitcoin Stamps weekly fee analyser
 pub struct StampsWeeklyFeeAnalyser;
@@ -128,10 +125,10 @@ impl StampsWeeklyFeeAnalyser {
 
             // Calculate week_end_iso: week_start_ts + 604799 (6 days, 23:59:59)
             let week_end_ts = week_start_ts + SECONDS_PER_WEEK - 1;
-            let week_end_iso = Self::timestamp_to_iso(week_end_ts);
+            let week_end_iso = timestamp_to_iso(week_end_ts);
 
             // Clean up week_start_iso (remove time portion if present)
-            let week_start_iso = Self::extract_date_from_datetime(&week_start_iso_db);
+            let week_start_iso = extract_date_from_datetime(&week_start_iso_db);
 
             // Calculate avg_fee_per_byte_sats (handle div-by-zero)
             let avg_fee_per_byte_sats = if script_bytes > 0 {
@@ -198,25 +195,6 @@ impl StampsWeeklyFeeAnalyser {
             },
         })
     }
-
-    /// Convert Unix timestamp to ISO 8601 date string (YYYY-MM-DD)
-    fn timestamp_to_iso(timestamp: i64) -> String {
-        match Utc.timestamp_opt(timestamp, 0) {
-            chrono::LocalResult::Single(dt) => dt.format("%Y-%m-%d").to_string(),
-            _ => String::new(),
-        }
-    }
-
-    /// Extract date portion from datetime string (handles "YYYY-MM-DD HH:MM:SS" format)
-    fn extract_date_from_datetime(datetime_str: &str) -> String {
-        // SQLite datetime() returns "YYYY-MM-DD HH:MM:SS" format
-        // We only want the date part
-        datetime_str
-            .split(' ')
-            .next()
-            .unwrap_or(datetime_str)
-            .to_string()
-    }
 }
 
 impl StampsWeeklyFeeReport {
@@ -272,7 +250,8 @@ impl StampsWeeklyFeeReport {
             "Week",
             "Total Fees (BTC)",
             "Avg Fee/Tx (sats)",
-        );
+        )
+        .with_legend("v", 1.02, 1.0, "left");
         // Set x-axis to date type for proper time series display
         layout.xaxis.axis_type = Some("date".to_string());
 
@@ -283,35 +262,5 @@ impl StampsWeeklyFeeReport {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_timestamp_to_iso() {
-        // Unix epoch (1970-01-01 00:00:00 UTC)
-        assert_eq!(StampsWeeklyFeeAnalyser::timestamp_to_iso(0), "1970-01-01");
-
-        // 2023-01-01 00:00:00 UTC (1672531200)
-        assert_eq!(
-            StampsWeeklyFeeAnalyser::timestamp_to_iso(1672531200),
-            "2023-01-01"
-        );
-    }
-
-    #[test]
-    fn test_extract_date_from_datetime() {
-        assert_eq!(
-            StampsWeeklyFeeAnalyser::extract_date_from_datetime("2023-01-01 00:00:00"),
-            "2023-01-01"
-        );
-        assert_eq!(
-            StampsWeeklyFeeAnalyser::extract_date_from_datetime("2023-12-31"),
-            "2023-12-31"
-        );
-    }
-
-    // Note: test_plotly_chart_generation is covered by external tests in
-    // tests/unit/analysis/stamps_weekly_fee_analysis.rs which test the full
-    // analysis flow including chart generation.
-}
+// Tests for time utilities moved to src/utils/time.rs
+// Tests for chart generation in tests/unit/analysis/stamps_weekly_fee_analysis.rs
