@@ -24,13 +24,13 @@ pub enum Commands {
     /// Run Stage 3: Protocol Classification
     Stage3(commands::stage3::Stage3Command),
     /// Test Bitcoin RPC connectivity
-    TestRpc(commands::decoder::TestRpcCommand),
+    TestRpc(commands::test_rpc::TestRpcCommand),
     /// Decode protocol data from transaction (Bitcoin Stamps, Counterparty, Omni, PPk, DataStorage, etc.)
-    DecodeTxid(commands::decoder::DecodeTxidCommand),
+    DecodeTxid(commands::decode::DecodeTxidCommand),
     /// Fetch transaction data from Bitcoin Core RPC
-    Fetch(commands::decoder::FetchCommand),
+    Fetch(commands::fetch::FetchCommand),
     /// Perform ARC4 deobfuscation on P2MS transaction data
-    Arc4(commands::decoder::Arc4Command),
+    Arc4(commands::arc4::Arc4Command),
     /// Run analysis on database
     Analyse(commands::analysis::AnalyseCommand),
 }
