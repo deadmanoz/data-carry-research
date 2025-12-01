@@ -302,7 +302,7 @@ fn export_plotly_value_distributions(report: &ValueDistributionReport) -> AppRes
             PlotlyTrace::bar(
                 bucket_labels.clone(),
                 protocol_counts,
-                &display_name,
+                display_name,
                 colour,
             )
             .hidden_by_default(),

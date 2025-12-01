@@ -293,7 +293,7 @@ impl P2msOutputCountAnalyser {
         }
 
         // Sort by canonical ProtocolType enum discriminant order
-        distributions.sort_by_key(|d| d.protocol.clone() as u8);
+        distributions.sort_by_key(|d| d.protocol as u8);
 
         Ok(distributions)
     }

@@ -210,7 +210,7 @@ impl DustAnalyser {
         }
 
         // Sort by canonical ProtocolType enum discriminant order
-        protocol_breakdown.sort_by_key(|p| p.protocol.clone() as u8);
+        protocol_breakdown.sort_by_key(|p| p.protocol as u8);
 
         // Calculate classified total
         let classified_outputs_total: usize =
