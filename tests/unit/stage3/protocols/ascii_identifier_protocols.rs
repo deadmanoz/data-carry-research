@@ -187,13 +187,9 @@ mod metronotes {
             vec![valid_pk.to_string(), metronotes_pk],
         );
 
-        run_ascii_test(
-            tx,
-            "metronotes",
-            ProtocolVariant::AsciiIdentifierMetronotes,
-        )
-        .await
-        .expect("Metronotes test failed");
+        run_ascii_test(tx, "metronotes", ProtocolVariant::AsciiIdentifierMetronotes)
+            .await
+            .expect("Metronotes test failed");
     }
 }
 

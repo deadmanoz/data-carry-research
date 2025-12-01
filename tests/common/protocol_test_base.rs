@@ -571,15 +571,12 @@ pub fn load_transaction_inputs_from_json(json_path: &str) -> Result<Vec<Transact
                 .ok_or_else(|| anyhow::anyhow!("Missing vout in input {}", idx))?
                 as u32;
             let sequence = input["sequence"].as_u64().unwrap_or(0xffffffff) as u32;
-            let script_sig = input["scriptSig"]["hex"]
-                .as_str()
-                .unwrap_or("")
-                .to_string();
+            let script_sig = input["scriptSig"]["hex"].as_str().unwrap_or("").to_string();
 
             inputs.push(TransactionInput {
                 txid: prev_txid,
                 vout: prev_vout,
-                value: 0,          // Not available without looking up previous tx
+                value: 0, // Not available without looking up previous tx
                 script_sig,
                 sequence,
                 source_address: None, // Not available without looking up previous tx

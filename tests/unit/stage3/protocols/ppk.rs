@@ -30,7 +30,9 @@ use serial_test::serial;
 use crate::common::db_seeding::seed_enriched_transaction;
 use crate::common::fixture_registry::{self, ProtocolFixture};
 use crate::common::fixtures;
-use crate::common::protocol_test_base::{run_stage3_processor, setup_protocol_test, ProtocolTestBuilder};
+use crate::common::protocol_test_base::{
+    run_stage3_processor, setup_protocol_test, ProtocolTestBuilder,
+};
 
 /// Run a PPk test using the unified ProtocolTestBuilder
 async fn run_ppk_fixture_test(fixture: &'static ProtocolFixture) {

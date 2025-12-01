@@ -11,12 +11,12 @@
 use data_carry_research::types::ProtocolType;
 use serial_test::serial;
 
+use crate::common::db_seeding::build_and_seed_from_p2ms;
 use crate::common::fixture_registry::likely_legitimate;
 use crate::common::protocol_test_base::{
     load_p2ms_outputs_from_json, run_stage3_processor, setup_protocol_test, verify_classification,
     verify_output_spendability, ProtocolTestBuilder,
 };
-use crate::common::db_seeding::build_and_seed_from_p2ms;
 
 /// Test that real legitimate 2-of-3 multisig is correctly classified
 ///
@@ -68,7 +68,11 @@ async fn test_legitimate_p2ms_spendability_details() -> anyhow::Result<()> {
     )?;
 
     // Verify output-level spendability
-    verify_output_spendability(&test_db, fixture.txid, ProtocolType::LikelyLegitimateMultisig)?;
+    verify_output_spendability(
+        &test_db,
+        fixture.txid,
+        ProtocolType::LikelyLegitimateMultisig,
+    )?;
 
     // Verify spendability details
     let conn = rusqlite::Connection::open(test_db.path())?;

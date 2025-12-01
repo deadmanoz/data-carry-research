@@ -8,7 +8,9 @@
 use data_carry_research::database::traits::Stage1Operations;
 use data_carry_research::processor::stage3::wikileaks_cablegate::WikiLeaksCablegateClassifier;
 use data_carry_research::processor::stage3::ProtocolSpecificClassifier;
-use data_carry_research::types::{script_metadata::MultisigInfo, EnrichedTransaction, TransactionOutput};
+use data_carry_research::types::{
+    script_metadata::MultisigInfo, EnrichedTransaction, TransactionOutput,
+};
 use serial_test::serial;
 
 use crate::common::fixtures;
