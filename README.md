@@ -222,18 +222,31 @@ just stats-json <db>                         # JSON format
 
 # Analysis (umbrella command: just analyse <subcommand> [db] [options])
 just analyse value <db>                      # Value distribution & economics
+just analyse value-distributions <db>        # Value histograms (for plotting)
 just analyse burn-patterns <db>              # Burn pattern analysis
 just analyse fees <db>                       # Fee analysis
 just analyse classifications <db>            # Classification statistics
 just analyse signatures <db>                 # Protocol signature detection stats
 just analyse spendability <db>               # Spendability analysis
-just analyse stamps-signatures <db>          # Stamps signature variant breakdown
 just analyse full <db>                       # Comprehensive report (all analyses)
 
 # Content type analysis (MIME type detection for embedded data)
 just analyse content-types <db>              # All content types
 just analyse content-types --protocol BitcoinStamps <db>
 just analyse content-types --mime-type image/png <db>
+
+# Data size analysis (byte statistics)
+just analyse protocol-data-sizes <db>        # Protocol-level byte totals
+just analyse spendability-data-sizes <db>    # Bytes by spendability
+just analyse content-type-spendability <db>  # Content type byte breakdown
+just analyse comprehensive-data-sizes <db>   # All data size analyses
+
+# Additional analyses
+just analyse multisig-configurations <db>    # Exhaustive multisig config breakdown
+just analyse dust-thresholds <db>            # Bitcoin dust threshold analysis
+just analyse tx-sizes <db>                   # Transaction size distribution
+just analyse stamps-weekly-fees <db>         # Bitcoin Stamps weekly fee analysis
+just analyse output-counts <db>              # P2MS output count distribution
 
 # Visualisation (umbrella command: just viz <subcommand> [db] [options])
 just viz temporal <db>                       # Temporal distribution plots
