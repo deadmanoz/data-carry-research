@@ -1,5 +1,6 @@
 //! Protocol temporal analysis types
 
+use crate::types::ProtocolType;
 use serde::{Deserialize, Serialize};
 
 /// Temporal distribution of P2MS protocols
@@ -30,11 +31,8 @@ pub struct ProtocolTemporalReport {
 /// Total counts for a single protocol
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct ProtocolTotal {
-    /// Protocol identifier (e.g., "BitcoinStamps", "Counterparty")
-    pub protocol: String,
-
-    /// Human-readable display name
-    pub display_name: String,
+    /// Protocol type
+    pub protocol: ProtocolType,
 
     /// Total output count for this protocol
     pub count: usize,
@@ -55,8 +53,8 @@ pub struct WeeklyProtocolStats {
     /// Week end date (ISO format: YYYY-MM-DD)
     pub week_end_iso: String,
 
-    /// Protocol identifier
-    pub protocol: String,
+    /// Protocol type
+    pub protocol: ProtocolType,
 
     /// Output count for this protocol in this week
     pub count: usize,

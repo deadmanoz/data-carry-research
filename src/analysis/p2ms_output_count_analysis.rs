@@ -334,10 +334,7 @@ impl OutputCountDistributionReport {
 
         // Add per-protocol bar traces (stacked)
         for proto_dist in &self.protocol_distributions {
-            // Use Debug format for colour lookup (matches get_protocol_colour keys)
-            let colour_key = format!("{:?}", proto_dist.protocol);
-            let colour = get_protocol_colour(&colour_key);
-            // Use display_name() for user-facing trace names
+            let colour = get_protocol_colour(proto_dist.protocol);
             let display_name = proto_dist.protocol.display_name();
 
             let counts: Vec<f64> = proto_dist.buckets.iter().map(|b| b.count as f64).collect();

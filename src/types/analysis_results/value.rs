@@ -2,6 +2,7 @@
 
 use super::common::ValueBucket;
 use super::fees::{FeeAnalysisReport, ProtocolFeeStats};
+use crate::types::ProtocolType;
 use serde::{Deserialize, Serialize};
 
 /// Comprehensive value distribution analysis across protocols
@@ -15,7 +16,7 @@ pub struct ValueAnalysisReport {
 /// Value statistics for a specific protocol
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct ProtocolValueStats {
-    pub protocol: String,
+    pub protocol: ProtocolType,
     pub output_count: usize,
     pub transaction_count: usize,
     pub total_btc_value_sats: u64,
@@ -37,7 +38,7 @@ pub struct OverallValueStats {
 /// Protocol-specific value distribution
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProtocolValueDistribution {
-    pub protocol: String,
+    pub protocol: ProtocolType,
     pub total_outputs: usize,
     pub total_value_sats: u64,
     pub buckets: Vec<ValueBucket>,

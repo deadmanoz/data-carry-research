@@ -23,6 +23,8 @@ use crate::types::analysis_results::{
     KeyCountDistribution, KeyCountStats, OverallSpendability, ProtocolSpendabilityStats,
     ReasonStats, SpendabilityStatsReport, TransactionSpendabilityStats,
 };
+use crate::types::ProtocolType;
+use std::str::FromStr;
 
 // SQL constants for reusability in tests
 // CRITICAL: Only count UTXO outputs (is_spent = 0), not spent outputs
@@ -204,7 +206,7 @@ impl SpendabilityStatsAnalyser {
         // Convert to Vec of stats
         let mut protocol_stats: Vec<ProtocolSpendabilityStats> = protocol_map
             .into_iter()
-            .map(|(protocol, (spendable, unspendable))| {
+            .map(|(protocol_str, (spendable, unspendable))| {
                 let total = spendable + unspendable;
                 let spendable_percentage = if total > 0 {
                     (spendable as f64 * 100.0) / total as f64
@@ -216,6 +218,9 @@ impl SpendabilityStatsAnalyser {
                 } else {
                     0.0
                 };
+
+                // Parse protocol string to enum (parse once at DB boundary)
+                let protocol = ProtocolType::from_str(&protocol_str).unwrap_or_default();
 
                 ProtocolSpendabilityStats {
                     protocol,
@@ -229,17 +234,7 @@ impl SpendabilityStatsAnalyser {
             .collect();
 
         // Sort by canonical ProtocolType enum order for consistent JSON output
-        protocol_stats.sort_by(|a, b| {
-            use crate::types::ProtocolType;
-            use std::str::FromStr;
-            let a_order = ProtocolType::from_str(&a.protocol)
-                .map(|p| p as u8)
-                .unwrap_or(u8::MAX);
-            let b_order = ProtocolType::from_str(&b.protocol)
-                .map(|p| p as u8)
-                .unwrap_or(u8::MAX);
-            a_order.cmp(&b_order)
-        });
+        protocol_stats.sort_by_key(|p| p.protocol as u8);
 
         Ok(protocol_stats)
     }

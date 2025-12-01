@@ -13,7 +13,9 @@ use crate::types::analysis_results::{
     SpendabilityDataSizeReport,
 };
 use crate::types::content_detection::ContentType;
+use crate::types::ProtocolType;
 use std::collections::{HashMap, HashSet};
+use std::str::FromStr;
 
 /// Data size analysis engine for byte-level analysis
 pub struct DataSizeAnalyser;
@@ -74,12 +76,16 @@ impl DataSizeAnalyser {
 
         let protocols = stmt
             .query_map([], |row| {
+                let protocol_str: String = row.get(0)?;
                 let total_bytes = row.get::<_, Option<i64>>(4)?.unwrap_or(0) as u64;
                 let spendable_bytes = row.get::<_, Option<i64>>(8)?.unwrap_or(0) as u64;
                 let unspendable_bytes = row.get::<_, Option<i64>>(9)?.unwrap_or(0) as u64;
 
+                // Parse protocol string to enum (parse once at DB boundary)
+                let protocol = ProtocolType::from_str(&protocol_str).unwrap_or_default();
+
                 Ok(ProtocolDataSize {
-                    protocol: row.get(0)?,
+                    protocol,
                     variant: row.get(1)?,
                     output_count: row.get::<_, i64>(3)? as usize,
                     transaction_count: row.get::<_, i64>(2)? as usize,
@@ -234,7 +240,10 @@ impl DataSizeAnalyser {
         let by_protocol = protocol_map
             .into_iter()
             .map(
-                |(protocol, (spendable, unspendable, spend_count, unspend_count))| {
+                |(protocol_str, (spendable, unspendable, spend_count, unspend_count))| {
+                    // Parse protocol string to enum (parse once at DB boundary)
+                    let protocol = ProtocolType::from_str(&protocol_str).unwrap_or_default();
+
                     ProtocolSpendabilityData {
                         protocol,
                         spendable_bytes: spendable,

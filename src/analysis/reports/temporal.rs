@@ -60,7 +60,7 @@ pub fn format_protocol_temporal(
             for total in &report.protocol_totals {
                 output.push_str(&format!(
                     "  {:<20} {:>12} {:>16}\n",
-                    total.display_name,
+                    total.protocol.display_name(),
                     format_number(total.count),
                     format_sats_as_btc(total.value_sats)
                 ));

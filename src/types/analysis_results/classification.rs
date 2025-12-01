@@ -1,5 +1,6 @@
 //! Protocol classification analysis types
 
+use crate::types::ProtocolType;
 use serde::{Deserialize, Serialize};
 
 /// Protocol classification statistics report
@@ -62,7 +63,7 @@ pub struct MethodStats {
 /// Sample classification result
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct ClassificationSample {
-    pub protocol: String,
+    pub protocol: ProtocolType,
     pub variant: String,
     pub classification_method: String,
     pub count: usize,

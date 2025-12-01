@@ -15,6 +15,8 @@ use crate::types::analysis_results::{
     ContentTypeAnalysisReport, ContentTypeCategoryStats, ContentTypeProtocolStats,
     ContentTypeStats, ValidNoneStats,
 };
+use crate::types::ProtocolType;
+use std::str::FromStr;
 
 /// Content type analyser for MIME type distribution insights
 pub struct ContentTypeAnalyser;
@@ -333,8 +335,11 @@ impl ContentTypeAnalyser {
                 0.0
             };
 
+            // Parse protocol string to enum (parse once at DB boundary)
+            let protocol_type = ProtocolType::from_str(protocol).unwrap_or_default();
+
             breakdown.push(ContentTypeProtocolStats {
-                protocol: protocol.to_string(),
+                protocol: protocol_type,
                 total_outputs: total_outputs as usize,
                 with_content_type: with_content_type as usize,
                 without_content_type: without_content_type as usize,
@@ -499,8 +504,11 @@ impl ContentTypeAnalyser {
                     |row| row.get(0),
                 )?;
 
+                // Parse protocol string to enum (parse once at DB boundary)
+                let protocol_type = ProtocolType::from_str(protocol).unwrap_or_default();
+
                 breakdown.push(ContentTypeProtocolStats {
-                    protocol: protocol.to_string(),
+                    protocol: protocol_type,
                     total_outputs: total_outputs as usize,
                     with_content_type: 0,
                     without_content_type: invalid_count as usize,
@@ -592,8 +600,11 @@ impl ContentTypeAnalyser {
             0.0
         };
 
+        // Parse protocol string to enum (parse once at DB boundary)
+        let protocol_type = ProtocolType::from_str(protocol).unwrap_or_default();
+
         Ok(ContentTypeProtocolStats {
-            protocol: protocol.to_string(),
+            protocol: protocol_type,
             total_outputs: total_outputs as usize,
             with_content_type: with_content_type as usize,
             without_content_type: without_content_type as usize,
@@ -655,8 +666,11 @@ impl ContentTypeAnalyser {
                     0.0
                 };
 
+                // Parse protocol string to enum (parse once at DB boundary)
+                let protocol_type = ProtocolType::from_str(protocol).unwrap_or_default();
+
                 breakdown.push(ContentTypeProtocolStats {
-                    protocol: protocol.to_string(),
+                    protocol: protocol_type,
                     total_outputs: total_outputs as usize,
                     with_content_type: count as usize,
                     without_content_type: (total_outputs - count) as usize,

@@ -109,7 +109,7 @@ impl ClassificationResult {
 }
 
 /// Definitive protocol classifications - no ambiguity
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
 pub enum ProtocolType {
     BitcoinStamps,
     Counterparty,
@@ -121,6 +121,7 @@ pub enum ProtocolType {
     DataStorage,
     LikelyDataStorage, // Suspicious patterns (invalid EC points, high output count, dust amounts)
     LikelyLegitimateMultisig, // All pubkeys are valid EC points - likely legitimate multisig
+    #[default]
     Unknown,
 }
 
@@ -143,26 +144,6 @@ impl ProtocolType {
             ProtocolType::LikelyLegitimateMultisig => "Likely Legitimate Multisig",
             ProtocolType::Unknown => "Unknown",
         }
-    }
-
-    /// Convert protocol string to display name
-    ///
-    /// Parses a protocol string (e.g., "BitcoinStamps") and returns its
-    /// human-readable display name. Returns the original string if parsing fails.
-    pub fn str_to_display_name(s: &str) -> String {
-        std::str::FromStr::from_str(s)
-            .map(|p: ProtocolType| p.display_name().to_string())
-            .unwrap_or_else(|_| s.to_string())
-    }
-
-    /// Get sort order for a protocol string
-    ///
-    /// Returns the enum variant order for sorting protocols consistently.
-    /// Unknown strings sort to the end (u8::MAX).
-    pub fn str_to_sort_order(s: &str) -> u8 {
-        std::str::FromStr::from_str(s)
-            .map(|p: ProtocolType| p as u8)
-            .unwrap_or(u8::MAX)
     }
 }
 

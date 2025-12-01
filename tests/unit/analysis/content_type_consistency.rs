@@ -12,6 +12,7 @@ use crate::common::analysis_test_setup::{
 };
 use data_carry_research::analysis::ContentTypeAnalyser;
 use data_carry_research::errors::AppResult;
+use data_carry_research::types::ProtocolType;
 
 #[test]
 fn test_counterparty_data_carrying_outputs_have_content_type() -> AppResult<()> {
@@ -75,7 +76,7 @@ fn test_counterparty_dust_outputs_excluded_from_invalid_none() -> AppResult<()> 
     let cp_invalid = report
         .invalid_none_stats
         .iter()
-        .find(|s| s.protocol == "Counterparty");
+        .find(|s| s.protocol == ProtocolType::Counterparty);
 
     if let Some(stats) = cp_invalid {
         assert_eq!(
@@ -146,7 +147,7 @@ fn test_omni_failed_deobfuscation_excluded_from_invalid_none() -> AppResult<()> 
     let omni_invalid = report
         .invalid_none_stats
         .iter()
-        .find(|s| s.protocol == "OmniLayer");
+        .find(|s| s.protocol == ProtocolType::OmniLayer);
 
     if let Some(stats) = omni_invalid {
         assert_eq!(
@@ -185,7 +186,7 @@ fn test_stamps_unknown_excluded_from_invalid_none() -> AppResult<()> {
     let stamps_invalid = report
         .invalid_none_stats
         .iter()
-        .find(|s| s.protocol == "BitcoinStamps");
+        .find(|s| s.protocol == ProtocolType::BitcoinStamps);
 
     if let Some(stats) = stamps_invalid {
         assert_eq!(
@@ -280,7 +281,7 @@ fn test_invalid_none_detection_only_flags_signature_found() -> AppResult<()> {
     let cp_invalid = report
         .invalid_none_stats
         .iter()
-        .find(|s| s.protocol == "Counterparty");
+        .find(|s| s.protocol == ProtocolType::Counterparty);
 
     assert!(
         cp_invalid.is_some(),
@@ -396,7 +397,7 @@ fn test_protocol_breakdown_structure() -> AppResult<()> {
     let stamps_stats = report
         .protocol_breakdown
         .iter()
-        .find(|p| p.protocol == "BitcoinStamps");
+        .find(|p| p.protocol == ProtocolType::BitcoinStamps);
     assert!(stamps_stats.is_some(), "Should have BitcoinStamps stats");
     if let Some(stats) = stamps_stats {
         assert_eq!(stats.with_content_type, 1);
@@ -407,7 +408,7 @@ fn test_protocol_breakdown_structure() -> AppResult<()> {
     let cp_stats = report
         .protocol_breakdown
         .iter()
-        .find(|p| p.protocol == "Counterparty");
+        .find(|p| p.protocol == ProtocolType::Counterparty);
     assert!(cp_stats.is_some(), "Should have Counterparty stats");
     if let Some(stats) = cp_stats {
         assert_eq!(stats.with_content_type, 1);

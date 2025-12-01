@@ -1,5 +1,6 @@
 //! Data size analysis types
 
+use crate::types::ProtocolType;
 use serde::{Deserialize, Serialize};
 
 /// Protocol-level data size report
@@ -14,7 +15,7 @@ pub struct ProtocolDataSizeReport {
 /// Per-protocol data size statistics
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProtocolDataSize {
-    pub protocol: String,
+    pub protocol: ProtocolType,
     pub variant: Option<String>,
     pub output_count: usize,
     pub transaction_count: usize,
@@ -51,7 +52,7 @@ pub struct SpendabilityDataMetrics {
 /// Per-protocol spendability data breakdown
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProtocolSpendabilityData {
-    pub protocol: String,
+    pub protocol: ProtocolType,
     pub spendable_bytes: u64,
     pub unspendable_bytes: u64,
     pub spendable_output_count: usize,

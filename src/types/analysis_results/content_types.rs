@@ -1,5 +1,6 @@
 //! Content type (MIME type) analysis types
 
+use crate::types::ProtocolType;
 use serde::{Deserialize, Serialize};
 
 /// Content type (MIME type) analysis report
@@ -40,7 +41,7 @@ pub struct ContentTypeCategoryStats {
 /// Protocol-specific content type statistics
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContentTypeProtocolStats {
-    pub protocol: String,
+    pub protocol: ProtocolType,
     pub total_outputs: usize,
     pub with_content_type: usize,
     pub without_content_type: usize,

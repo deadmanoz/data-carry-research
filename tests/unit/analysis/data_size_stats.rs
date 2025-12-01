@@ -9,6 +9,7 @@ use crate::common::analysis_test_setup::{
 use data_carry_research::analysis::DataSizeAnalyser;
 use data_carry_research::database::Database;
 use data_carry_research::errors::AppResult;
+use data_carry_research::types::ProtocolType;
 
 /// Helper to seed test data with proper FK relationships
 fn seed_test_data(db: &Database) -> AppResult<()> {
@@ -118,7 +119,7 @@ fn test_analyse_protocol_data_sizes() -> AppResult<()> {
     let stamps = report
         .protocols
         .iter()
-        .find(|p| p.protocol == "BitcoinStamps")
+        .find(|p| p.protocol == ProtocolType::BitcoinStamps)
         .expect("Should have BitcoinStamps");
     assert_eq!(stamps.total_bytes, 1100, "BitcoinStamps total bytes");
     assert_eq!(stamps.output_count, 2, "BitcoinStamps output count");
@@ -136,7 +137,7 @@ fn test_analyse_protocol_data_sizes() -> AppResult<()> {
     let cp = report
         .protocols
         .iter()
-        .find(|p| p.protocol == "Counterparty")
+        .find(|p| p.protocol == ProtocolType::Counterparty)
         .expect("Should have Counterparty");
     assert_eq!(cp.total_bytes, 800, "Counterparty total bytes");
     assert_eq!(cp.output_count, 1, "Counterparty output count");
@@ -150,7 +151,7 @@ fn test_analyse_protocol_data_sizes() -> AppResult<()> {
     let omni = report
         .protocols
         .iter()
-        .find(|p| p.protocol == "OmniLayer")
+        .find(|p| p.protocol == ProtocolType::OmniLayer)
         .expect("Should have OmniLayer");
     assert_eq!(omni.total_bytes, 700, "OmniLayer total bytes");
     assert_eq!(omni.output_count, 2, "OmniLayer output count");

@@ -1,6 +1,7 @@
 //! Signature analysis types
 
 use super::classification::MethodStats;
+use crate::types::ProtocolType;
 use serde::{Deserialize, Serialize};
 
 /// Signature analysis comprehensive report
@@ -20,7 +21,7 @@ pub struct BurnPatternCorrelation {
 /// Correlation data between pattern and protocol
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct PatternProtocolCorrelation {
-    pub protocol: String,
+    pub protocol: ProtocolType,
     pub burn_patterns_count: usize,
     pub transactions: usize,
 }

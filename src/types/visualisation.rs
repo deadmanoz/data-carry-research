@@ -3,6 +3,7 @@
 //! Shared Plotly types used across analysis modules for generating
 //! interactive charts compatible with Plotly.js.
 
+use super::ProtocolType;
 use serde::Serialize;
 
 // ============================================================================
@@ -475,21 +476,20 @@ impl PlotlyTrace {
     }
 }
 
-/// Get colour for a protocol name (consistent with visualisation/export.py)
-pub fn get_protocol_colour(protocol: &str) -> &'static str {
+/// Get colour for a protocol type (consistent with visualisation/export.py)
+pub fn get_protocol_colour(protocol: ProtocolType) -> &'static str {
     match protocol {
-        "BitcoinStamps" => "#E74C3C",
-        "Counterparty" => "#3498DB",
-        "OmniLayer" => "#9B59B6",
-        "LikelyLegitimateMultisig" => "#2ECC71",
-        "DataStorage" => "#F39C12",
-        "Chancecoin" => "#1ABC9C",
-        "AsciiIdentifierProtocols" => "#E67E22",
-        "PPk" => "#16A085",
-        "OpReturnSignalled" => "#BB3A00",
-        "LikelyDataStorage" => "#D35400",
-        "Unknown" => "#95A5A6",
-        _ => "#CCCCCC",
+        ProtocolType::BitcoinStamps => "#E74C3C",
+        ProtocolType::Counterparty => "#3498DB",
+        ProtocolType::OmniLayer => "#9B59B6",
+        ProtocolType::LikelyLegitimateMultisig => "#2ECC71",
+        ProtocolType::DataStorage => "#F39C12",
+        ProtocolType::Chancecoin => "#1ABC9C",
+        ProtocolType::AsciiIdentifierProtocols => "#E67E22",
+        ProtocolType::PPk => "#16A085",
+        ProtocolType::OpReturnSignalled => "#BB3A00",
+        ProtocolType::LikelyDataStorage => "#D35400",
+        ProtocolType::Unknown => "#95A5A6",
     }
 }
 

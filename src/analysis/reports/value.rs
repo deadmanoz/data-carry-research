@@ -8,9 +8,7 @@ use super::OutputFormat;
 use crate::errors::AppResult;
 use crate::types::analysis_results::{ValueAnalysisReport, ValueDistributionReport};
 use crate::types::visualisation::{get_protocol_colour, PlotlyChart, PlotlyLayout, PlotlyTrace};
-use crate::types::ProtocolType;
 use crate::utils::currency::{format_rate_as_btc, format_sats_as_btc, format_sats_as_btc_f64};
-use std::str::FromStr;
 
 /// Format value analysis for console output
 ///
@@ -38,7 +36,7 @@ pub fn format_value_analysis(
             for protocol_stats in &report.protocol_value_breakdown {
                 output.push_str(&format!(
                     "{:<28} | {:>10} | {:>14} | {:>16} | {:>14} | {:>14} |\n",
-                    ProtocolType::str_to_display_name(&protocol_stats.protocol),
+                    protocol_stats.protocol.display_name(),
                     format_number(protocol_stats.output_count),
                     format_sats_as_btc(protocol_stats.total_btc_value_sats),
                     format_sats_as_btc_f64(protocol_stats.average_btc_per_output),
@@ -73,7 +71,7 @@ pub fn format_value_analysis(
             for protocol_stats in &report.protocol_value_breakdown {
                 output.push_str(&format!(
                     "{:<28} | {:>14} | {:>14} | {:>18} | {:>20} |\n",
-                    ProtocolType::str_to_display_name(&protocol_stats.protocol),
+                    protocol_stats.protocol.display_name(),
                     format_sats_as_btc(protocol_stats.fee_stats.total_fees_paid_sats),
                     format_sats_as_btc_f64(protocol_stats.fee_stats.average_fee_sats),
                     format_rate_as_btc(protocol_stats.fee_stats.average_fee_per_byte, "byte"),
@@ -286,15 +284,7 @@ fn export_plotly_value_distributions(report: &ValueDistributionReport) -> AppRes
 
     // Per-protocol traces (sorted by canonical ProtocolType enum order)
     let mut protocol_dists = report.protocol_distributions.clone();
-    protocol_dists.sort_by(|a, b| {
-        let a_order = ProtocolType::from_str(&a.protocol)
-            .map(|p| p as u8)
-            .unwrap_or(u8::MAX);
-        let b_order = ProtocolType::from_str(&b.protocol)
-            .map(|p| p as u8)
-            .unwrap_or(u8::MAX);
-        a_order.cmp(&b_order)
-    });
+    protocol_dists.sort_by_key(|p| p.protocol as u8);
 
     for protocol_dist in &protocol_dists {
         let protocol_counts: Vec<f64> = protocol_dist
@@ -303,13 +293,10 @@ fn export_plotly_value_distributions(report: &ValueDistributionReport) -> AppRes
             .map(|b| b.count as f64)
             .collect();
 
-        // Use display_name() for user-facing trace names, fall back to raw string
-        let display_name = ProtocolType::from_str(&protocol_dist.protocol)
-            .map(|p| p.display_name().to_string())
-            .unwrap_or_else(|_| protocol_dist.protocol.clone());
+        // Use display_name() directly (no parsing needed)
+        let display_name = protocol_dist.protocol.display_name();
 
-        // Use raw protocol string for colour lookup (matches get_protocol_colour keys)
-        let colour = get_protocol_colour(&protocol_dist.protocol);
+        let colour = get_protocol_colour(protocol_dist.protocol);
 
         traces.push(
             PlotlyTrace::bar(

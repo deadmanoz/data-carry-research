@@ -7,6 +7,8 @@ use crate::errors::AppResult;
 use crate::types::analysis_results::{
     ClassificationStatsReport, ProtocolBreakdown, SignatureDetectionStats,
 };
+use crate::types::ProtocolType;
+use std::str::FromStr;
 
 /// Protocol statistics analyser for classification insights
 pub struct ProtocolStatsAnalyser;
@@ -40,8 +42,12 @@ impl ProtocolStatsAnalyser {
 
         let sample_classifications = stmt
             .query_map([], |row| {
+                let protocol_str: String = row.get(0)?;
+                // Parse protocol string to enum (parse once at DB boundary)
+                let protocol = ProtocolType::from_str(&protocol_str).unwrap_or_default();
+
                 Ok(crate::types::analysis_results::ClassificationSample {
-                    protocol: row.get(0)?,
+                    protocol,
                     variant: row.get(1)?,
                     classification_method: row.get(2)?,
                     count: row.get::<_, i64>(3)? as usize,

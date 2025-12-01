@@ -29,8 +29,8 @@ pub use classification::{
 };
 pub use common::{DistributionBucket, OutputCountBucket, TxSizeBucket, ValueBucket};
 pub use content_types::{
-    ContentTypeAnalysisReport, ContentTypeCategoryStats, ContentTypeProtocolStats, ContentTypeStats,
-    ValidNoneStats,
+    ContentTypeAnalysisReport, ContentTypeCategoryStats, ContentTypeProtocolStats,
+    ContentTypeStats, ValidNoneStats,
 };
 pub use data_size::{
     CategoryDataMetrics, CategorySpendabilityData, ComprehensiveDataSizeReport, ContentTypeData,
@@ -54,8 +54,8 @@ pub use signatures::{
     BurnPatternCorrelation, ConfidenceStats, PatternProtocolCorrelation, SignatureAnalysisReport,
 };
 pub use spendability::{
-    KeyCountDistribution, KeyCountStats, OverallSpendability, ProtocolSpendabilityStats, ReasonStats,
-    SpendabilityStatsReport, SpendabilityTemporalReport, TransactionSpendabilityStats,
+    KeyCountDistribution, KeyCountStats, OverallSpendability, ProtocolSpendabilityStats,
+    ReasonStats, SpendabilityStatsReport, SpendabilityTemporalReport, TransactionSpendabilityStats,
     WeeklySpendabilityStats,
 };
 pub use stamps::{

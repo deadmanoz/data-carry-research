@@ -22,6 +22,7 @@ use crate::types::visualisation::{get_protocol_colour, PlotlyChart, PlotlyLayout
 use crate::types::ProtocolType;
 use crate::utils::time::week_bucket_dates;
 use std::collections::HashMap;
+use std::str::FromStr;
 
 /// Protocol temporal distribution analyser
 pub struct ProtocolTemporalAnalyser;
@@ -77,23 +78,24 @@ impl ProtocolTemporalAnalyser {
         })?;
 
         let mut weekly_data: Vec<WeeklyProtocolStats> = Vec::new();
-        let mut protocol_totals_map: HashMap<String, (usize, u64)> = HashMap::new();
+        let mut protocol_totals_map: HashMap<ProtocolType, (usize, u64)> = HashMap::new();
         let mut total_outputs: usize = 0;
         let mut total_value_sats: u64 = 0;
         let mut unique_weeks: std::collections::HashSet<i64> = std::collections::HashSet::new();
 
         for row_result in rows {
-            let (week_bucket, week_start_ts, protocol, output_count, total_sats) = row_result?;
+            let (week_bucket, week_start_ts, protocol_str, output_count, total_sats) = row_result?;
 
             let (week_start_iso, week_end_iso) = week_bucket_dates(week_start_ts);
 
             let count = output_count as usize;
             let value = total_sats as u64;
 
+            // Parse protocol string to enum (parse once at DB boundary)
+            let protocol = ProtocolType::from_str(&protocol_str).unwrap_or_default();
+
             // Accumulate protocol totals
-            let entry = protocol_totals_map
-                .entry(protocol.clone())
-                .or_insert((0, 0));
+            let entry = protocol_totals_map.entry(protocol).or_insert((0, 0));
             entry.0 += count;
             entry.1 += value;
 
@@ -119,23 +121,15 @@ impl ProtocolTemporalAnalyser {
         // Convert protocol totals map to sorted vec (by protocol enum order)
         let mut protocol_totals: Vec<ProtocolTotal> = protocol_totals_map
             .into_iter()
-            .map(|(protocol, (count, value_sats))| {
-                let display_name = ProtocolType::str_to_display_name(&protocol);
-                ProtocolTotal {
-                    protocol,
-                    display_name,
-                    count,
-                    value_sats,
-                }
+            .map(|(protocol, (count, value_sats))| ProtocolTotal {
+                protocol,
+                count,
+                value_sats,
             })
             .collect();
 
-        // Sort by protocol enum order
-        protocol_totals.sort_by(|a, b| {
-            let a_order = ProtocolType::str_to_sort_order(&a.protocol);
-            let b_order = ProtocolType::str_to_sort_order(&b.protocol);
-            a_order.cmp(&b_order)
-        });
+        // Sort by protocol enum order (direct comparison, no string parsing)
+        protocol_totals.sort_by_key(|p| p.protocol as u8);
 
         Ok(ProtocolTemporalReport {
             total_outputs,
@@ -151,11 +145,11 @@ impl ProtocolTemporalReport {
     /// Generate Plotly chart from this report
     pub fn to_plotly_chart(&self) -> PlotlyChart {
         // Group weekly data by protocol
-        let mut protocol_weekly: HashMap<String, Vec<(String, f64)>> = HashMap::new();
+        let mut protocol_weekly: HashMap<ProtocolType, Vec<(String, f64)>> = HashMap::new();
 
         for week in &self.weekly_data {
             protocol_weekly
-                .entry(week.protocol.clone())
+                .entry(week.protocol)
                 .or_default()
                 .push((week.week_start_iso.clone(), week.count as f64));
         }
@@ -175,12 +169,12 @@ impl ProtocolTemporalReport {
 
         // Sort protocols by enum order (using the totals which are already sorted)
         for total in &self.protocol_totals {
-            let protocol = &total.protocol;
-            let display_name = &total.display_name;
+            let protocol = total.protocol;
+            let display_name = protocol.display_name();
             let colour = get_protocol_colour(protocol);
 
             // Build y-values for each week (0 if no data for that week)
-            let week_data = protocol_weekly.get(protocol);
+            let week_data = protocol_weekly.get(&protocol);
             let week_map: HashMap<String, f64> = week_data
                 .map(|data| data.iter().cloned().collect())
                 .unwrap_or_default();

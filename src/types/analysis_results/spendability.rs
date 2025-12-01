@@ -1,5 +1,6 @@
 //! Spendability analysis types
 
+use crate::types::ProtocolType;
 use serde::{Deserialize, Serialize};
 
 /// Spendability analysis comprehensive report
@@ -25,7 +26,7 @@ pub struct OverallSpendability {
 /// Per-protocol spendability statistics
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct ProtocolSpendabilityStats {
-    pub protocol: String,
+    pub protocol: ProtocolType,
     pub total_outputs: usize,
     pub spendable_count: usize,
     pub spendable_percentage: f64,

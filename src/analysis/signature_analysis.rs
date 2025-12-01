@@ -8,6 +8,8 @@ use crate::errors::AppResult;
 use crate::types::analysis_results::{
     BurnPatternCorrelation, ConfidenceStats, SignatureAnalysisReport,
 };
+use crate::types::ProtocolType;
+use std::str::FromStr;
 
 /// Signature analyser for protocol detection insights
 pub struct SignatureAnalyser;
@@ -68,8 +70,12 @@ impl SignatureAnalyser {
              GROUP BY protocol, pattern_count
              ORDER BY protocol, pattern_count",
             |row| {
+                let protocol_str: String = row.get(0)?;
+                // Parse protocol string to enum (parse once at DB boundary)
+                let protocol = ProtocolType::from_str(&protocol_str).unwrap_or_default();
+
                 Ok(crate::types::analysis_results::PatternProtocolCorrelation {
-                    protocol: row.get(0)?,
+                    protocol,
                     burn_patterns_count: row.get::<_, i64>(1)? as usize,
                     transactions: row.get::<_, i64>(2)? as usize,
                 })
