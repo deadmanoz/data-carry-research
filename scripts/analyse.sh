@@ -23,6 +23,7 @@ set -euo pipefail
 #   dust-thresholds            - Show Bitcoin dust threshold analysis
 #   tx-sizes                   - Show transaction size distribution
 #   stamps-weekly-fees         - Show Bitcoin Stamps weekly fee analysis
+#   stamps-variant-temporal    - Show Stamps variant distribution over time
 #   output-counts              - Show P2MS output count distribution per transaction
 #   full                       - Show comprehensive analysis report
 #
@@ -41,7 +42,7 @@ if [[ $# -eq 0 ]]; then
     echo "          signatures, spendability, content-types, protocol-data-sizes,"
     echo "          spendability-data-sizes, content-type-spendability,"
     echo "          comprehensive-data-sizes, multisig-configurations, dust-thresholds,"
-    echo "          tx-sizes, stamps-weekly-fees, output-counts, full"
+    echo "          tx-sizes, stamps-weekly-fees, stamps-variant-temporal, output-counts, full"
     echo ""
     echo "Examples:"
     echo "  $0 value                           # Uses default DB"

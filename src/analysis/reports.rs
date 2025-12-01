@@ -10,8 +10,8 @@ use crate::types::analysis_results::{
     ContentTypeSpendabilityReport, DustAnalysisReport, FeeAnalysisReport, FileExtensionReport,
     FullAnalysisReport, MultisigConfigReport, OutputCountDistributionReport,
     ProtocolDataSizeReport, SignatureAnalysisReport, SpendabilityDataSizeReport,
-    SpendabilityStatsReport, StampsWeeklyFeeReport, TxSizeDistributionReport, ValueAnalysisReport,
-    ValueDistributionReport,
+    SpendabilityStatsReport, StampsVariantTemporalReport, StampsWeeklyFeeReport,
+    TxSizeDistributionReport, ValueAnalysisReport, ValueDistributionReport,
 };
 use crate::types::visualisation::{get_protocol_colour, PlotlyChart};
 use crate::utils::currency::{format_rate_as_btc, format_sats_as_btc, format_sats_as_btc_f64};
@@ -1608,6 +1608,169 @@ impl ReportFormatter {
                     "\nNote: Week boundaries are Thursday-to-Wednesday (fixed 7-day buckets).\n",
                 );
                 output.push_str("      For Plotly-compatible JSON output, use --format plotly\n");
+
+                Ok(output)
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Bitcoin Stamps Variant Temporal Analysis Formatter
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Format Bitcoin Stamps variant temporal distribution report
+    ///
+    /// Displays temporal distribution of Bitcoin Stamps variants with:
+    /// - Console: Human-readable summary with variant totals and first appearances
+    /// - JSON: Full structured data with all weekly breakdowns
+    /// - Plotly: Stacked area chart data for visualisation
+    pub fn format_stamps_variant_temporal(
+        report: &StampsVariantTemporalReport,
+        format: &OutputFormat,
+    ) -> AppResult<String> {
+        match format {
+            OutputFormat::Json => Self::export_json(report),
+            OutputFormat::Plotly => {
+                let chart: PlotlyChart = report.to_plotly_chart();
+                Self::export_json(&chart)
+            }
+            OutputFormat::Console => {
+                let mut output = String::new();
+
+                // Header
+                output.push_str("\n📊 Bitcoin Stamps Variant Temporal Distribution\n");
+                output.push_str("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n");
+
+                // Handle empty report
+                if report.total_outputs == 0 {
+                    output.push_str("No Bitcoin Stamps outputs found.\n");
+                    return Ok(output);
+                }
+
+                // Summary section
+                output.push_str("Summary:\n");
+                output.push_str(&format!(
+                    "  Total outputs (valid variants): {}\n",
+                    Self::format_number(report.total_outputs)
+                ));
+                output.push_str(&format!(
+                    "  Total value: {}\n",
+                    format_sats_as_btc(report.total_value_sats)
+                ));
+                output.push_str(&format!(
+                    "  Date range: {} to {}\n",
+                    report.date_range_start, report.date_range_end
+                ));
+                output.push_str(&format!(
+                    "  NULL variants (bug indicator): {}\n\n",
+                    Self::format_number(report.null_variant_count)
+                ));
+
+                // Variant Totals
+                output.push_str("Variant Totals:\n");
+                output.push_str(&format!(
+                    "  {:<15} {:>10} {:>8} {:>16}\n",
+                    "Variant", "Count", "%", "Value (BTC)"
+                ));
+                output.push_str(&format!(
+                    "  {:-<15} {:->10} {:->8} {:->16}\n",
+                    "", "", "", ""
+                ));
+
+                for variant in &report.variant_totals {
+                    output.push_str(&format!(
+                        "  {:<15} {:>10} {:>7.2}% {:>16}\n",
+                        variant.variant,
+                        Self::format_number(variant.count),
+                        variant.percentage,
+                        format_sats_as_btc(variant.total_value_sats)
+                    ));
+                }
+                output.push('\n');
+
+                // First Appearances
+                output.push_str("First Appearances:\n");
+                output.push_str(&format!(
+                    "  {:<15} {:>10} {:>12} {:>16}\n",
+                    "Variant", "Height", "Date", "TXID"
+                ));
+                output.push_str(&format!(
+                    "  {:-<15} {:->10} {:->12} {:->16}\n",
+                    "", "", "", ""
+                ));
+
+                for first in &report.first_appearances {
+                    let txid_short = if first.first_txid.len() > 12 {
+                        format!("{}...", &first.first_txid[..12])
+                    } else {
+                        first.first_txid.clone()
+                    };
+                    output.push_str(&format!(
+                        "  {:<15} {:>10} {:>12} {:>16}\n",
+                        first.variant,
+                        Self::format_number(first.first_height as usize),
+                        first.first_date,
+                        txid_short
+                    ));
+                }
+                output.push('\n');
+
+                // Weekly Distribution (last 10 weeks only for console)
+                let recent_weeks: Vec<_> = {
+                    let mut weeks_seen = std::collections::HashSet::new();
+                    report
+                        .weekly_data
+                        .iter()
+                        .rev()
+                        .filter(|w| weeks_seen.insert(w.week_bucket))
+                        .take(10)
+                        .collect::<Vec<_>>()
+                        .into_iter()
+                        .rev()
+                        .collect()
+                };
+
+                if !recent_weeks.is_empty() {
+                    let start_week = recent_weeks.first().map(|w| w.week_bucket);
+                    let relevant_data: Vec<_> = report
+                        .weekly_data
+                        .iter()
+                        .filter(|w| start_week.is_some_and(|sw| w.week_bucket >= sw))
+                        .collect();
+
+                    output.push_str("Weekly Distribution (last 10 weeks):\n");
+                    output.push_str(&format!(
+                        "  {:<12} {:<15} {:>10} {:>16}\n",
+                        "Week", "Variant", "Count", "Value (sats)"
+                    ));
+                    output.push_str(&format!(
+                        "  {:-<12} {:-<15} {:->10} {:->16}\n",
+                        "", "", "", ""
+                    ));
+
+                    for week_stat in relevant_data.iter().take(50) {
+                        output.push_str(&format!(
+                            "  {:<12} {:<15} {:>10} {:>16}\n",
+                            week_stat.week_start_iso,
+                            week_stat.variant,
+                            Self::format_number(week_stat.count),
+                            Self::format_number(week_stat.value_sats as usize)
+                        ));
+                    }
+                    if relevant_data.len() > 50 {
+                        output.push_str(&format!(
+                            "  ... and {} more entries\n",
+                            relevant_data.len() - 50
+                        ));
+                    }
+                }
+
+                output.push('\n');
+                output.push_str(
+                    "Note: Week boundaries are Thursday-to-Wednesday (fixed 7-day buckets).\n",
+                );
+                output.push_str("      For full weekly data, use --format json\n");
+                output.push_str("      For stacked area chart data, use --format plotly\n");
 
                 Ok(output)
             }

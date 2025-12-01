@@ -40,6 +40,12 @@ pub struct PlotlyTrace {
     pub textposition: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hovertemplate: Option<String>,
+    /// Stack group for stacked area charts (e.g., "one")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stackgroup: Option<String>,
+    /// Fill mode for area charts (e.g., "tonexty")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fill: Option<String>,
 }
 
 /// Plotly marker configuration
@@ -174,6 +180,8 @@ impl PlotlyTrace {
             text: None,
             textposition: None,
             hovertemplate: None,
+            stackgroup: None,
+            fill: None,
         }
     }
 
@@ -194,6 +202,8 @@ impl PlotlyTrace {
             text: None,
             textposition: None,
             hovertemplate: None,
+            stackgroup: None,
+            fill: None,
         }
     }
 
@@ -206,6 +216,15 @@ impl PlotlyTrace {
     /// Set this trace to be hidden by default (toggle via legend)
     pub fn hidden_by_default(mut self) -> Self {
         self.visible = Some("legendonly".to_string());
+        self
+    }
+
+    /// Configure trace for stacked area chart
+    ///
+    /// Sets stackgroup to "one" and fill to "tonexty" for proper Plotly stacked area rendering.
+    pub fn stacked_area(mut self) -> Self {
+        self.stackgroup = Some("one".to_string());
+        self.fill = Some("tonexty".to_string());
         self
     }
 }
@@ -225,5 +244,22 @@ pub fn get_protocol_colour(protocol: &str) -> &'static str {
         "LikelyDataStorage" => "#D35400",
         "Unknown" => "#95A5A6",
         _ => "#CCCCCC",
+    }
+}
+
+/// Get colour for a Bitcoin Stamps variant name
+///
+/// Used for stacked area charts showing variant distribution over time.
+pub fn get_stamps_variant_colour(variant: &str) -> &'static str {
+    match variant {
+        "Classic" => "#E74C3C",    // Red (same as BitcoinStamps protocol)
+        "SRC-20" => "#3498DB",     // Blue
+        "SRC-721" => "#9B59B6",    // Purple
+        "SRC-101" => "#2ECC71",    // Green
+        "HTML" => "#F39C12",       // Orange
+        "Compressed" => "#1ABC9C", // Teal
+        "Data" => "#E67E22",       // Dark orange
+        "Unknown" => "#95A5A6",    // Grey
+        _ => "#CCCCCC",            // Default fallback
     }
 }

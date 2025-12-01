@@ -357,6 +357,32 @@ pub enum AnalysisCommands {
         output: Option<PathBuf>,
     },
 
+    /// Analyse Bitcoin Stamps variant distribution over time
+    ///
+    /// Shows temporal distribution of Stamps variants (Classic, SRC-20, SRC-721, etc.)
+    /// with weekly aggregation. Useful for understanding adoption patterns.
+    ///
+    /// Output formats:
+    /// - console: Human-readable summary with variant totals and first appearances
+    /// - json: Full structured data with all weekly breakdowns
+    /// - plotly: Stacked area chart data for visualisation
+    ///
+    /// Week boundaries are Thursday-to-Wednesday (fixed 7-day buckets).
+    /// NULL variants are reported separately as they indicate classification bugs.
+    StampsVariantTemporal {
+        /// Database path (overrides config.toml)
+        #[arg(long)]
+        database_path: Option<PathBuf>,
+
+        /// Output format (console, json, or plotly)
+        #[arg(long, default_value = "console")]
+        format: String,
+
+        /// Output file path
+        #[arg(long, short = 'o')]
+        output: Option<PathBuf>,
+    },
+
     /// Analyse P2MS output count distribution per transaction
     ///
     /// Provides histogram distribution of P2MS output counts per transaction with:
@@ -741,6 +767,21 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
             &app_config,
             |e| e.analyse_stamps_weekly_fees(),
             ReportFormatter::format_stamps_weekly_fees,
+        ),
+
+        AnalysisCommands::StampsVariantTemporal {
+            database_path,
+            format,
+            output,
+        } => run_analysis_with_file_output(
+            database_path,
+            format,
+            output,
+            "stamps_variant_temporal.json",
+            "Stamps variant temporal analysis",
+            &app_config,
+            |e| e.analyse_stamps_variant_temporal(),
+            ReportFormatter::format_stamps_variant_temporal,
         ),
 
         AnalysisCommands::OutputCounts {

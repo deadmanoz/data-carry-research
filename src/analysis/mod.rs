@@ -53,6 +53,7 @@ pub mod signature_analysis;
 pub mod spendability_stats;
 pub mod stamps_signature_stats;
 pub mod stamps_transport_stats;
+pub mod stamps_variant_temporal;
 pub mod stamps_weekly_fee_analysis;
 pub mod tx_size_analysis;
 pub mod value_analysis;
@@ -68,9 +69,10 @@ pub use crate::types::analysis_results::{
     OutputCountDistributionReport, OutputCountPercentiles, ProtocolDataSizeReport,
     ProtocolDustStats, ProtocolOutputCountDistribution, ProtocolTxSizeDistribution,
     ProtocolValueDistribution, SignatureAnalysisReport, SpendabilityDataSizeReport,
-    SpendabilityStatsReport, StampsFeeSummary, StampsWeeklyFeeReport, TxSizeBucket,
-    TxSizeDistributionReport, TxSizePercentiles, ValidNoneStats, ValueAnalysisReport, ValueBucket,
-    ValueDistributionReport, ValuePercentiles, WeeklyStampsFeeStats, UNCLASSIFIED_SENTINEL,
+    SpendabilityStatsReport, StampsFeeSummary, StampsVariantTemporalReport, StampsWeeklyFeeReport,
+    TxSizeBucket, TxSizeDistributionReport, TxSizePercentiles, ValidNoneStats, ValueAnalysisReport,
+    ValueBucket, ValueDistributionReport, ValuePercentiles, VariantFirstSeen, VariantTotal,
+    WeeklyStampsFeeStats, WeeklyVariantStats, UNCLASSIFIED_SENTINEL,
 };
 pub use crate::types::visualisation::PlotlyChart;
 pub use burn_detector::BurnPatternDetector;
@@ -93,6 +95,7 @@ pub use signature_analysis::SignatureAnalyser;
 pub use spendability_stats::SpendabilityStatsAnalyser;
 pub use stamps_signature_stats::{StampsSignatureAnalyser, StampsSignatureAnalysis};
 pub use stamps_transport_stats::{StampsTransportAnalyser, StampsTransportAnalysis};
+pub use stamps_variant_temporal::StampsVariantTemporalAnalyser;
 pub use stamps_weekly_fee_analysis::StampsWeeklyFeeAnalyser;
 pub use tx_size_analysis::TxSizeAnalyser;
 pub use value_analysis::ValueAnalysisEngine;
@@ -392,6 +395,22 @@ impl AnalysisEngine {
     /// * `AppResult<StampsWeeklyFeeReport>` - Weekly fee statistics with Plotly support
     pub fn analyse_stamps_weekly_fees(&self) -> AppResult<StampsWeeklyFeeReport> {
         StampsWeeklyFeeAnalyser::analyse_weekly_fees(&self.database)
+    }
+
+    /// Analyse Bitcoin Stamps variant distribution over time
+    ///
+    /// Provides temporal analysis of Bitcoin Stamps variants including:
+    /// - Weekly aggregation with fixed 7-day buckets (Thursday-Wednesday)
+    /// - Per-variant output counts and values
+    /// - First appearance dates per variant
+    /// - NULL variant detection (indicates classification bugs)
+    ///
+    /// Follows the same pattern as `analyse_stamps_weekly_fees()`.
+    ///
+    /// # Returns
+    /// * `AppResult<StampsVariantTemporalReport>` - Variant temporal distribution
+    pub fn analyse_stamps_variant_temporal(&self) -> AppResult<StampsVariantTemporalReport> {
+        StampsVariantTemporalAnalyser::analyse_temporal_distribution(&self.database)
     }
 
     /// Analyse transaction size distribution across all P2MS transactions

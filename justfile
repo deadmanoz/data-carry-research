@@ -36,6 +36,7 @@ default:
     @echo "  analyse dust-thresholds      - Bitcoin dust threshold analysis"
     @echo "  analyse tx-sizes             - Transaction size distribution"
     @echo "  analyse stamps-weekly-fees   - Bitcoin Stamps weekly fee analysis"
+    @echo "  analyse stamps-variant-temporal - Stamps variant distribution over time"
     @echo "  analyse output-counts        - P2MS output count distribution"
     @echo "  stats [db]                   - Quick statistics"
     @echo ""
@@ -299,7 +300,7 @@ stats-json db_path=default_db_path:
 # Commands: burn-patterns, fees, value, value-distributions, classifications, signatures, spendability,
 #           content-types, full, protocol-data-sizes, spendability-data-sizes, content-type-spendability,
 #           comprehensive-data-sizes, multisig-configurations, dust-thresholds, tx-sizes, stamps-weekly-fees,
-#           output-counts
+#           stamps-variant-temporal, output-counts
 # Examples:
 #   just analyse value                           # Uses default DB
 #   just analyse value ./custom.db --format json
@@ -311,6 +312,7 @@ stats-json db_path=default_db_path:
 #   just analyse dust-thresholds                 # Bitcoin dust threshold analysis
 #   just analyse tx-sizes                        # Transaction size distribution
 #   just analyse stamps-weekly-fees --format plotly  # Weekly fee analysis for plotting
+#   just analyse stamps-variant-temporal --format plotly  # Variant temporal distribution
 #   just analyse output-counts --format plotly   # P2MS output count distribution
 analyse cmd db_path=default_db_path *args="":
     ./scripts/analyse.sh "{{cmd}}" "{{db_path}}" {{args}}

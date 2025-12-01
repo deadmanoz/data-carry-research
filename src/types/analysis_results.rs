@@ -1092,3 +1092,96 @@ pub struct TransportVariantStats {
     /// Percentage within this transport type
     pub percentage: f64,
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Stamps Variant Temporal Distribution
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Temporal distribution of Bitcoin Stamps variants
+///
+/// Week boundaries are Thursday-to-Wednesday (Unix epoch started Thursday).
+/// Uses fixed 7-day buckets: `timestamp / 604800`
+///
+/// Follows the same pattern as `StampsWeeklyFeeReport` for consistency.
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct StampsVariantTemporalReport {
+    /// Total outputs with valid (non-NULL) variants
+    pub total_outputs: usize,
+
+    /// Total value of all outputs in satoshis
+    pub total_value_sats: u64,
+
+    /// First week in the data range (ISO date: YYYY-MM-DD)
+    pub date_range_start: String,
+
+    /// Last week in the data range (ISO date: YYYY-MM-DD)
+    pub date_range_end: String,
+
+    /// Aggregate statistics per variant
+    pub variant_totals: Vec<VariantTotal>,
+
+    /// Weekly time series data - one entry per (week, variant) pair
+    pub weekly_data: Vec<WeeklyVariantStats>,
+
+    /// First appearance of each variant (ordered by height)
+    pub first_appearances: Vec<VariantFirstSeen>,
+
+    /// Count of outputs with NULL variant (indicates bug - should be 0)
+    pub null_variant_count: usize,
+}
+
+/// Aggregate statistics for a single variant
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct VariantTotal {
+    /// Variant name (e.g., "Classic", "SRC-20")
+    pub variant: String,
+
+    /// Total output count for this variant
+    pub count: usize,
+
+    /// Percentage of total Stamps outputs (denominator = unspent P2MS Stamps with non-NULL variant)
+    pub percentage: f64,
+
+    /// Total value of outputs in satoshis
+    pub total_value_sats: u64,
+}
+
+/// Weekly statistics for a single variant
+///
+/// Empty weeks are omitted (following stamps_weekly_fee_analysis pattern).
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct WeeklyVariantStats {
+    /// Week bucket number (timestamp / 604800)
+    pub week_bucket: i64,
+
+    /// Week start date (ISO format: YYYY-MM-DD)
+    pub week_start_iso: String,
+
+    /// Week end date (ISO format: YYYY-MM-DD)
+    pub week_end_iso: String,
+
+    /// Variant name
+    pub variant: String,
+
+    /// Output count for this variant in this week
+    pub count: usize,
+
+    /// Total value in satoshis for this variant in this week
+    pub value_sats: u64,
+}
+
+/// First appearance information for a variant
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct VariantFirstSeen {
+    /// Variant name
+    pub variant: String,
+
+    /// Block height of first appearance
+    pub first_height: u64,
+
+    /// Date of first appearance (ISO format: YYYY-MM-DD)
+    pub first_date: String,
+
+    /// TXID of first appearance (deterministic tie-break: MIN(txid) at MIN(height))
+    pub first_txid: String,
+}
