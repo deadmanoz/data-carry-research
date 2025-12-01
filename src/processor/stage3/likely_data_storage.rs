@@ -10,10 +10,10 @@
 //! checked after all specific protocol detectors have run.
 
 use crate::database::Database;
-use crate::shared::likely_data_storage::{detect, LikelyDataStorageVariant};
+use crate::shared::likely_data_storage::detect;
 use crate::types::{
-    ClassificationDetails, ClassificationResult, EnrichedTransaction, OutputClassificationDetails,
-    ProtocolType, ProtocolVariant, TransactionOutput,
+    ClassificationDetails, ClassificationResult, EnrichedTransaction, LikelyDataStorageVariant,
+    OutputClassificationDetails, ProtocolType, ProtocolVariant, TransactionOutput,
 };
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{debug, trace};
@@ -71,11 +71,17 @@ impl LikelyDataStorageClassifier {
                 result.details
             );
 
-            // Map shared variant to Stage 3 ProtocolVariant (exact match)
+            // Map shared variant to Stage 3 ProtocolVariant (prefixed names for consistency)
             let protocol_variant = match result.variant {
-                LikelyDataStorageVariant::InvalidECPoint => ProtocolVariant::InvalidECPoint,
-                LikelyDataStorageVariant::HighOutputCount => ProtocolVariant::HighOutputCount,
-                LikelyDataStorageVariant::DustAmount => ProtocolVariant::DustAmount,
+                LikelyDataStorageVariant::InvalidECPoint => {
+                    ProtocolVariant::LikelyDataStorageInvalidECPoint
+                }
+                LikelyDataStorageVariant::HighOutputCount => {
+                    ProtocolVariant::LikelyDataStorageHighOutputCount
+                }
+                LikelyDataStorageVariant::DustAmount => {
+                    ProtocolVariant::LikelyDataStorageDustAmount
+                }
             };
 
             // Build Stage 3-specific output classifications (spendability analysis)
@@ -231,7 +237,7 @@ mod tests {
         assert_eq!(classification.protocol, ProtocolType::LikelyDataStorage);
         assert_eq!(
             classification.variant,
-            Some(ProtocolVariant::HighOutputCount)
+            Some(ProtocolVariant::LikelyDataStorageHighOutputCount)
         );
         assert!(classification
             .classification_details
@@ -345,7 +351,10 @@ mod tests {
 
         let (classification, _output_classifications) = result.unwrap();
         assert_eq!(classification.protocol, ProtocolType::LikelyDataStorage);
-        assert_eq!(classification.variant, Some(ProtocolVariant::DustAmount));
+        assert_eq!(
+            classification.variant,
+            Some(ProtocolVariant::LikelyDataStorageDustAmount)
+        );
         assert!(classification
             .classification_details
             .classification_method

@@ -201,9 +201,9 @@ fn test_analyse_spendability_data_sizes() -> AppResult<()> {
         "Should have 1 spendability reason"
     );
     let reason = &report.by_reason[0];
-    assert_eq!(reason.reason, "InvalidECPoints");
-    assert_eq!(reason.output_count, 2, "Two outputs with InvalidECPoints");
-    assert_eq!(reason.total_bytes, 1200, "Total bytes for InvalidECPoints");
+    assert_eq!(reason.reason, "AllDataKeys");
+    assert_eq!(reason.output_count, 2, "Two outputs with AllDataKeys");
+    assert_eq!(reason.total_bytes, 1200, "Total bytes for AllDataKeys");
 
     Ok(())
 }

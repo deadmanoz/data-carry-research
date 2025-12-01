@@ -30,7 +30,8 @@ use crate::types::content_detection::{detect_image_format, DocumentFormat, Image
 use crate::types::stamps::validation::{
     detect_content_type_from_payload, extract_stamps_payload, find_stamp_signature,
 };
-use crate::types::stamps::{classify_json_data, StampsVariant};
+use crate::types::stamps::classify_json_data;
+use crate::types::StampsVariant;
 use base64::Engine;
 
 // Use the shared lenient base64 decoder from types::stamps::validation

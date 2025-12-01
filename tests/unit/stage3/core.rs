@@ -269,7 +269,9 @@ async fn test_stage3_classification_stats_calculations() {
                 ProtocolType::PPk => Some(ProtocolVariant::PPkProfile),
                 ProtocolType::OpReturnSignalled => Some(ProtocolVariant::OpReturnProtocol47930),
                 ProtocolType::DataStorage => None,
-                ProtocolType::LikelyDataStorage => Some(ProtocolVariant::InvalidECPoint),
+                ProtocolType::LikelyDataStorage => {
+                    Some(ProtocolVariant::LikelyDataStorageInvalidECPoint)
+                }
                 ProtocolType::LikelyLegitimateMultisig => Some(ProtocolVariant::LegitimateMultisig),
                 ProtocolType::Unknown => None,
             },

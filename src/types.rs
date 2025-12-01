@@ -1,15 +1,25 @@
 //! Bitcoin P2MS Data-Carrying Protocol Analyser - Type System
 //!
+//! ## Core Types
 //! - `common`: Shared types used across all stages (UtxoRecord, TransactionOutput, etc.)
 //! - `stage1`: Stage 1 specific types (Stage1Config, ProcessingStats)
 //! - `stage2`: Stage 2 specific types (EnrichedTransaction, Stage2Stats, etc.)
-//! - `stage3`: Stage 3 specific types (ClassificationResult, ProtocolType, etc.)
+//! - `stage3`: Stage 3 specific types (ClassificationResult, ProtocolType, ProtocolVariant)
 //! - `statistics`: Unified statistics framework with common traits
 //! - `burn_patterns`: Centralised burn pattern definitions
-//! - `chancecoin`: Chancecoin protocol specific types
-//! - `counterparty`: Counterparty protocol specific types
-//! - `omni`: Omni Layer protocol specific types
-//! - `stamps`: Bitcoin Stamps protocol specific types
+//!
+//! ## Protocol-Specific Variant Types
+//! Each protocol has a dedicated module with variant enums and `From<Variant> for ProtocolVariant`:
+//! - `ascii_identifier`: AsciiIdentifierVariant (TB0001, TEST01, Metronotes, etc.)
+//! - `chancecoin`: ChancecoinMessageType
+//! - `counterparty`: CounterpartyMessageType
+//! - `datastorage`: DataStorageVariant (ProofOfBurn, WikiLeaksCablegate, etc.)
+//! - `likely_data_storage`: LikelyDataStorageVariant (InvalidECPoint, HighOutputCount, DustAmount)
+//! - `likely_legitimate`: LikelyLegitimateVariant (Standard, DuplicateKeys, WithNullKey)
+//! - `omni`: OmniMessageType
+//! - `opreturn_signalled`: OpReturnVariant (Protocol47930, CLIPPERZ, GenericASCII)
+//! - `ppk`: PPkDetectionResult, OdinIdentifier
+//! - `stamps`: StampsVariant, StampSignature
 
 // Import all types from the modular structure
 mod common;
@@ -20,11 +30,16 @@ mod stage3;
 pub mod statistics;
 
 // Protocol-specific modules
+pub mod ascii_identifier;
 pub mod burn_patterns;
 pub mod chancecoin;
 pub mod content_detection;
 pub mod counterparty;
+pub mod datastorage;
+pub mod likely_data_storage;
+pub mod likely_legitimate;
 pub mod omni;
+pub mod opreturn_signalled;
 pub mod ppk;
 pub mod spendability;
 pub mod stamps;
@@ -52,6 +67,14 @@ pub use script_metadata::{
 
 // Re-export statistics types for convenience
 pub use statistics::{ProcessingStats, Stage2Stats, Stage3Results};
+
+// Re-export protocol variant types for convenience
+pub use ascii_identifier::AsciiIdentifierVariant;
+pub use datastorage::DataStorageVariant;
+pub use likely_data_storage::LikelyDataStorageVariant;
+pub use likely_legitimate::LikelyLegitimateVariant;
+pub use opreturn_signalled::OpReturnVariant;
+pub use stamps::StampsVariant;
 
 #[cfg(test)]
 mod tests {

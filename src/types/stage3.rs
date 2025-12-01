@@ -245,9 +245,9 @@ pub enum ProtocolVariant {
     OpReturnGenericASCII, // Generic ASCII OP_RETURN protocols (one-off protocols: PRVCY, unsuccessful, @DEVCHA, etc.)
 
     // LikelyDataStorage variants
-    InvalidECPoint, // Invalid EC points (not on secp256k1 curve - obvious data embedding)
-    HighOutputCount, // 5+ P2MS outputs with valid EC points
-    DustAmount,     // P2MS outputs with dust-level amounts (<= 1000 sats)
+    LikelyDataStorageInvalidECPoint, // Invalid EC points (not on secp256k1 curve - obvious data embedding)
+    LikelyDataStorageHighOutputCount, // 5+ P2MS outputs with valid EC points
+    LikelyDataStorageDustAmount,     // P2MS outputs with dust-level amounts (<= 1000 sats)
 
     // LikelyLegitimateMultisig variants
     LegitimateMultisig,            // Standard multisig with valid EC points
@@ -309,9 +309,9 @@ impl std::fmt::Display for ProtocolVariant {
             ProtocolVariant::OpReturnProtocol47930 => "Protocol47930",
             ProtocolVariant::OpReturnCLIPPERZ => "CLIPPERZ",
             ProtocolVariant::OpReturnGenericASCII => "GenericASCII",
-            ProtocolVariant::InvalidECPoint => "Invalid EC Point",
-            ProtocolVariant::HighOutputCount => "High Output Count",
-            ProtocolVariant::DustAmount => "Dust Amount",
+            ProtocolVariant::LikelyDataStorageInvalidECPoint => "Invalid EC Point",
+            ProtocolVariant::LikelyDataStorageHighOutputCount => "High Output Count",
+            ProtocolVariant::LikelyDataStorageDustAmount => "Dust Amount",
             ProtocolVariant::LegitimateMultisig => "Legitimate Multisig",
             ProtocolVariant::LegitimateMultisigDupeKeys => "Legitimate Multisig (Duplicate Keys)",
             ProtocolVariant::LegitimateMultisigWithNullKey => "Legitimate Multisig (Null-Padded)",

@@ -182,9 +182,9 @@ pub fn verify_classification(
                     "CLIPPERZ" => ProtocolVariant::OpReturnCLIPPERZ,
                     "GenericASCII" => ProtocolVariant::OpReturnGenericASCII,
                     // LikelyDataStorage variants (Display strings)
-                    "Invalid EC Point" => ProtocolVariant::InvalidECPoint,
-                    "High Output Count" => ProtocolVariant::HighOutputCount,
-                    "Dust Amount" => ProtocolVariant::DustAmount,
+                    "Invalid EC Point" => ProtocolVariant::LikelyDataStorageInvalidECPoint,
+                    "High Output Count" => ProtocolVariant::LikelyDataStorageHighOutputCount,
+                    "Dust Amount" => ProtocolVariant::LikelyDataStorageDustAmount,
                     // LikelyLegitimateMultisig variants (Display strings)
                     "Legitimate Multisig"
                         if !var_str.contains("Duplicate") && !var_str.contains("Null") =>
@@ -1380,9 +1380,15 @@ fn parse_variant_string(variant_str: &str, protocol: ProtocolType) -> ProtocolVa
         (ProtocolType::DataStorage, "DataStorageGeneric") => ProtocolVariant::DataStorageGeneric,
 
         // LikelyDataStorage variants
-        (ProtocolType::LikelyDataStorage, "InvalidECPoint") => ProtocolVariant::InvalidECPoint,
-        (ProtocolType::LikelyDataStorage, "HighOutputCount") => ProtocolVariant::HighOutputCount,
-        (ProtocolType::LikelyDataStorage, "DustAmount") => ProtocolVariant::DustAmount,
+        (ProtocolType::LikelyDataStorage, "LikelyDataStorageInvalidECPoint") => {
+            ProtocolVariant::LikelyDataStorageInvalidECPoint
+        }
+        (ProtocolType::LikelyDataStorage, "LikelyDataStorageHighOutputCount") => {
+            ProtocolVariant::LikelyDataStorageHighOutputCount
+        }
+        (ProtocolType::LikelyDataStorage, "LikelyDataStorageDustAmount") => {
+            ProtocolVariant::LikelyDataStorageDustAmount
+        }
 
         // LikelyLegitimateMultisig variants
         (ProtocolType::LikelyLegitimateMultisig, "LegitimateMultisig") => {

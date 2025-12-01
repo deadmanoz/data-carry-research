@@ -9,16 +9,8 @@
 use crate::types::TransactionOutput;
 use tracing::warn;
 
-/// Variant detected by LikelyDataStorage classification
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum LikelyDataStorageVariant {
-    /// ≥1 pubkey fails secp256k1 validation (highest confidence)
-    InvalidECPoint,
-    /// ≥5 P2MS outputs with ALL valid EC points
-    HighOutputCount,
-    /// ALL outputs ≤1000 sats with ALL valid EC points
-    DustAmount,
-}
+// Re-export variant from canonical types module location
+pub use crate::types::LikelyDataStorageVariant;
 
 /// Detection result with variant and human-readable details
 #[derive(Debug, Clone)]

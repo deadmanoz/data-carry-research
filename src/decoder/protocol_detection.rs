@@ -832,7 +832,8 @@ pub fn has_counterparty_signature(data: &[u8]) -> Option<usize> {
 ///
 /// Returns `Some(DecodedProtocol::LikelyDataStorage)` if a pattern is detected.
 pub fn try_likely_data_storage(tx_data: &TransactionData) -> Option<DecodedProtocol> {
-    use crate::shared::likely_data_storage::{detect, LikelyDataStorageVariant};
+    use crate::shared::likely_data_storage::detect;
+    use crate::types::LikelyDataStorageVariant;
     use tracing::debug;
 
     // Get P2MS outputs (returns Vec<TransactionOutput> - same type as Stage 3)

@@ -283,7 +283,7 @@ impl TestOutputClassificationParams {
             variant: None,
             content_type: Some("application/octet-stream".to_string()),
             is_spendable: false,
-            spendability_reason: "InvalidECPoints".to_string(),
+            spendability_reason: "AllDataKeys".to_string(),
             protocol_signature_found: true,
         }
     }
