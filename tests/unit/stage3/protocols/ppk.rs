@@ -23,118 +23,25 @@
 //! ensuring validation against real-world PPk protocol usage.
 
 use data_carry_research::database::Database;
-use data_carry_research::types::{ProtocolType, ProtocolVariant, TransactionOutput};
+use data_carry_research::types::TransactionOutput;
 use serial_test::serial;
 
 // Import standardised test utilities
-use crate::common::db_seeding::seed_enriched_transaction_simple;
+use crate::common::db_seeding::seed_enriched_transaction;
 use crate::common::fixture_registry::{self, ProtocolFixture};
 use crate::common::fixtures;
-use crate::common::protocol_test_base::{
-    load_transaction_from_json, run_stage3_processor, setup_protocol_test, verify_classification,
-    verify_content_type, verify_stage3_completion, TransactionLoadOptions,
-};
+use crate::common::protocol_test_base::{run_stage3_processor, setup_protocol_test, ProtocolTestBuilder};
 
-/// Run a PPk test using fixture registry metadata
-async fn run_ppk_fixture_test(fixture: &ProtocolFixture) {
-    let expected_variant = match fixture.variant {
-        Some("PPkProfile") => ProtocolVariant::PPkProfile,
-        Some("PPkRegistration") => ProtocolVariant::PPkRegistration,
-        Some("PPkMessage") => ProtocolVariant::PPkMessage,
-        Some("PPkUnknown") => ProtocolVariant::PPkUnknown,
-        other => panic!("Unknown PPk variant: {:?}", other),
-    };
-
-    let result = test_data::run_ppk_test_from_json(
-        fixture.path,
-        fixture.txid,
-        expected_variant.clone(),
-        fixture
-            .content_type
-            .expect("PPk fixtures should have content_type"),
-        fixture.description,
-    )
-    .await;
+/// Run a PPk test using the unified ProtocolTestBuilder
+async fn run_ppk_fixture_test(fixture: &'static ProtocolFixture) {
+    // PPk requires all outputs for RT transport detection via OP_RETURN
+    let result = ProtocolTestBuilder::from_fixture(fixture)
+        .with_all_outputs()
+        .execute()
+        .await;
 
     if let Err(e) = result {
-        println!("⚠️  Test error: {}", e);
-    }
-}
-
-/// PPk protocol test data helpers
-mod test_data {
-    use super::*;
-
-    /// Run PPk test from JSON fixture
-    pub async fn run_ppk_test_from_json(
-        json_path: &str,
-        txid: &str,
-        expected_variant: ProtocolVariant,
-        expected_content_type: &str,
-        test_name: &str,
-    ) -> anyhow::Result<()> {
-        let (mut test_db, config) = setup_protocol_test(test_name)?;
-
-        println!("\n╔══════════════════════════════════════════════════════════════");
-        println!("║ PPk Protocol Classification Test");
-        println!("╠══════════════════════════════════════════════════════════════");
-        println!("║ Test: {}", test_name);
-        println!("║ TXID: {}", txid);
-        println!("║ Expected Variant: {:?}", expected_variant);
-        println!("║ Expected Content-Type: {}", expected_content_type);
-        println!("╟──────────────────────────────────────────────────────────────");
-
-        // Load transaction data using unified helper (ALL outputs for PPk RT transport)
-        let (tx, _inputs) = match load_transaction_from_json(
-            json_path,
-            txid,
-            TransactionLoadOptions {
-                include_all_outputs: true,
-                ..Default::default()
-            },
-        ) {
-            Ok(result) => result,
-            Err(e) => {
-                println!(
-                    "⚠️  Skipping test - no valid transaction data in {}: {}",
-                    json_path, e
-                );
-                return Ok(());
-            }
-        };
-
-        // Seed transaction
-        seed_enriched_transaction_simple(&mut test_db, &tx, Vec::new())?;
-
-        // Run Stage 3 processor
-        let total_classified = run_stage3_processor(test_db.path(), config).await?;
-
-        // Verify classification occurred
-        let expected_count = match expected_variant {
-            ProtocolVariant::PPkProfile
-            | ProtocolVariant::PPkRegistration
-            | ProtocolVariant::PPkMessage
-            | ProtocolVariant::PPkUnknown => 1,
-            _ => panic!("Invalid PPk variant: {:?}", expected_variant),
-        };
-
-        verify_stage3_completion(total_classified, expected_count, expected_count);
-
-        // Verify protocol classification
-        verify_classification(
-            &test_db,
-            txid,
-            ProtocolType::PPk,
-            Some(expected_variant.clone()),
-        )?;
-
-        // Verify content type
-        verify_content_type(&test_db, txid, Some(expected_content_type))?;
-
-        println!("╚══════════════════════════════════════════════════════════════");
-        println!("✅ PPk {:?} test PASSED\n", expected_variant);
-
-        Ok(())
+        panic!("PPk test failed: {}", e);
     }
 }
 
@@ -173,6 +80,9 @@ async fn test_ppk_unknown() {
 }
 
 /// Test PPk marker detection with synthetic transaction (no marker)
+///
+/// This negative test ensures PPk classification doesn't match transactions
+/// without the PPk marker pubkey. Uses synthetic data rather than fixtures.
 #[tokio::test]
 #[serial]
 async fn test_ppk_no_marker_negative() {
@@ -209,7 +119,7 @@ async fn test_ppk_no_marker_negative() {
     }];
     tx.p2ms_outputs_count = 1;
 
-    seed_enriched_transaction_simple(&mut test_db, &tx, Vec::new()).unwrap();
+    seed_enriched_transaction(&mut test_db, &tx, Vec::new()).unwrap();
 
     // Run Stage 3 processor
     let _total_classified = run_stage3_processor(test_db.path(), config).await.unwrap();

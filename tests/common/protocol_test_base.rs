@@ -15,9 +15,10 @@ use rusqlite::Connection;
 use serde_json;
 use std::fs;
 
-use super::fixtures;
-
 use super::database::TestDatabase;
+use super::db_seeding::seed_enriched_transaction;
+use super::fixture_registry::ProtocolFixture;
+use super::fixtures;
 
 /// Standard protocol test configuration factory
 ///
@@ -547,8 +548,8 @@ pub fn load_transaction_from_json(
 /// Extracts input data from the transaction's "vin" array. This is needed
 /// for protocols like Omni that require sender address for deobfuscation.
 ///
-/// Note: This loads basic input data. For Omni which needs previous transaction
-/// outputs for source addresses, use the protocol-specific input loader in omni.rs.
+/// Note: This loads basic input data. For protocols needing source addresses
+/// (like Omni), use load_inputs_with_source_addresses instead.
 pub fn load_transaction_inputs_from_json(json_path: &str) -> Result<Vec<TransactionInput>> {
     let content = fs::read_to_string(json_path)?;
     let tx: serde_json::Value = serde_json::from_str(&content)?;
@@ -582,6 +583,59 @@ pub fn load_transaction_inputs_from_json(json_path: &str) -> Result<Vec<Transact
                 script_sig,
                 sequence,
                 source_address: None, // Not available without looking up previous tx
+            });
+        }
+    }
+
+    Ok(inputs)
+}
+
+/// Load transaction inputs with source addresses from separate input fixture files
+///
+/// This is required for protocols like Omni that need the sender's address for
+/// SHA256-based deobfuscation. It loads each input's previous transaction from
+/// the input_fixture_dir to extract the source address.
+pub fn load_inputs_with_source_addresses(
+    json_path: &str,
+    input_fixture_dir: &str,
+) -> Result<Vec<TransactionInput>> {
+    let content = fs::read_to_string(json_path)?;
+    let tx: serde_json::Value = serde_json::from_str(&content)?;
+
+    let mut inputs = Vec::new();
+    if let Some(vin) = tx["vin"].as_array() {
+        for input in vin {
+            // Skip coinbase inputs
+            if input.get("coinbase").is_some() {
+                continue;
+            }
+
+            let prev_txid = input["txid"].as_str().unwrap();
+            let prev_vout = input["vout"].as_u64().unwrap() as u32;
+
+            // Load the previous transaction from stored JSON
+            let input_json_path = format!("{}{}.json", input_fixture_dir, prev_txid);
+
+            let prev_tx_content = fs::read_to_string(&input_json_path)?;
+            let prev_tx: serde_json::Value = serde_json::from_str(&prev_tx_content)?;
+
+            // Extract value and address from the specific output
+            let output = &prev_tx["vout"][prev_vout as usize];
+            let value = (output["value"].as_f64().unwrap() * 100_000_000.0) as u64;
+            let source_address = output["scriptPubKey"]["address"]
+                .as_str()
+                .map(|s| s.to_string());
+
+            inputs.push(TransactionInput {
+                txid: prev_txid.to_string(),
+                vout: prev_vout,
+                value,
+                script_sig: hex::encode(
+                    hex::decode(input["scriptSig"]["hex"].as_str().unwrap_or(""))
+                        .unwrap_or_default(),
+                ),
+                sequence: input["sequence"].as_u64().unwrap_or(0xffffffff) as u32,
+                source_address,
             });
         }
     }
@@ -994,4 +1048,360 @@ pub fn seed_stage3_test_data(
     }
 
     Ok(())
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Protocol Test Builder
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Builder for protocol classification tests
+///
+/// Provides a unified interface for running protocol classification tests,
+/// eliminating duplicate `run_*_test_from_json()` functions across protocol test files.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// // Simple protocol test (Chancecoin)
+/// ProtocolTestBuilder::from_fixture(&fixture_registry::chancecoin::BET)
+///     .execute()
+///     .await?;
+///
+/// // Protocol with burn patterns (Stamps)
+/// ProtocolTestBuilder::from_fixture(&fixture_registry::stamps::SRC20_DEPLOY)
+///     .with_burn_patterns(fixtures::stamps_burn_patterns())
+///     .execute()
+///     .await?;
+///
+/// // Protocol needing all outputs (PPk, Omni)
+/// ProtocolTestBuilder::from_fixture(&fixture_registry::ppk::RT_STANDARD)
+///     .with_all_outputs()
+///     .execute()
+///     .await?;
+/// ```
+pub struct ProtocolTestBuilder {
+    fixture: &'static ProtocolFixture,
+    include_all_outputs: bool,
+    include_inputs: bool,
+    burn_patterns: Option<Vec<BurnPattern>>,
+    skip_content_type_check: bool,
+}
+
+impl ProtocolTestBuilder {
+    /// Create a new builder from a fixture registry entry
+    pub fn from_fixture(fixture: &'static ProtocolFixture) -> Self {
+        Self {
+            fixture,
+            include_all_outputs: false,
+            include_inputs: false,
+            burn_patterns: None,
+            skip_content_type_check: false,
+        }
+    }
+
+    /// Load ALL outputs (P2MS, OP_RETURN, P2PKH, etc.) instead of P2MS-only
+    ///
+    /// Required for protocols that examine non-P2MS outputs:
+    /// - PPk (RT transport via OP_RETURN)
+    /// - Omni Layer (Exodus address detection)
+    /// - OP_RETURN Signalled protocols
+    pub fn with_all_outputs(mut self) -> Self {
+        self.include_all_outputs = true;
+        self
+    }
+
+    /// Load transaction inputs from JSON fixture
+    ///
+    /// Required for protocols that need sender address:
+    /// - Omni Layer (SHA256 deobfuscation)
+    /// - Counterparty (ARC4 key derivation)
+    pub fn with_inputs(mut self) -> Self {
+        self.include_inputs = true;
+        self
+    }
+
+    /// Apply burn patterns to the transaction
+    ///
+    /// Required for protocols with burn pattern detection:
+    /// - Bitcoin Stamps (stamps_burn_patterns)
+    /// - Counterparty (counterparty_burn_patterns)
+    pub fn with_burn_patterns(mut self, patterns: Vec<BurnPattern>) -> Self {
+        self.burn_patterns = Some(patterns);
+        self
+    }
+
+    /// Skip content type verification
+    ///
+    /// Use for protocols where content_type is not yet implemented or is None.
+    pub fn skip_content_type(mut self) -> Self {
+        self.skip_content_type_check = true;
+        self
+    }
+
+    /// Execute the test and verify results
+    ///
+    /// This performs the standard test flow:
+    /// 1. Setup test database
+    /// 2. Load transaction from JSON fixture
+    /// 3. Seed database (FK-safe order)
+    /// 4. Run Stage 3 processor
+    /// 5. Verify classification matches expected protocol/variant
+    /// 6. Verify content type matches expected MIME type (unless skipped)
+    pub async fn execute(&self) -> Result<ProtocolTestResult> {
+        let test_name = self.fixture.description;
+        let txid = self.fixture.txid;
+
+        // 1. Setup test database
+        let (mut test_db, config) = setup_protocol_test(test_name)?;
+
+        // 2. Print test header
+        println!("\n╔══════════════════════════════════════════════════════════════");
+        println!(
+            "║ {} Protocol Classification Test",
+            protocol_display_name(self.fixture.protocol.clone())
+        );
+        println!("╠══════════════════════════════════════════════════════════════");
+        println!("║ Test: {}", test_name);
+        println!("║ TXID: {}", txid);
+        if let Some(variant) = self.fixture.variant {
+            println!("║ Expected Variant: {}", variant);
+        }
+        if let Some(content_type) = self.fixture.content_type {
+            println!("║ Expected Content-Type: {}", content_type);
+        }
+        println!("╟──────────────────────────────────────────────────────────────");
+
+        // 3. Load transaction from JSON fixture
+        let options = TransactionLoadOptions {
+            include_all_outputs: self.include_all_outputs,
+            include_inputs: false, // We'll handle inputs separately for input_fixture_path
+            burn_patterns: self.burn_patterns.clone(),
+        };
+
+        let (tx, _) = match load_transaction_from_json(self.fixture.path, txid, options) {
+            Ok(result) => result,
+            Err(e) => {
+                println!(
+                    "⚠️  Skipping test - no valid transaction data in {}: {}",
+                    self.fixture.path, e
+                );
+                return Ok(ProtocolTestResult {
+                    skipped: true,
+                    classified_count: 0,
+                });
+            }
+        };
+
+        // Load inputs - use source address loader if input_fixture_path is set
+        let inputs = if self.include_inputs {
+            if let Some(input_path) = self.fixture.input_fixture_path {
+                load_inputs_with_source_addresses(self.fixture.path, input_path)?
+            } else {
+                load_transaction_inputs_from_json(self.fixture.path)?
+            }
+        } else {
+            Vec::new()
+        };
+
+        println!("║ P2MS Outputs Found: {}", tx.p2ms_outputs_count);
+        println!("║");
+
+        // 4. Seed database (FK-safe order)
+        seed_enriched_transaction(&mut test_db, &tx, inputs)?;
+
+        println!("║ Running Stage 3 Classification...");
+        println!("╟──────────────────────────────────────────────────────────────");
+
+        // 5. Run Stage 3 processor
+        let total_classified = run_stage3_processor(test_db.path(), config).await?;
+
+        // 6. Verify Stage 3 completion
+        verify_stage3_completion(total_classified, 1, 1);
+
+        println!("║ ✅ Classified: {}/{}", total_classified, 1);
+        println!("║");
+
+        // 7. Parse expected variant
+        let expected_variant = self
+            .fixture
+            .variant
+            .map(|v| parse_variant_string(v, self.fixture.protocol.clone()));
+
+        // 8. Verify classification
+        verify_classification(
+            &test_db,
+            txid,
+            self.fixture.protocol.clone(),
+            expected_variant.clone(),
+        )?;
+
+        println!("║ ✅ Protocol: {:?}", self.fixture.protocol);
+        if let Some(ref variant) = expected_variant {
+            println!("║ ✅ Variant: {:?}", variant);
+        }
+
+        // 9. Verify content type (unless skipped)
+        if !self.skip_content_type_check {
+            verify_content_type(&test_db, txid, self.fixture.content_type)?;
+            if let Some(content_type) = self.fixture.content_type {
+                println!("║ ✅ Content-Type: {}", content_type);
+            }
+        }
+
+        println!("╚══════════════════════════════════════════════════════════════\n");
+
+        Ok(ProtocolTestResult {
+            skipped: false,
+            classified_count: total_classified,
+        })
+    }
+}
+
+/// Result of a protocol test execution
+#[derive(Debug)]
+pub struct ProtocolTestResult {
+    /// Whether the test was skipped (e.g., missing fixture)
+    pub skipped: bool,
+    /// Number of transactions classified
+    pub classified_count: usize,
+}
+
+/// Get display name for a protocol type
+fn protocol_display_name(protocol: ProtocolType) -> &'static str {
+    match protocol {
+        ProtocolType::BitcoinStamps => "Bitcoin Stamps",
+        ProtocolType::Counterparty => "Counterparty",
+        ProtocolType::OmniLayer => "Omni Layer",
+        ProtocolType::Chancecoin => "Chancecoin",
+        ProtocolType::PPk => "PPk",
+        ProtocolType::OpReturnSignalled => "OP_RETURN Signalled",
+        ProtocolType::AsciiIdentifierProtocols => "ASCII Identifier",
+        ProtocolType::DataStorage => "DataStorage",
+        ProtocolType::LikelyDataStorage => "LikelyDataStorage",
+        ProtocolType::LikelyLegitimateMultisig => "LikelyLegitimateMultisig",
+        ProtocolType::Unknown => "Unknown",
+    }
+}
+
+/// Parse variant string to ProtocolVariant enum
+fn parse_variant_string(variant_str: &str, protocol: ProtocolType) -> ProtocolVariant {
+    match (protocol.clone(), variant_str) {
+        // Bitcoin Stamps variants
+        (ProtocolType::BitcoinStamps, "StampsClassic") => ProtocolVariant::StampsClassic,
+        (ProtocolType::BitcoinStamps, "StampsSRC20") => ProtocolVariant::StampsSRC20,
+        (ProtocolType::BitcoinStamps, "StampsSRC721") => ProtocolVariant::StampsSRC721,
+        (ProtocolType::BitcoinStamps, "StampsSRC101") => ProtocolVariant::StampsSRC101,
+        (ProtocolType::BitcoinStamps, "StampsHTML") => ProtocolVariant::StampsHTML,
+        (ProtocolType::BitcoinStamps, "StampsCompressed") => ProtocolVariant::StampsCompressed,
+        (ProtocolType::BitcoinStamps, "StampsData") => ProtocolVariant::StampsData,
+        (ProtocolType::BitcoinStamps, "StampsUnknown") => ProtocolVariant::StampsUnknown,
+
+        // Counterparty variants (7 semantically coherent categories)
+        (ProtocolType::Counterparty, "CounterpartyTransfer") => {
+            ProtocolVariant::CounterpartyTransfer
+        }
+        (ProtocolType::Counterparty, "CounterpartyIssuance") => {
+            ProtocolVariant::CounterpartyIssuance
+        }
+        (ProtocolType::Counterparty, "CounterpartyDestruction") => {
+            ProtocolVariant::CounterpartyDestruction
+        }
+        (ProtocolType::Counterparty, "CounterpartyDEX") => ProtocolVariant::CounterpartyDEX,
+        (ProtocolType::Counterparty, "CounterpartyOracle") => ProtocolVariant::CounterpartyOracle,
+        (ProtocolType::Counterparty, "CounterpartyGaming") => ProtocolVariant::CounterpartyGaming,
+        (ProtocolType::Counterparty, "CounterpartyUtility") => ProtocolVariant::CounterpartyUtility,
+
+        // Omni Layer variants (7 semantic categories + 1 special case)
+        (ProtocolType::OmniLayer, "OmniTransfer") => ProtocolVariant::OmniTransfer,
+        (ProtocolType::OmniLayer, "OmniDistribution") => ProtocolVariant::OmniDistribution,
+        (ProtocolType::OmniLayer, "OmniIssuance") => ProtocolVariant::OmniIssuance,
+        (ProtocolType::OmniLayer, "OmniDestruction") => ProtocolVariant::OmniDestruction,
+        (ProtocolType::OmniLayer, "OmniDEX") => ProtocolVariant::OmniDEX,
+        (ProtocolType::OmniLayer, "OmniAdministration") => ProtocolVariant::OmniAdministration,
+        (ProtocolType::OmniLayer, "OmniUtility") => ProtocolVariant::OmniUtility,
+        (ProtocolType::OmniLayer, "OmniFailedDeobfuscation") => {
+            ProtocolVariant::OmniFailedDeobfuscation
+        }
+
+        // Chancecoin variants
+        (ProtocolType::Chancecoin, "ChancecoinSend") => ProtocolVariant::ChancecoinSend,
+        (ProtocolType::Chancecoin, "ChancecoinOrder") => ProtocolVariant::ChancecoinOrder,
+        (ProtocolType::Chancecoin, "ChancecoinBTCPay") => ProtocolVariant::ChancecoinBTCPay,
+        (ProtocolType::Chancecoin, "ChancecoinRoll") => ProtocolVariant::ChancecoinRoll,
+        (ProtocolType::Chancecoin, "ChancecoinBet") => ProtocolVariant::ChancecoinBet,
+        (ProtocolType::Chancecoin, "ChancecoinCancel") => ProtocolVariant::ChancecoinCancel,
+        (ProtocolType::Chancecoin, "ChancecoinUnknown") => ProtocolVariant::ChancecoinUnknown,
+
+        // PPk variants
+        (ProtocolType::PPk, "PPkProfile") => ProtocolVariant::PPkProfile,
+        (ProtocolType::PPk, "PPkRegistration") => ProtocolVariant::PPkRegistration,
+        (ProtocolType::PPk, "PPkMessage") => ProtocolVariant::PPkMessage,
+        (ProtocolType::PPk, "PPkUnknown") => ProtocolVariant::PPkUnknown,
+
+        // OP_RETURN Signalled variants
+        (ProtocolType::OpReturnSignalled, "OpReturnCLIPPERZ") => ProtocolVariant::OpReturnCLIPPERZ,
+        (ProtocolType::OpReturnSignalled, "OpReturnProtocol47930") => {
+            ProtocolVariant::OpReturnProtocol47930
+        }
+        (ProtocolType::OpReturnSignalled, "OpReturnGenericASCII") => {
+            ProtocolVariant::OpReturnGenericASCII
+        }
+
+        // ASCII Identifier Protocol variants
+        (ProtocolType::AsciiIdentifierProtocols, "AsciiIdentifierTB0001") => {
+            ProtocolVariant::AsciiIdentifierTB0001
+        }
+        (ProtocolType::AsciiIdentifierProtocols, "AsciiIdentifierTEST01") => {
+            ProtocolVariant::AsciiIdentifierTEST01
+        }
+        (ProtocolType::AsciiIdentifierProtocols, "AsciiIdentifierMetronotes") => {
+            ProtocolVariant::AsciiIdentifierMetronotes
+        }
+        (ProtocolType::AsciiIdentifierProtocols, "AsciiIdentifierOther") => {
+            ProtocolVariant::AsciiIdentifierOther
+        }
+        (ProtocolType::AsciiIdentifierProtocols, "AsciiIdentifierUnknown") => {
+            ProtocolVariant::AsciiIdentifierUnknown
+        }
+
+        // DataStorage variants
+        (ProtocolType::DataStorage, "DataStorageProofOfBurn") => {
+            ProtocolVariant::DataStorageProofOfBurn
+        }
+        (ProtocolType::DataStorage, "DataStorageFileMetadata") => {
+            ProtocolVariant::DataStorageFileMetadata
+        }
+        (ProtocolType::DataStorage, "DataStorageEmbeddedData")
+        | (ProtocolType::DataStorage, "EmbeddedData") => ProtocolVariant::DataStorageEmbeddedData,
+        (ProtocolType::DataStorage, "DataStorageWikiLeaksCablegate") => {
+            ProtocolVariant::DataStorageWikiLeaksCablegate
+        }
+        (ProtocolType::DataStorage, "DataStorageBitcoinWhitepaper") => {
+            ProtocolVariant::DataStorageBitcoinWhitepaper
+        }
+        (ProtocolType::DataStorage, "DataStorageNullData") => ProtocolVariant::DataStorageNullData,
+        (ProtocolType::DataStorage, "DataStorageGeneric") => ProtocolVariant::DataStorageGeneric,
+
+        // LikelyDataStorage variants
+        (ProtocolType::LikelyDataStorage, "InvalidECPoint") => ProtocolVariant::InvalidECPoint,
+        (ProtocolType::LikelyDataStorage, "HighOutputCount") => ProtocolVariant::HighOutputCount,
+        (ProtocolType::LikelyDataStorage, "DustAmount") => ProtocolVariant::DustAmount,
+
+        // LikelyLegitimateMultisig variants
+        (ProtocolType::LikelyLegitimateMultisig, "LegitimateMultisig") => {
+            ProtocolVariant::LegitimateMultisig
+        }
+        (ProtocolType::LikelyLegitimateMultisig, "LegitimateMultisigDupeKeys") => {
+            ProtocolVariant::LegitimateMultisigDupeKeys
+        }
+        (ProtocolType::LikelyLegitimateMultisig, "LegitimateMultisigWithNullKey") => {
+            ProtocolVariant::LegitimateMultisigWithNullKey
+        }
+
+        // Fallback
+        _ => panic!(
+            "Unknown variant string '{}' for protocol {:?}",
+            variant_str, protocol
+        ),
+    }
 }

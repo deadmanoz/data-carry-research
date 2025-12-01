@@ -1,138 +1,47 @@
-use anyhow::Result;
-use data_carry_research::types::{ProtocolType, ProtocolVariant, TransactionInput, TransactionOutput};
-use serial_test::serial;
-use std::path::Path;
+//! Stage 3 OP_RETURN Signalled Protocol Classification Tests
+//!
+//! This test suite validates the OP_RETURN Signalled protocol classification functionality
+//! in the Bitcoin P2MS Data-Carrying Protocol Analyser.
+//!
+//! ## Test Coverage
+//!
+//! ### Transaction Patterns Tested:
+//! - **CLIPPERZ**: Notarisation protocol with "CLIPPERZ" signature in OP_RETURN
+//! - **Protocol47930**: 0xbb3a marker + 2-of-2 multisig
+//! - **GenericASCII**: Generic ASCII OP_RETURN protocols (catch-all)
+//!
+//! ### Real Bitcoin Transactions:
+//! All tests use authentic Bitcoin mainnet transaction data from JSON fixtures,
+//! ensuring validation against real-world OP_RETURN signalled protocol usage.
 
-use crate::common::db_seeding::seed_enriched_transaction_with_outputs;
+use anyhow::Result;
+use data_carry_research::types::{ProtocolType, ProtocolVariant, TransactionOutput};
+use serial_test::serial;
+
+use crate::common::db_seeding::seed_enriched_transaction;
 use crate::common::fixture_registry::{self, ProtocolFixture};
 use crate::common::fixtures;
 use crate::common::protocol_test_base::{
-    load_transaction_from_json, run_stage3_processor, setup_protocol_test, verify_classification,
-    verify_content_type, verify_stage3_completion, TransactionLoadOptions,
+    run_stage3_processor, setup_protocol_test, verify_classification, verify_content_type,
+    verify_stage3_completion, ProtocolTestBuilder,
 };
 
-/// Run an opreturn_signalled test using fixture registry metadata
-async fn run_opreturn_fixture_test(fixture: &ProtocolFixture) {
-    let expected_variant = match fixture.variant {
-        Some("OpReturnCLIPPERZ") => ProtocolVariant::OpReturnCLIPPERZ,
-        Some("OpReturnProtocol47930") => ProtocolVariant::OpReturnProtocol47930,
-        Some("OpReturnGenericASCII") => ProtocolVariant::OpReturnGenericASCII,
-        other => panic!("Unknown OpReturnSignalled variant: {:?}", other),
-    };
-
-    let result = run_opreturn_test_from_json(
-        fixture.path,
-        fixture.txid,
-        expected_variant,
-        fixture
-            .content_type
-            .expect("OpReturnSignalled fixtures should have content_type"),
-        fixture.description,
-    )
-    .await;
+/// Run an opreturn_signalled test using the unified ProtocolTestBuilder
+async fn run_opreturn_fixture_test(fixture: &'static ProtocolFixture) {
+    // OP_RETURN Signalled requires all outputs for OP_RETURN detection
+    let result = ProtocolTestBuilder::from_fixture(fixture)
+        .with_all_outputs()
+        .execute()
+        .await;
 
     if let Err(e) = result {
-        println!("⚠️  Test error: {}", e);
+        panic!("OpReturnSignalled test failed: {}", e);
     }
 }
 
-/// Run opreturn_signalled test from JSON fixture
-async fn run_opreturn_test_from_json(
-    fixture_path: &str,
-    txid: &str,
-    expected_variant: ProtocolVariant,
-    expected_content_type: &str,
-    test_name: &str,
-) -> Result<()> {
-    if !Path::new(fixture_path).exists() {
-        println!(
-            "Skipping {} test - missing fixture {}",
-            test_name, fixture_path
-        );
-        return Ok(());
-    }
-
-    let (mut test_db, config) = setup_protocol_test(test_name)?;
-
-    // Load transaction data using unified helper (with ALL outputs for OP_RETURN detection)
-    let (tx, _) = match load_transaction_from_json(
-        fixture_path,
-        txid,
-        TransactionLoadOptions {
-            include_all_outputs: true,
-            ..Default::default()
-        },
-    ) {
-        Ok(result) => result,
-        Err(e) => {
-            println!(
-                "⚠️  Skipping test - no valid transaction data in {}: {}",
-                fixture_path, e
-            );
-            return Ok(());
-        }
-    };
-
-    // Separate P2MS and OP_RETURN outputs
-    let p2ms_outputs: Vec<_> = tx
-        .outputs
-        .iter()
-        .filter(|o| o.script_type == "multisig")
-        .cloned()
-        .collect();
-    let op_return_outputs: Vec<_> = tx
-        .outputs
-        .iter()
-        .filter(|o| o.script_type == "op_return")
-        .cloned()
-        .collect();
-
-    assert!(
-        !p2ms_outputs.is_empty(),
-        "{} fixture must contain at least one P2MS output",
-        test_name
-    );
-    assert!(
-        !op_return_outputs.is_empty(),
-        "{} fixture must contain OP_RETURN output",
-        test_name
-    );
-
-    // Update tx to have only P2MS outputs for EnrichedTransaction
-    let mut enriched_tx = tx;
-    let total_p2ms_amount: u64 = p2ms_outputs.iter().map(|o| o.amount).sum();
-    enriched_tx.outputs = p2ms_outputs.clone();
-    enriched_tx.p2ms_outputs_count = p2ms_outputs.len();
-    enriched_tx.total_p2ms_amount = total_p2ms_amount;
-
-    // Seed database with enriched transaction (FK-safe: P2MS + OP_RETURN)
-    seed_enriched_transaction_with_outputs(
-        &mut test_db,
-        &enriched_tx,
-        Vec::<TransactionInput>::new(),
-        p2ms_outputs,
-        op_return_outputs,
-    )?;
-
-    // Run Stage 3
-    let total_classified = run_stage3_processor(test_db.path(), config).await?;
-    verify_stage3_completion(total_classified, 1, 1);
-
-    // Verify classification
-    verify_classification(
-        &test_db,
-        txid,
-        ProtocolType::OpReturnSignalled,
-        Some(expected_variant),
-    )?;
-
-    verify_content_type(&test_db, txid, Some(expected_content_type))?;
-
-    println!("{} transaction classified correctly", test_name);
-    Ok(())
-}
-
-// ==================== CLIPPERZ Protocol Tests ====================
+// ═══════════════════════════════════════════════════════════════════════════════
+// CLIPPERZ Protocol Tests
+// ═══════════════════════════════════════════════════════════════════════════════
 
 #[tokio::test]
 #[serial]
@@ -146,7 +55,9 @@ async fn test_clipperz_v2() {
     run_opreturn_fixture_test(&fixture_registry::opreturn_signalled::CLIPPERZ_V2).await;
 }
 
-// ==================== Protocol47930 Tests ====================
+// ═══════════════════════════════════════════════════════════════════════════════
+// Protocol47930 Tests
+// ═══════════════════════════════════════════════════════════════════════════════
 
 #[tokio::test]
 #[serial]
@@ -154,10 +65,17 @@ async fn test_protocol47930_standard() {
     run_opreturn_fixture_test(&fixture_registry::opreturn_signalled::PROTOCOL47930).await;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// GenericASCII Tests (Synthetic)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Test GenericASCII detection with PRVCY-like payload (exactly 5 consecutive ASCII chars)
+///
+/// This is a synthetic test that creates its own outputs rather than using fixtures,
+/// so it cannot use the ProtocolTestBuilder.
 #[tokio::test]
 #[serial]
 async fn test_generic_ascii_prvcy() -> Result<()> {
-    // Test GenericASCII detection with PRVCY-like payload (exactly 5 consecutive ASCII chars)
     let txid = "test_generic_ascii_prvcy";
     let (mut test_db, config) = setup_protocol_test("generic_ascii_prvcy")?;
 
@@ -197,21 +115,15 @@ async fn test_generic_ascii_prvcy() -> Result<()> {
         address: None,
     };
 
-    // Build enriched transaction for Stage 2 data with combined outputs
+    // Build enriched transaction with ALL outputs
     let mut enriched_tx = fixtures::create_test_enriched_transaction(txid);
-    enriched_tx.outputs = vec![p2ms_output.clone()];
+    enriched_tx.outputs = vec![p2ms_output, op_return_output]; // Both outputs
     enriched_tx.p2ms_outputs_count = 1;
     enriched_tx.total_p2ms_amount = 1000;
     enriched_tx.output_count = 2;
 
-    // Seed database with enriched transaction (FK-safe: P2MS + OP_RETURN)
-    seed_enriched_transaction_with_outputs(
-        &mut test_db,
-        &enriched_tx,
-        Vec::<TransactionInput>::new(),
-        vec![p2ms_output],
-        vec![op_return_output],
-    )?;
+    // Seed database with enriched transaction (FK-safe)
+    seed_enriched_transaction(&mut test_db, &enriched_tx, Vec::new())?;
 
     // Run Stage 3
     let total_classified = run_stage3_processor(test_db.path(), config).await?;
