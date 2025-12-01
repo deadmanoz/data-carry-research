@@ -10,7 +10,7 @@
 //! checked after all specific protocol detectors have run.
 
 use crate::database::Database;
-use crate::detection::likely_data_storage::{detect, LikelyDataStorageVariant};
+use crate::shared::likely_data_storage::{detect, LikelyDataStorageVariant};
 use crate::types::{
     ClassificationDetails, ClassificationResult, EnrichedTransaction, OutputClassificationDetails,
     ProtocolType, ProtocolVariant, TransactionOutput,
