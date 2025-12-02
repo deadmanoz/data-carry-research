@@ -19,6 +19,9 @@
 
 use data_carry_research::processor::stage3::datastorage::DataStorageClassifier;
 use data_carry_research::processor::stage3::ProtocolSpecificClassifier;
+use data_carry_research::shared::datastorage_helpers::{
+    detect_binary_signature, is_burn_pattern,
+};
 use data_carry_research::types::{
     EnrichedTransaction, ProtocolType, ProtocolVariant, TransactionOutput,
 };
@@ -33,46 +36,8 @@ use crate::common::test_output::TestOutputFormatter;
 mod test_data {
     use super::*;
 
-    /// Detect embedded format from magic bytes
-    fn detect_format(data: &[u8]) -> Option<&'static str> {
-        if data.len() < 4 {
-            return None;
-        }
-
-        match &data[0..4] {
-            [0x1f, 0x8b, 0x08, _] => Some("GZIP"),
-            [0x42, 0x5a, 0x68, _] => Some("BZIP2"),
-            [0x89, 0x50, 0x4E, 0x47] => Some("PNG"),
-            [0x25, 0x50, 0x44, 0x46] => Some("PDF"),
-            _ => {
-                // Check ZLIB (2-byte header)
-                if data[0] == 0x78
-                    && (data[1] == 0x01 || data[1] == 0x5e || data[1] == 0x9c || data[1] == 0xda)
-                {
-                    Some("ZLIB")
-                } else {
-                    None
-                }
-            }
-        }
-    }
-
-    /// Check if data is proof-of-burn pattern
-    fn is_proof_of_burn(data: &[u8]) -> bool {
-        if data.is_empty() {
-            return false;
-        }
-        let first_byte = data[0];
-        // Compressed: 0x02/0x03 + all 0xFF
-        // Uncompressed: 0x04 + all 0xFF
-        if first_byte == 0x02 || first_byte == 0x03 || first_byte == 0x04 {
-            data[1..].iter().all(|&b| b == 0xff)
-        } else {
-            false
-        }
-    }
-
     /// Display pubkey analysis for DataStorage patterns
+    /// Uses production helpers: is_burn_pattern() and detect_binary_signature()
     pub fn display_pubkey_analysis(pubkeys: &[String]) -> String {
         let mut output = String::new();
         output.push_str("║ Pubkey Analysis:\n");
@@ -85,15 +50,15 @@ mod test_data {
                 pubkey.clone()
             };
 
-            // Detect patterns
-            if is_proof_of_burn(&hex_data) {
+            // Detect patterns using production helpers
+            if is_burn_pattern(&hex_data, Some(pubkey)) {
                 output.push_str(&format!(
                     "║   Pubkey {}: {} [Proof-of-Burn: 0x{}]\n",
                     i + 1,
                     preview,
                     &pubkey[..4]
                 ));
-            } else if let Some(format) = detect_format(&hex_data) {
+            } else if let Some(format) = detect_binary_signature(&hex_data) {
                 output.push_str(&format!(
                     "║   Pubkey {}: {} [Format: {}]\n",
                     i + 1,
@@ -127,8 +92,8 @@ mod test_data {
             pubkeys.len()
         ));
 
-        // Check for formats at various offsets
-        if let Some(format) = detect_format(&combined_data) {
+        // Check for formats using production helper
+        if let Some(format) = detect_binary_signature(&combined_data) {
             output.push_str(&format!("║   Detected format: {} (at offset 0)\n", format));
         }
 

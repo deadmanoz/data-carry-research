@@ -287,5 +287,4 @@ mod tests {
         assert_eq!(counts.get(&BurnPatternType::Stamps22Pattern), Some(&2));
         assert_eq!(counts.get(&BurnPatternType::Stamps33Pattern), Some(&1));
     }
-
 }
