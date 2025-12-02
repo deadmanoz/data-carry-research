@@ -68,7 +68,7 @@ test:
 
 # Run comprehensive test suite (unit, integration, E2E pipeline)
 test-all:
-    ./scripts/test-all.sh
+    ./scripts/tests/all.sh
 
 # Check code without building
 check:
@@ -90,7 +90,7 @@ clean:
 
 # Integration test with small dataset (1M records)
 stage1-small:
-    ./scripts/stage1-runner.sh tests/test_data/utxo_1m.csv test_output/stage1_small.db 10000 "small dataset (1M records)"
+    ./scripts/tests/stage1.sh tests/test_data/utxo_1m.csv test_output/stage1_small.db 10000 "small dataset (1M records)"
 
 # ============================================================================
 # === STAGE 2 DEVELOPMENT ===
@@ -149,7 +149,7 @@ stage3-small:
 #   just stage3-test stamps
 #   just stage3-test decoder-verbose
 stage3-test cmd *args="":
-    ./scripts/test-stage3.sh "{{cmd}}" {{args}}
+    ./scripts/tests/stage3.sh "{{cmd}}" {{args}}
 
 # ============================================================================
 # === DECODER TOOLS ===

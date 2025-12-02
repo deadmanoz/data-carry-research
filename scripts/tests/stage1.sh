@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Stage 1 parameterized runner
-# Usage: ./scripts/stage1-runner.sh <CSV_PATH> <DB_PATH> <BATCH_SIZE> [DESCRIPTION]
+# Usage: ./scripts/tests/stage1.sh <CSV_PATH> <DB_PATH> <BATCH_SIZE> [DESCRIPTION]
 
 if [[ $# -lt 3 ]]; then
     echo "Usage: $0 <CSV_PATH> <DB_PATH> <BATCH_SIZE> [DESCRIPTION]"

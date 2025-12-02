@@ -4,7 +4,7 @@ set -euo pipefail
 # Stage 3 test dispatcher
 # Routes test commands to appropriate Cargo test modules
 #
-# Usage: ./scripts/test-stage3.sh <COMMAND> [OPTIONS...]
+# Usage: ./scripts/tests/stage3.sh <COMMAND> [OPTIONS...]
 #
 # Commands:
 #   all              - Run all Stage 3 tests
@@ -18,10 +18,10 @@ set -euo pipefail
 #   decoder-verbose  - Decoder tests with verbose output
 #
 # Examples:
-#   ./scripts/test-stage3.sh all                    # All Stage 3 tests
-#   ./scripts/test-stage3.sh stamps                 # Bitcoin Stamps only
-#   ./scripts/test-stage3.sh decoder                # Decoder tests
-#   ./scripts/test-stage3.sh decoder-verbose        # Decoder with debug logs
+#   ./scripts/tests/stage3.sh all                   # All Stage 3 tests
+#   ./scripts/tests/stage3.sh stamps                # Bitcoin Stamps only
+#   ./scripts/tests/stage3.sh decoder               # Decoder tests
+#   ./scripts/tests/stage3.sh decoder-verbose       # Decoder with debug logs
 
 if [[ $# -eq 0 ]]; then
     echo "Usage: $0 <COMMAND> [OPTIONS...]"
