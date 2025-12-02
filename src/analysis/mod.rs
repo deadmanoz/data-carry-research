@@ -41,7 +41,6 @@ pub mod burn_patterns;
 pub mod content_type_analysis;
 pub mod data_size_stats;
 pub mod dust_analysis;
-pub mod fee_analyser;
 pub mod fee_analysis;
 pub mod file_extension_stats;
 pub mod multisig_config_stats;
@@ -57,6 +56,7 @@ pub mod stamps_signature_stats;
 pub mod stamps_transport_stats;
 pub mod stamps_variant_temporal;
 pub mod stamps_weekly_fee_analysis;
+pub mod tx_fee_calculator;
 pub mod tx_size_analysis;
 pub mod value_analysis;
 
@@ -83,7 +83,6 @@ pub use burn_patterns::BurnPatternAnalyser;
 pub use content_type_analysis::ContentTypeAnalyser;
 pub use data_size_stats::DataSizeAnalyser;
 pub use dust_analysis::DustAnalyser;
-pub use fee_analyser::FeeAnalyser;
 pub use fee_analysis::FeeAnalysisEngine;
 pub use file_extension_stats::FileExtensionAnalyser;
 pub use multisig_config_stats::MultisigConfigAnalyser;
@@ -102,6 +101,7 @@ pub use stamps_signature_stats::{StampsSignatureAnalyser, StampsSignatureAnalysi
 pub use stamps_transport_stats::{StampsTransportAnalyser, StampsTransportAnalysis};
 pub use stamps_variant_temporal::StampsVariantTemporalAnalyser;
 pub use stamps_weekly_fee_analysis::StampsWeeklyFeeAnalyser;
+pub use tx_fee_calculator::TransactionFeeCalculator;
 pub use tx_size_analysis::TxSizeAnalyser;
 pub use value_analysis::ValueAnalysisEngine;
 

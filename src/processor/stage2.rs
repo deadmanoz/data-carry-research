@@ -1,12 +1,10 @@
 use crate::analysis::BurnPatternDetector;
-use crate::analysis::FeeAnalyser;
+use crate::analysis::TransactionFeeCalculator;
 use crate::config::BitcoinRpcConfig;
 use crate::database::traits::{Stage1Operations, Stage2Operations, StatisticsOperations};
 use crate::database::{Database, EnrichedTransactionStats};
 use crate::errors::{AppError, AppResult, RpcError};
-use crate::processor::{
-    ConfigValidator, ProgressReporter, StandardBatchProcessor, StandardProgressTracker,
-};
+use crate::processor::{ConfigValidator, ProgressReporter, StandardProgressTracker};
 use crate::rpc::BitcoinRpcClient;
 use crate::types::statistics::StatisticsCollector;
 use crate::types::{EnrichedTransaction, Stage2Stats, TransactionInput, TransactionOutput};
@@ -28,7 +26,6 @@ pub struct Stage2Processor {
     batch_size: usize,
     progress_interval: usize,
     progress_tracker: StandardProgressTracker,
-    _batch_processor: StandardBatchProcessor,
     /// Session cache: tracks heights already updated with block hash/timestamp
     /// Prevents redundant RPC calls across batches within the same run
     updated_block_heights: HashSet<u32>,
@@ -68,7 +65,6 @@ impl Stage2Processor {
 
         // Initialise shared components
         let progress_tracker = StandardProgressTracker::new();
-        let batch_processor = StandardBatchProcessor::new(batch_size);
 
         // Use shared configuration logging
         ConfigValidator::log_config_summary(
@@ -87,7 +83,6 @@ impl Stage2Processor {
             batch_size,
             progress_interval,
             progress_tracker,
-            _batch_processor: batch_processor,
             updated_block_heights: HashSet::new(),
         })
     }
@@ -520,7 +515,8 @@ impl Stage2Processor {
             .map_err(|e| AppError::Config(format!("Failed to get transaction inputs: {}", e)))?;
 
         // Perform fee analysis
-        let fee_analysis = FeeAnalyser::analyse_fees(&transaction, &inputs, &p2ms_outputs);
+        let fee_analysis =
+            TransactionFeeCalculator::analyse_fees(&transaction, &inputs, &p2ms_outputs);
 
         // Detect burn patterns across all P2MS outputs
         let burn_patterns = BurnPatternDetector::detect_burn_patterns(&p2ms_outputs);

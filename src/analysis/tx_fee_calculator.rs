@@ -2,10 +2,13 @@ use crate::types::{FeeAnalysis, TransactionInput, TransactionOutput};
 use corepc_client::bitcoin::Transaction;
 use tracing::debug;
 
-/// Fee analysis engine for comprehensive transaction cost calculations
-pub struct FeeAnalyser;
+/// Per-transaction fee calculator for comprehensive cost calculations
+///
+/// This calculates fees for individual transactions during Stage 2 enrichment.
+/// For aggregate fee statistics across the database, see `FeeAnalysisEngine`.
+pub struct TransactionFeeCalculator;
 
-impl FeeAnalyser {
+impl TransactionFeeCalculator {
     /// Perform comprehensive fee analysis for a transaction
     pub fn analyse_fees(
         transaction: &Transaction,
@@ -135,7 +138,7 @@ mod tests {
         let inputs = vec![create_test_input(5000)]; // 5000 in, 3000 out = 2000 fee
         let p2ms_outputs = vec![create_test_p2ms_output(1000, 100)];
 
-        let analysis = FeeAnalyser::analyse_fees(&transaction, &inputs, &p2ms_outputs);
+        let analysis = TransactionFeeCalculator::analyse_fees(&transaction, &inputs, &p2ms_outputs);
 
         assert_eq!(analysis.total_input_value, 5000);
         assert_eq!(analysis.total_output_value, 3000);
