@@ -51,7 +51,6 @@ impl TransactionCache {
         let misses = *self.misses.lock().unwrap();
         CacheStats { hits, misses }
     }
-
 }
 
 #[cfg(test)]

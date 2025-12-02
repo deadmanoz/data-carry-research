@@ -1,5 +1,5 @@
-use crate::analysis::BurnPatternDetector;
-use crate::analysis::TransactionFeeCalculator;
+use crate::analysis::analyse_fees;
+use crate::analysis::detect_burn_patterns;
 use crate::config::BitcoinRpcConfig;
 use crate::database::traits::{Stage1Operations, Stage2Operations, StatisticsOperations};
 use crate::database::{Database, EnrichedTransactionStats};
@@ -515,11 +515,10 @@ impl Stage2Processor {
             .map_err(|e| AppError::Config(format!("Failed to get transaction inputs: {}", e)))?;
 
         // Perform fee analysis
-        let fee_analysis =
-            TransactionFeeCalculator::analyse_fees(&transaction, &inputs, &p2ms_outputs);
+        let fee_analysis = analyse_fees(&transaction, &inputs, &p2ms_outputs);
 
         // Detect burn patterns across all P2MS outputs
-        let burn_patterns = BurnPatternDetector::detect_burn_patterns(&p2ms_outputs);
+        let burn_patterns = detect_burn_patterns(&p2ms_outputs);
 
         // Parse ALL transaction outputs for unified storage
         let mut all_outputs = Vec::new();

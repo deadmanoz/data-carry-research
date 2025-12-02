@@ -10,7 +10,7 @@ use crate::common::analysis_test_setup::{
     seed_analysis_blocks, TestClassificationParams, TestOutputClassificationParams,
     TestOutputParams,
 };
-use data_carry_research::analysis::ContentTypeAnalyser;
+use data_carry_research::analysis::analyse_content_types;
 use data_carry_research::errors::AppResult;
 use data_carry_research::types::ProtocolType;
 
@@ -36,7 +36,7 @@ fn test_counterparty_data_carrying_outputs_have_content_type() -> AppResult<()> 
     )?;
 
     // Verify content type is present
-    let report = ContentTypeAnalyser::analyse_content_types(&db)?;
+    let report = analyse_content_types(&db)?;
     assert_eq!(report.outputs_with_content_type, 1);
     assert!(report
         .content_type_breakdown
@@ -70,7 +70,7 @@ fn test_counterparty_dust_outputs_excluded_from_invalid_none() -> AppResult<()> 
     )?;
 
     // Verify dust output is NOT counted as invalid None
-    let report = ContentTypeAnalyser::analyse_content_types(&db)?;
+    let report = analyse_content_types(&db)?;
 
     // Check invalid None stats for Counterparty
     let cp_invalid = report
@@ -110,7 +110,7 @@ fn test_omni_successful_deobfuscation_has_content_type() -> AppResult<()> {
     )?;
 
     // Verify content type is present
-    let report = ContentTypeAnalyser::analyse_content_types(&db)?;
+    let report = analyse_content_types(&db)?;
     assert_eq!(report.outputs_with_content_type, 1);
     assert!(report
         .content_type_breakdown
@@ -142,7 +142,7 @@ fn test_omni_failed_deobfuscation_excluded_from_invalid_none() -> AppResult<()> 
     )?;
 
     // Verify NOT counted as invalid None
-    let report = ContentTypeAnalyser::analyse_content_types(&db)?;
+    let report = analyse_content_types(&db)?;
 
     let omni_invalid = report
         .invalid_none_stats
@@ -181,7 +181,7 @@ fn test_stamps_unknown_excluded_from_invalid_none() -> AppResult<()> {
     )?;
 
     // Verify NOT counted as invalid None
-    let report = ContentTypeAnalyser::analyse_content_types(&db)?;
+    let report = analyse_content_types(&db)?;
 
     let stamps_invalid = report
         .invalid_none_stats
@@ -217,7 +217,7 @@ fn test_likely_data_storage_has_valid_none() -> AppResult<()> {
     )?;
 
     // Verify it's in valid None cases
-    let report = ContentTypeAnalyser::analyse_content_types(&db)?;
+    let report = analyse_content_types(&db)?;
     assert_eq!(report.valid_none_stats.likely_data_storage, 1);
     assert_eq!(report.valid_none_stats.total_valid_none, 1);
 
@@ -246,7 +246,7 @@ fn test_likely_legitimate_multisig_has_valid_none() -> AppResult<()> {
     )?;
 
     // Verify it's in valid None cases
-    let report = ContentTypeAnalyser::analyse_content_types(&db)?;
+    let report = analyse_content_types(&db)?;
     assert_eq!(report.valid_none_stats.likely_legitimate_multisig, 1);
     assert_eq!(report.valid_none_stats.total_valid_none, 1);
 
@@ -276,7 +276,7 @@ fn test_invalid_none_detection_only_flags_signature_found() -> AppResult<()> {
     )?;
 
     // Verify this IS flagged as invalid None
-    let report = ContentTypeAnalyser::analyse_content_types(&db)?;
+    let report = analyse_content_types(&db)?;
 
     let cp_invalid = report
         .invalid_none_stats
@@ -334,7 +334,7 @@ fn test_is_spent_filter_excludes_spent_outputs() -> AppResult<()> {
     )?;
 
     // Verify only unspent output is counted
-    let report = ContentTypeAnalyser::analyse_content_types(&db)?;
+    let report = analyse_content_types(&db)?;
     assert_eq!(
         report.outputs_with_content_type, 1,
         "Should only count unspent outputs"
@@ -385,7 +385,7 @@ fn test_protocol_breakdown_structure() -> AppResult<()> {
     )?;
 
     // Analyse
-    let report = ContentTypeAnalyser::analyse_content_types(&db)?;
+    let report = analyse_content_types(&db)?;
 
     // Verify protocol breakdown exists
     assert!(
@@ -455,7 +455,7 @@ fn test_category_breakdown_groups_mime_types() -> AppResult<()> {
     )?;
 
     // Analyse
-    let report = ContentTypeAnalyser::analyse_content_types(&db)?;
+    let report = analyse_content_types(&db)?;
 
     // Find image category
     let image_cat = report
@@ -588,7 +588,7 @@ fn test_comprehensive_content_type_coverage() -> AppResult<()> {
     )?;
 
     // Analyse
-    let report = ContentTypeAnalyser::analyse_content_types(&db)?;
+    let report = analyse_content_types(&db)?;
 
     // Verify totals
     assert_eq!(report.total_outputs, 6, "Should have 6 total outputs");

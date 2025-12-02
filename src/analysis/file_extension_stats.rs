@@ -14,16 +14,12 @@ use crate::types::content_detection::ContentType;
 use crate::utils::math::{safe_percentage, safe_percentage_u64};
 use std::collections::BTreeMap;
 
-/// Analyser responsible for computing file extension statistics.
-pub struct FileExtensionAnalyser;
+/// Aggregate file extension statistics from the database.
+pub fn analyse_file_types(db: &Database) -> AppResult<FileExtensionReport> {
+    let conn = db.connection();
 
-impl FileExtensionAnalyser {
-    /// Aggregate file extension statistics from the database.
-    pub fn analyse_file_types(db: &Database) -> AppResult<FileExtensionReport> {
-        let conn = db.connection();
-
-        let mut stmt = conn.prepare(
-            "SELECT tc.content_type,
+    let mut stmt = conn.prepare(
+        "SELECT tc.content_type,
                     COUNT(DISTINCT tc.txid) AS transaction_count,
                     COUNT(*) AS output_count,
                     COALESCE(SUM(outputs.script_size), 0) AS total_bytes
@@ -32,54 +28,52 @@ impl FileExtensionAnalyser {
              WHERE tc.content_type IS NOT NULL
              AND outputs.is_spent = 0
              GROUP BY tc.content_type",
-        )?;
+    )?;
 
-        let mut aggregates = Vec::new();
-        let mut rows = stmt.query([])?;
+    let mut aggregates = Vec::new();
+    let mut rows = stmt.query([])?;
 
-        while let Some(row) = rows.next()? {
-            let mime_type: String = row.get(0)?;
-            let transaction_count: i64 = row.get(1)?;
-            let output_count: i64 = row.get(2)?;
-            let total_bytes: i64 = row.get(3)?;
+    while let Some(row) = rows.next()? {
+        let mime_type: String = row.get(0)?;
+        let transaction_count: i64 = row.get(1)?;
+        let output_count: i64 = row.get(2)?;
+        let total_bytes: i64 = row.get(3)?;
 
-            let transaction_count = usize::try_from(transaction_count).map_err(|_| {
-                AppError::InvalidData("Negative transaction count encountered".to_string())
-            })?;
+        let transaction_count = usize::try_from(transaction_count).map_err(|_| {
+            AppError::InvalidData("Negative transaction count encountered".to_string())
+        })?;
 
-            let output_count = usize::try_from(output_count).map_err(|_| {
-                AppError::InvalidData("Negative output count encountered".to_string())
-            })?;
+        let output_count = usize::try_from(output_count)
+            .map_err(|_| AppError::InvalidData("Negative output count encountered".to_string()))?;
 
-            let total_bytes = if total_bytes < 0 {
-                return Err(AppError::InvalidData(
-                    "Negative byte count encountered".to_string(),
-                ));
-            } else {
-                total_bytes as u64
-            };
+        let total_bytes = if total_bytes < 0 {
+            return Err(AppError::InvalidData(
+                "Negative byte count encountered".to_string(),
+            ));
+        } else {
+            total_bytes as u64
+        };
 
-            let parsed = ContentType::from_mime_type(&mime_type);
-            let category = parsed
-                .as_ref()
-                .map(|ct| ct.category().to_string())
-                .unwrap_or_else(|| "Other".to_string());
+        let parsed = ContentType::from_mime_type(&mime_type);
+        let category = parsed
+            .as_ref()
+            .map(|ct| ct.category().to_string())
+            .unwrap_or_else(|| "Other".to_string());
 
-            let extension = parsed
-                .and_then(|ct| ct.file_extension().map(str::to_string))
-                .unwrap_or_else(|| "Unknown".to_string());
+        let extension = parsed
+            .and_then(|ct| ct.file_extension().map(str::to_string))
+            .unwrap_or_else(|| "Unknown".to_string());
 
-            aggregates.push(ExtensionAggregate {
-                category,
-                extension,
-                transaction_count,
-                output_count,
-                total_bytes,
-            });
-        }
-
-        build_report(aggregates)
+        aggregates.push(ExtensionAggregate {
+            category,
+            extension,
+            transaction_count,
+            output_count,
+            total_bytes,
+        });
     }
+
+    build_report(aggregates)
 }
 
 fn build_report(raw: Vec<ExtensionAggregate>) -> AppResult<FileExtensionReport> {
@@ -190,7 +184,7 @@ mod tests {
     #[test]
     fn report_is_empty_when_no_classifications() {
         let db = setup_db();
-        let report = FileExtensionAnalyser::analyse_file_types(&db).unwrap();
+        let report = analyse_file_types(&db).unwrap();
         assert_eq!(report.total_transactions, 0);
         assert_eq!(report.total_outputs, 0);
         assert_eq!(report.total_bytes, 0);
@@ -270,7 +264,7 @@ mod tests {
         )
         .unwrap();
 
-        let report = FileExtensionAnalyser::analyse_file_types(&db).unwrap();
+        let report = analyse_file_types(&db).unwrap();
         assert_eq!(report.total_transactions, 3);
         assert_eq!(report.total_outputs, 4);
         assert_eq!(report.total_bytes, 570);

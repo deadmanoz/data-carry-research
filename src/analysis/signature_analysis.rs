@@ -9,50 +9,46 @@ use crate::types::analysis_results::{BurnPatternCorrelation, SignatureAnalysisRe
 use crate::types::ProtocolType;
 use std::str::FromStr;
 
-/// Signature analyser for protocol detection insights
-pub struct SignatureAnalyser;
+/// Analyse signature detection comprehensively
+pub fn analyse_signatures(db: &Database) -> AppResult<SignatureAnalysisReport> {
+    let conn = db.connection();
 
-impl SignatureAnalyser {
-    /// Analyse signature detection comprehensively
-    pub fn analyse_signatures(db: &Database) -> AppResult<SignatureAnalysisReport> {
-        let conn = db.connection();
-
-        // Get classification method distribution with automatic percentages
-        let results = conn.query_grouped_percentages(
-            "SELECT classification_method, COUNT(*) as count
+    // Get classification method distribution with automatic percentages
+    let results = conn.query_grouped_percentages(
+        "SELECT classification_method, COUNT(*) as count
              FROM transaction_classifications
              GROUP BY classification_method
              ORDER BY count DESC",
-        )?;
+    )?;
 
-        // Convert to MethodStats
-        let classification_methods = results
-            .into_iter()
-            .map(
-                |(method, count, percentage)| crate::types::analysis_results::MethodStats {
-                    method,
-                    count,
-                    percentage,
-                },
-            )
-            .collect();
+    // Convert to MethodStats
+    let classification_methods = results
+        .into_iter()
+        .map(
+            |(method, count, percentage)| crate::types::analysis_results::MethodStats {
+                method,
+                count,
+                percentage,
+            },
+        )
+        .collect();
 
-        // Get burn pattern correlation
-        let burn_pattern_analysis = Self::analyse_burn_pattern_correlation(db)?;
+    // Get burn pattern correlation
+    let burn_pattern_analysis = analyse_burn_pattern_correlation(db)?;
 
-        Ok(SignatureAnalysisReport {
-            classification_methods,
-            burn_pattern_analysis,
-        })
-    }
+    Ok(SignatureAnalysisReport {
+        classification_methods,
+        burn_pattern_analysis,
+    })
+}
 
-    /// Analyse correlation between burn patterns and protocol classifications
-    pub fn analyse_burn_pattern_correlation(db: &Database) -> AppResult<BurnPatternCorrelation> {
-        let conn = db.connection();
+/// Analyse correlation between burn patterns and protocol classifications
+pub fn analyse_burn_pattern_correlation(db: &Database) -> AppResult<BurnPatternCorrelation> {
+    let conn = db.connection();
 
-        // Use query_collect for cleaner code
-        let correlations = conn.query_collect(
-            "WITH pattern_counts AS (
+    // Use query_collect for cleaner code
+    let correlations = conn.query_collect(
+        "WITH pattern_counts AS (
                  SELECT tc.txid, tc.protocol, COUNT(DISTINCT bp.pattern_type) as pattern_count
                  FROM transaction_classifications tc
                  INNER JOIN burn_patterns bp ON tc.txid = bp.txid
@@ -63,19 +59,18 @@ impl SignatureAnalyser {
              WHERE pattern_count > 0
              GROUP BY protocol, pattern_count
              ORDER BY protocol, pattern_count",
-            |row| {
-                let protocol_str: String = row.get(0)?;
-                // Parse protocol string to enum (parse once at DB boundary)
-                let protocol = ProtocolType::from_str(&protocol_str).unwrap_or_default();
+        |row| {
+            let protocol_str: String = row.get(0)?;
+            // Parse protocol string to enum (parse once at DB boundary)
+            let protocol = ProtocolType::from_str(&protocol_str).unwrap_or_default();
 
-                Ok(crate::types::analysis_results::PatternProtocolCorrelation {
-                    protocol,
-                    burn_patterns_count: row.get::<_, i64>(1)? as usize,
-                    transactions: row.get::<_, i64>(2)? as usize,
-                })
-            },
-        )?;
+            Ok(crate::types::analysis_results::PatternProtocolCorrelation {
+                protocol,
+                burn_patterns_count: row.get::<_, i64>(1)? as usize,
+                transactions: row.get::<_, i64>(2)? as usize,
+            })
+        },
+    )?;
 
-        Ok(BurnPatternCorrelation { correlations })
-    }
+    Ok(BurnPatternCorrelation { correlations })
 }

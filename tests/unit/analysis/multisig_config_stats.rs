@@ -3,7 +3,7 @@
 use crate::common::analysis_test_setup::{
     create_analysis_test_db, insert_test_output, seed_analysis_blocks, TestOutputParams,
 };
-use data_carry_research::analysis::MultisigConfigAnalyser;
+use data_carry_research::analysis::{analyse_multisig_configurations, determine_configuration};
 use data_carry_research::errors::AppResult;
 use serde_json::json;
 
@@ -113,7 +113,7 @@ fn test_analyse_empty_database() -> AppResult<()> {
     // Test analysis with empty database
     let db = create_analysis_test_db()?;
 
-    let report = MultisigConfigAnalyser::analyse_multisig_configurations(&db)?;
+    let report = analyse_multisig_configurations(&db)?;
 
     assert_eq!(report.total_outputs, 0);
     assert_eq!(report.total_script_bytes, 0);
@@ -143,7 +143,7 @@ fn test_overall_efficiency_calculation() -> AppResult<()> {
         &create_test_multisig_params("tx2", 0, 100, 2000, 105, 1, 3),
     )?;
 
-    let report = MultisigConfigAnalyser::analyse_multisig_configurations(&db)?;
+    let report = analyse_multisig_configurations(&db)?;
 
     // Total script: 210 bytes, total data: 128 bytes
     // Efficiency: (128/210) * 100 = 60.95%
@@ -189,7 +189,7 @@ fn test_type_summary_grouping() -> AppResult<()> {
         &create_test_multisig_params("tx6", 0, 100, 6000, 105, 2, 3),
     )?;
 
-    let report = MultisigConfigAnalyser::analyse_multisig_configurations(&db)?;
+    let report = analyse_multisig_configurations(&db)?;
 
     assert_eq!(report.type_summary.get("1-of-3"), Some(&3));
     assert_eq!(report.type_summary.get("1-of-2"), Some(&2));
@@ -211,7 +211,7 @@ fn test_zero_data_capacity_efficiency() -> AppResult<()> {
         &create_test_multisig_params("tx1", 0, 100, 1000, 71, 2, 2),
     )?;
 
-    let report = MultisigConfigAnalyser::analyse_multisig_configurations(&db)?;
+    let report = analyse_multisig_configurations(&db)?;
 
     assert_eq!(report.total_outputs, 1);
     assert_eq!(report.total_script_bytes, 71);
@@ -225,7 +225,7 @@ fn test_zero_data_capacity_efficiency() -> AppResult<()> {
 
 fn assert_config(m: u32, n: u32, script_size: u32, expected_config: &str, expected_capacity: u32) {
     // Call the production function directly (exposed publicly for testing)
-    let (config, capacity) = MultisigConfigAnalyser::determine_configuration(m, n, script_size);
+    let (config, capacity) = determine_configuration(m, n, script_size);
 
     assert_eq!(
         config, expected_config,
@@ -247,7 +247,7 @@ fn assert_config_pattern(
     expected_capacity: u32,
 ) {
     // Call the production function directly
-    let (config, capacity) = MultisigConfigAnalyser::determine_configuration(m, n, script_size);
+    let (config, capacity) = determine_configuration(m, n, script_size);
 
     assert_eq!(
         config, expected_pattern,

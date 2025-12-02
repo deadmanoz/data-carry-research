@@ -9,7 +9,7 @@ use crate::common::analysis_test_setup::{
     insert_test_tx_classification, seed_analysis_blocks, TestClassificationParams,
     TestOutputClassificationParams, TestOutputParams, TestP2msOutputParams,
 };
-use data_carry_research::analysis::DustAnalyser;
+use data_carry_research::analysis::analyse_dust_thresholds;
 use data_carry_research::errors::AppResult;
 use data_carry_research::types::ProtocolType;
 
@@ -94,7 +94,7 @@ fn test_global_dust_analysis_boundaries() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_boundary_test_data(&db)?;
 
-    let report = DustAnalyser::analyse_dust_thresholds(&db)?;
+    let report = analyse_dust_thresholds(&db)?;
 
     // Verify global totals
     assert_eq!(
@@ -148,7 +148,7 @@ fn test_per_protocol_breakdown() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_boundary_test_data(&db)?;
 
-    let report = DustAnalyser::analyse_dust_thresholds(&db)?;
+    let report = analyse_dust_thresholds(&db)?;
 
     // Should have 2 protocols
     assert_eq!(
@@ -190,7 +190,7 @@ fn test_protocol_ordering() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_boundary_test_data(&db)?;
 
-    let report = DustAnalyser::analyse_dust_thresholds(&db)?;
+    let report = analyse_dust_thresholds(&db)?;
 
     // Protocols should be sorted by canonical ProtocolType enum discriminant order
     // BitcoinStamps comes before Counterparty in the enum
@@ -212,7 +212,7 @@ fn test_empty_database() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     // Don't seed any data
 
-    let report = DustAnalyser::analyse_dust_thresholds(&db)?;
+    let report = analyse_dust_thresholds(&db)?;
 
     // All counts should be zero
     assert_eq!(report.global_stats.total_outputs, 0);
@@ -256,7 +256,7 @@ fn test_spent_outputs_excluded() -> AppResult<()> {
         &TestOutputParams::multisig("test_tx1", 1, 100000, 600, 100).spent(),
     )?;
 
-    let report = DustAnalyser::analyse_dust_thresholds(&db)?;
+    let report = analyse_dust_thresholds(&db)?;
 
     // Should only count the unspent output
     assert_eq!(
@@ -289,7 +289,7 @@ fn test_unclassified_vs_unknown() -> AppResult<()> {
     insert_complete_p2ms_output(&db, "unclassified_tx", 0, 100001, 600, 100)?;
     // NO classification rows for unclassified_tx - this is intentional for the test
 
-    let report = DustAnalyser::analyse_dust_thresholds(&db)?;
+    let report = analyse_dust_thresholds(&db)?;
 
     // Global should see both outputs
     assert_eq!(report.global_stats.total_outputs, 2);
@@ -328,7 +328,7 @@ fn test_consistency_validation() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_boundary_test_data(&db)?;
 
-    let report = DustAnalyser::analyse_dust_thresholds(&db)?;
+    let report = analyse_dust_thresholds(&db)?;
 
     // Count consistency: below_546.count + above_dust.count == total_outputs
     let bucket_sum =
@@ -378,7 +378,7 @@ fn test_percentage_calculations() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_boundary_test_data(&db)?;
 
-    let report = DustAnalyser::analyse_dust_thresholds(&db)?;
+    let report = analyse_dust_thresholds(&db)?;
 
     // 4 out of 7 outputs below 546 = ~57.14%
     let expected_below_546_pct = (4.0 / 7.0) * 100.0;
@@ -425,7 +425,7 @@ fn test_percentage_calculations() -> AppResult<()> {
 #[test]
 fn test_thresholds_values() -> AppResult<()> {
     let db = create_analysis_test_db()?;
-    let report = DustAnalyser::analyse_dust_thresholds(&db)?;
+    let report = analyse_dust_thresholds(&db)?;
 
     // Verify threshold constants are correct
     assert_eq!(
@@ -450,7 +450,7 @@ fn test_all_outputs_in_one_bucket() -> AppResult<()> {
         insert_complete_p2ms_output(&db, "all_high", vout, 100000, 1000, 100)?;
     }
 
-    let report = DustAnalyser::analyse_dust_thresholds(&db)?;
+    let report = analyse_dust_thresholds(&db)?;
 
     assert_eq!(report.global_stats.total_outputs, 5);
     assert_eq!(report.global_stats.below_non_segwit_threshold.count, 0);
@@ -489,7 +489,7 @@ fn test_non_multisig_outputs_excluded() -> AppResult<()> {
         [],
     )?;
 
-    let report = DustAnalyser::analyse_dust_thresholds(&db)?;
+    let report = analyse_dust_thresholds(&db)?;
 
     // Should only count the multisig output
     assert_eq!(

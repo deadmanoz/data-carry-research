@@ -88,281 +88,276 @@ const SQL_TX_LEVEL_AGGREGATION: &str = "
     )
 ";
 
-/// Spendability statistics analyser
-pub struct SpendabilityStatsAnalyser;
+/// Analyse spendability statistics comprehensively
+/// Provides:
+/// - Overall spendable vs unspendable breakdown
+/// - Per-protocol spendability rates
+/// - Spendability reason distribution
+/// - Key count statistics (burn/data/real)
+/// - Transaction-level aggregation
+pub fn analyse_spendability(db: &Database) -> AppResult<SpendabilityStatsReport> {
+    let overall = get_overall_breakdown(db)?;
+    let protocol_breakdown = get_protocol_breakdown(db)?;
+    let reason_distribution = get_reason_distribution(db)?;
+    let key_count_distribution = get_key_count_distributions(db)?;
+    let transaction_level = get_transaction_level_stats(db)?;
 
-impl SpendabilityStatsAnalyser {
-    /// Analyse spendability statistics comprehensively
-    /// Provides:
-    /// - Overall spendable vs unspendable breakdown
-    /// - Per-protocol spendability rates
-    /// - Spendability reason distribution
-    /// - Key count statistics (burn/data/real)
-    /// - Transaction-level aggregation
-    pub fn analyse_spendability(db: &Database) -> AppResult<SpendabilityStatsReport> {
-        let overall = Self::get_overall_breakdown(db)?;
-        let protocol_breakdown = Self::get_protocol_breakdown(db)?;
-        let reason_distribution = Self::get_reason_distribution(db)?;
-        let key_count_distribution = Self::get_key_count_distributions(db)?;
-        let transaction_level = Self::get_transaction_level_stats(db)?;
+    Ok(SpendabilityStatsReport {
+        overall,
+        protocol_breakdown,
+        reason_distribution,
+        key_count_distribution,
+        transaction_level,
+    })
+}
 
-        Ok(SpendabilityStatsReport {
-            overall,
-            protocol_breakdown,
-            reason_distribution,
-            key_count_distribution,
-            transaction_level,
-        })
-    }
+/// Get overall spendability breakdown
+///
+/// Queries: `SELECT is_spendable, COUNT(*) FROM p2ms_output_classifications`
+///
+/// CRITICAL: Only counts UTXO outputs (is_spent = 0), not spent outputs
+pub fn get_overall_breakdown(db: &Database) -> AppResult<OverallSpendability> {
+    let conn = db.connection();
 
-    /// Get overall spendability breakdown
-    ///
-    /// Queries: `SELECT is_spendable, COUNT(*) FROM p2ms_output_classifications`
-    ///
-    /// CRITICAL: Only counts UTXO outputs (is_spent = 0), not spent outputs
-    pub fn get_overall_breakdown(db: &Database) -> AppResult<OverallSpendability> {
-        let conn = db.connection();
-
-        // Get total count for percentage calculation (UTXO outputs only)
-        let total_count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM p2ms_output_classifications c
+    // Get total count for percentage calculation (UTXO outputs only)
+    let total_count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM p2ms_output_classifications c
              JOIN transaction_outputs o ON c.txid = o.txid AND c.vout = o.vout
              WHERE o.is_spent = 0",
-            [],
-            |row| row.get(0),
-        )?;
+        [],
+        |row| row.get(0),
+    )?;
 
-        if total_count == 0 {
-            return Ok(OverallSpendability::default());
-        }
+    if total_count == 0 {
+        return Ok(OverallSpendability::default());
+    }
 
-        // Get spendable/unspendable counts
-        let mut stmt = conn.prepare(SQL_OVERALL_BREAKDOWN)?;
-        let mut rows = stmt.query([])?;
+    // Get spendable/unspendable counts
+    let mut stmt = conn.prepare(SQL_OVERALL_BREAKDOWN)?;
+    let mut rows = stmt.query([])?;
 
-        let mut spendable_count = 0usize;
-        let mut unspendable_count = 0usize;
+    let mut spendable_count = 0usize;
+    let mut unspendable_count = 0usize;
 
-        while let Some(row) = rows.next()? {
-            let is_spendable: Option<bool> = row.get(0)?;
-            let count: i64 = row.get(1)?;
+    while let Some(row) = rows.next()? {
+        let is_spendable: Option<bool> = row.get(0)?;
+        let count: i64 = row.get(1)?;
 
-            match is_spendable {
-                Some(true) => spendable_count = count as usize,
-                Some(false) => unspendable_count = count as usize,
-                None => {
-                    // Should never happen - all protocols evaluate spendability
-                    // If we see NULL, that's a bug in the classifiers
-                }
+        match is_spendable {
+            Some(true) => spendable_count = count as usize,
+            Some(false) => unspendable_count = count as usize,
+            None => {
+                // Should never happen - all protocols evaluate spendability
+                // If we see NULL, that's a bug in the classifiers
             }
         }
-
-        let spendable_percentage = (spendable_count as f64 * 100.0) / total_count as f64;
-        let unspendable_percentage = (unspendable_count as f64 * 100.0) / total_count as f64;
-
-        Ok(OverallSpendability {
-            total_outputs: total_count as usize,
-            spendable_count,
-            spendable_percentage,
-            unspendable_count,
-            unspendable_percentage,
-        })
     }
 
-    /// Get per-protocol spendability breakdown
-    ///
-    /// No join required - p2ms_output_classifications already has protocol column.
-    ///
-    /// Queries: `SELECT protocol, is_spendable, COUNT(*) FROM p2ms_output_classifications`
-    pub fn get_protocol_breakdown(db: &Database) -> AppResult<Vec<ProtocolSpendabilityStats>> {
-        let conn = db.connection();
+    let spendable_percentage = (spendable_count as f64 * 100.0) / total_count as f64;
+    let unspendable_percentage = (unspendable_count as f64 * 100.0) / total_count as f64;
 
-        let mut stmt = conn.prepare(SQL_PROTOCOL_BREAKDOWN)?;
-        let rows = stmt.query_map([], |row| {
-            let protocol: String = row.get(0)?;
-            let is_spendable: Option<bool> = row.get(1)?;
-            let count: i64 = row.get(2)?;
-            Ok((protocol, is_spendable, count))
-        })?;
+    Ok(OverallSpendability {
+        total_outputs: total_count as usize,
+        spendable_count,
+        spendable_percentage,
+        unspendable_count,
+        unspendable_percentage,
+    })
+}
 
-        // Aggregate by protocol - two categories: spendable, unspendable
-        use std::collections::HashMap;
-        let mut protocol_map: HashMap<String, (usize, usize)> = HashMap::new();
+/// Get per-protocol spendability breakdown
+///
+/// No join required - p2ms_output_classifications already has protocol column.
+///
+/// Queries: `SELECT protocol, is_spendable, COUNT(*) FROM p2ms_output_classifications`
+pub fn get_protocol_breakdown(db: &Database) -> AppResult<Vec<ProtocolSpendabilityStats>> {
+    let conn = db.connection();
 
-        for row in rows {
-            let (protocol, is_spendable, count) = row?;
-            let entry = protocol_map.entry(protocol).or_insert((0, 0));
+    let mut stmt = conn.prepare(SQL_PROTOCOL_BREAKDOWN)?;
+    let rows = stmt.query_map([], |row| {
+        let protocol: String = row.get(0)?;
+        let is_spendable: Option<bool> = row.get(1)?;
+        let count: i64 = row.get(2)?;
+        Ok((protocol, is_spendable, count))
+    })?;
 
-            match is_spendable {
-                Some(true) => entry.0 += count as usize,  // spendable
-                Some(false) => entry.1 += count as usize, // unspendable
-                None => {
-                    // Should never happen - all protocols evaluate spendability
-                    // If we see NULL, that's a bug in the classifiers
-                }
+    // Aggregate by protocol - two categories: spendable, unspendable
+    use std::collections::HashMap;
+    let mut protocol_map: HashMap<String, (usize, usize)> = HashMap::new();
+
+    for row in rows {
+        let (protocol, is_spendable, count) = row?;
+        let entry = protocol_map.entry(protocol).or_insert((0, 0));
+
+        match is_spendable {
+            Some(true) => entry.0 += count as usize,  // spendable
+            Some(false) => entry.1 += count as usize, // unspendable
+            None => {
+                // Should never happen - all protocols evaluate spendability
+                // If we see NULL, that's a bug in the classifiers
             }
         }
-
-        // Convert to Vec of stats
-        let mut protocol_stats: Vec<ProtocolSpendabilityStats> = protocol_map
-            .into_iter()
-            .map(|(protocol_str, (spendable, unspendable))| {
-                let total = spendable + unspendable;
-                let spendable_percentage = if total > 0 {
-                    (spendable as f64 * 100.0) / total as f64
-                } else {
-                    0.0
-                };
-                let unspendable_percentage = if total > 0 {
-                    (unspendable as f64 * 100.0) / total as f64
-                } else {
-                    0.0
-                };
-
-                // Parse protocol string to enum (parse once at DB boundary)
-                let protocol = ProtocolType::from_str(&protocol_str).unwrap_or_default();
-
-                ProtocolSpendabilityStats {
-                    protocol,
-                    total_outputs: total,
-                    spendable_count: spendable,
-                    spendable_percentage,
-                    unspendable_count: unspendable,
-                    unspendable_percentage,
-                }
-            })
-            .collect();
-
-        // Sort by canonical ProtocolType enum order for consistent JSON output
-        protocol_stats.sort_by_key(|p| p.protocol as u8);
-
-        Ok(protocol_stats)
     }
 
-    /// Get spendability reason distribution
-    ///
-    /// Queries: `SELECT spendability_reason, COUNT(*) FROM p2ms_output_classifications`
-    /// CRITICAL: Only counts UTXO outputs (is_spent = 0), not spent outputs
-    pub fn get_reason_distribution(db: &Database) -> AppResult<Vec<ReasonStats>> {
-        let conn = db.connection();
-
-        // Get total count for percentage calculation (UTXO only)
-        let total_count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM p2ms_output_classifications c
-             JOIN transaction_outputs o ON c.txid = o.txid AND c.vout = o.vout
-             WHERE o.is_spent = 0 AND c.spendability_reason IS NOT NULL",
-            [],
-            |row| row.get(0),
-        )?;
-
-        if total_count == 0 {
-            return Ok(Vec::new());
-        }
-
-        let mut stmt = conn.prepare(SQL_REASON_DISTRIBUTION)?;
-        let reason_stats = stmt
-            .query_map([], |row| {
-                let reason: String = row.get(0)?;
-                let count: i64 = row.get(1)?;
-                let percentage = (count as f64 * 100.0) / total_count as f64;
-
-                Ok(ReasonStats {
-                    reason,
-                    count: count as usize,
-                    percentage,
-                })
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(reason_stats)
-    }
-
-    /// Get key count distribution statistics
-    ///
-    /// Aggregates statistics on real_pubkey_count, burn_key_count, data_key_count.
-    pub fn get_key_count_distributions(db: &Database) -> AppResult<KeyCountDistribution> {
-        let conn = db.connection();
-
-        let mut stmt = conn.prepare(SQL_KEY_COUNT_STATS)?;
-        let mut rows = stmt.query([])?;
-
-        if let Some(row) = rows.next()? {
-            // Handle NULL values from aggregate functions on empty tables
-            let total_real: Option<i64> = row.get(0)?;
-            let avg_real: Option<f64> = row.get(1)?;
-            let min_real: Option<i64> = row.get(2)?;
-            let max_real: Option<i64> = row.get(3)?;
-
-            let total_burn: Option<i64> = row.get(4)?;
-            let avg_burn: Option<f64> = row.get(5)?;
-            let min_burn: Option<i64> = row.get(6)?;
-            let max_burn: Option<i64> = row.get(7)?;
-
-            let total_data: Option<i64> = row.get(8)?;
-            let avg_data: Option<f64> = row.get(9)?;
-            let min_data: Option<i64> = row.get(10)?;
-            let max_data: Option<i64> = row.get(11)?;
-
-            Ok(KeyCountDistribution {
-                real_pubkey_stats: KeyCountStats {
-                    total: total_real.unwrap_or(0) as u64,
-                    average: avg_real.unwrap_or(0.0),
-                    min: min_real.unwrap_or(0) as u8,
-                    max: max_real.unwrap_or(0) as u8,
-                },
-                burn_key_stats: KeyCountStats {
-                    total: total_burn.unwrap_or(0) as u64,
-                    average: avg_burn.unwrap_or(0.0),
-                    min: min_burn.unwrap_or(0) as u8,
-                    max: max_burn.unwrap_or(0) as u8,
-                },
-                data_key_stats: KeyCountStats {
-                    total: total_data.unwrap_or(0) as u64,
-                    average: avg_data.unwrap_or(0.0),
-                    min: min_data.unwrap_or(0) as u8,
-                    max: max_data.unwrap_or(0) as u8,
-                },
-            })
-        } else {
-            Ok(KeyCountDistribution::default())
-        }
-    }
-
-    /// Get transaction-level spendability statistics
-    ///
-    /// Aggregates whether transactions have ANY spendable output.
-    ///
-    /// Queries: `SELECT txid, MAX(is_spendable) FROM p2ms_output_classifications GROUP BY txid`
-    pub fn get_transaction_level_stats(db: &Database) -> AppResult<TransactionSpendabilityStats> {
-        let conn = db.connection();
-
-        let mut stmt = conn.prepare(SQL_TX_LEVEL_AGGREGATION)?;
-        let mut rows = stmt.query([])?;
-
-        if let Some(row) = rows.next()? {
-            // Handle NULL values from aggregate functions on empty tables
-            let txs_with_spendable: Option<i64> = row.get(0)?;
-            let total_txs: Option<i64> = row.get(1)?;
-
-            let txs_with_spendable = txs_with_spendable.unwrap_or(0);
-            let total_txs = total_txs.unwrap_or(0);
-
-            let txs_all_unspendable = (total_txs - txs_with_spendable) as usize;
-            let spendable_percentage = if total_txs > 0 {
-                (txs_with_spendable as f64 * 100.0) / total_txs as f64
+    // Convert to Vec of stats
+    let mut protocol_stats: Vec<ProtocolSpendabilityStats> = protocol_map
+        .into_iter()
+        .map(|(protocol_str, (spendable, unspendable))| {
+            let total = spendable + unspendable;
+            let spendable_percentage = if total > 0 {
+                (spendable as f64 * 100.0) / total as f64
+            } else {
+                0.0
+            };
+            let unspendable_percentage = if total > 0 {
+                (unspendable as f64 * 100.0) / total as f64
             } else {
                 0.0
             };
 
-            Ok(TransactionSpendabilityStats {
-                total_transactions: total_txs as usize,
-                transactions_with_spendable_outputs: txs_with_spendable as usize,
-                transactions_all_unspendable: txs_all_unspendable,
-                spendable_transaction_percentage: spendable_percentage,
+            // Parse protocol string to enum (parse once at DB boundary)
+            let protocol = ProtocolType::from_str(&protocol_str).unwrap_or_default();
+
+            ProtocolSpendabilityStats {
+                protocol,
+                total_outputs: total,
+                spendable_count: spendable,
+                spendable_percentage,
+                unspendable_count: unspendable,
+                unspendable_percentage,
+            }
+        })
+        .collect();
+
+    // Sort by canonical ProtocolType enum order for consistent JSON output
+    protocol_stats.sort_by_key(|p| p.protocol as u8);
+
+    Ok(protocol_stats)
+}
+
+/// Get spendability reason distribution
+///
+/// Queries: `SELECT spendability_reason, COUNT(*) FROM p2ms_output_classifications`
+/// CRITICAL: Only counts UTXO outputs (is_spent = 0), not spent outputs
+pub fn get_reason_distribution(db: &Database) -> AppResult<Vec<ReasonStats>> {
+    let conn = db.connection();
+
+    // Get total count for percentage calculation (UTXO only)
+    let total_count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM p2ms_output_classifications c
+             JOIN transaction_outputs o ON c.txid = o.txid AND c.vout = o.vout
+             WHERE o.is_spent = 0 AND c.spendability_reason IS NOT NULL",
+        [],
+        |row| row.get(0),
+    )?;
+
+    if total_count == 0 {
+        return Ok(Vec::new());
+    }
+
+    let mut stmt = conn.prepare(SQL_REASON_DISTRIBUTION)?;
+    let reason_stats = stmt
+        .query_map([], |row| {
+            let reason: String = row.get(0)?;
+            let count: i64 = row.get(1)?;
+            let percentage = (count as f64 * 100.0) / total_count as f64;
+
+            Ok(ReasonStats {
+                reason,
+                count: count as usize,
+                percentage,
             })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(reason_stats)
+}
+
+/// Get key count distribution statistics
+///
+/// Aggregates statistics on real_pubkey_count, burn_key_count, data_key_count.
+pub fn get_key_count_distributions(db: &Database) -> AppResult<KeyCountDistribution> {
+    let conn = db.connection();
+
+    let mut stmt = conn.prepare(SQL_KEY_COUNT_STATS)?;
+    let mut rows = stmt.query([])?;
+
+    if let Some(row) = rows.next()? {
+        // Handle NULL values from aggregate functions on empty tables
+        let total_real: Option<i64> = row.get(0)?;
+        let avg_real: Option<f64> = row.get(1)?;
+        let min_real: Option<i64> = row.get(2)?;
+        let max_real: Option<i64> = row.get(3)?;
+
+        let total_burn: Option<i64> = row.get(4)?;
+        let avg_burn: Option<f64> = row.get(5)?;
+        let min_burn: Option<i64> = row.get(6)?;
+        let max_burn: Option<i64> = row.get(7)?;
+
+        let total_data: Option<i64> = row.get(8)?;
+        let avg_data: Option<f64> = row.get(9)?;
+        let min_data: Option<i64> = row.get(10)?;
+        let max_data: Option<i64> = row.get(11)?;
+
+        Ok(KeyCountDistribution {
+            real_pubkey_stats: KeyCountStats {
+                total: total_real.unwrap_or(0) as u64,
+                average: avg_real.unwrap_or(0.0),
+                min: min_real.unwrap_or(0) as u8,
+                max: max_real.unwrap_or(0) as u8,
+            },
+            burn_key_stats: KeyCountStats {
+                total: total_burn.unwrap_or(0) as u64,
+                average: avg_burn.unwrap_or(0.0),
+                min: min_burn.unwrap_or(0) as u8,
+                max: max_burn.unwrap_or(0) as u8,
+            },
+            data_key_stats: KeyCountStats {
+                total: total_data.unwrap_or(0) as u64,
+                average: avg_data.unwrap_or(0.0),
+                min: min_data.unwrap_or(0) as u8,
+                max: max_data.unwrap_or(0) as u8,
+            },
+        })
+    } else {
+        Ok(KeyCountDistribution::default())
+    }
+}
+
+/// Get transaction-level spendability statistics
+///
+/// Aggregates whether transactions have ANY spendable output.
+///
+/// Queries: `SELECT txid, MAX(is_spendable) FROM p2ms_output_classifications GROUP BY txid`
+pub fn get_transaction_level_stats(db: &Database) -> AppResult<TransactionSpendabilityStats> {
+    let conn = db.connection();
+
+    let mut stmt = conn.prepare(SQL_TX_LEVEL_AGGREGATION)?;
+    let mut rows = stmt.query([])?;
+
+    if let Some(row) = rows.next()? {
+        // Handle NULL values from aggregate functions on empty tables
+        let txs_with_spendable: Option<i64> = row.get(0)?;
+        let total_txs: Option<i64> = row.get(1)?;
+
+        let txs_with_spendable = txs_with_spendable.unwrap_or(0);
+        let total_txs = total_txs.unwrap_or(0);
+
+        let txs_all_unspendable = (total_txs - txs_with_spendable) as usize;
+        let spendable_percentage = if total_txs > 0 {
+            (txs_with_spendable as f64 * 100.0) / total_txs as f64
         } else {
-            Ok(TransactionSpendabilityStats::default())
-        }
+            0.0
+        };
+
+        Ok(TransactionSpendabilityStats {
+            total_transactions: total_txs as usize,
+            transactions_with_spendable_outputs: txs_with_spendable as usize,
+            transactions_all_unspendable: txs_all_unspendable,
+            spendable_transaction_percentage: spendable_percentage,
+        })
+    } else {
+        Ok(TransactionSpendabilityStats::default())
     }
 }
 
@@ -374,7 +369,7 @@ mod tests {
     fn test_analyser_creation() {
         // Test that analyser can be instantiated
         let db = Database::new(":memory:").unwrap();
-        let result = SpendabilityStatsAnalyser::analyse_spendability(&db);
+        let result = analyse_spendability(&db);
         if let Err(e) = &result {
             eprintln!("Error: {}", e);
         }

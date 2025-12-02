@@ -25,27 +25,23 @@ use crate::types::analysis_results::{
 use crate::types::visualisation::{PlotlyChart, PlotlyLayout, PlotlyTrace};
 use crate::utils::time::{extract_date_from_datetime, timestamp_to_iso, SECONDS_PER_WEEK};
 
-/// Bitcoin Stamps weekly fee analyser
-pub struct StampsWeeklyFeeAnalyser;
+/// Analyse weekly fee statistics for Bitcoin Stamps transactions
+///
+/// Uses a two-CTE approach to ensure correct de-duplication:
+/// - CTE 1 (`stamps_txs`): Gets distinct Bitcoin Stamps transactions with fee + timestamp
+/// - CTE 2 (`script_bytes_per_tx`): Sums script_size for Stamps txs only
+/// - Main SELECT: Aggregates over distinct transactions, LEFT JOINs script bytes
+///
+/// # Arguments
+/// * `db` - Database connection
+///
+/// # Returns
+/// * `AppResult<StampsWeeklyFeeReport>` - Weekly fee analysis report
+pub fn analyse_weekly_fees(db: &Database) -> AppResult<StampsWeeklyFeeReport> {
+    let conn = db.connection();
 
-impl StampsWeeklyFeeAnalyser {
-    /// Analyse weekly fee statistics for Bitcoin Stamps transactions
-    ///
-    /// Uses a two-CTE approach to ensure correct de-duplication:
-    /// - CTE 1 (`stamps_txs`): Gets distinct Bitcoin Stamps transactions with fee + timestamp
-    /// - CTE 2 (`script_bytes_per_tx`): Sums script_size for Stamps txs only
-    /// - Main SELECT: Aggregates over distinct transactions, LEFT JOINs script bytes
-    ///
-    /// # Arguments
-    /// * `db` - Database connection
-    ///
-    /// # Returns
-    /// * `AppResult<StampsWeeklyFeeReport>` - Weekly fee analysis report
-    pub fn analyse_weekly_fees(db: &Database) -> AppResult<StampsWeeklyFeeReport> {
-        let conn = db.connection();
-
-        // Two-CTE query for correct de-duplication
-        let query = r#"
+    // Two-CTE query for correct de-duplication
+    let query = r#"
             WITH stamps_txs AS (
                 -- CTE 1: Get distinct Bitcoin Stamps transactions with fee + timestamp
                 SELECT DISTINCT
@@ -86,115 +82,114 @@ impl StampsWeeklyFeeAnalyser {
             ORDER BY week_bucket
         "#;
 
-        let mut stmt = conn.prepare(query)?;
-        let rows = stmt.query_map([], |row| {
-            let week_bucket: i64 = row.get(0)?;
-            let week_start_ts: i64 = row.get(1)?;
-            let week_start_iso: String = row.get(2)?;
-            let transaction_count: i64 = row.get(3)?;
-            let total_fees_sats: i64 = row.get(4)?;
-            let avg_fee_sats: f64 = row.get(5)?;
-            let total_script_bytes: i64 = row.get(6)?;
+    let mut stmt = conn.prepare(query)?;
+    let rows = stmt.query_map([], |row| {
+        let week_bucket: i64 = row.get(0)?;
+        let week_start_ts: i64 = row.get(1)?;
+        let week_start_iso: String = row.get(2)?;
+        let transaction_count: i64 = row.get(3)?;
+        let total_fees_sats: i64 = row.get(4)?;
+        let avg_fee_sats: f64 = row.get(5)?;
+        let total_script_bytes: i64 = row.get(6)?;
 
-            Ok((
-                week_bucket,
-                week_start_ts,
-                week_start_iso,
-                transaction_count as usize,
-                total_fees_sats as u64,
-                avg_fee_sats,
-                total_script_bytes as u64,
-            ))
-        })?;
+        Ok((
+            week_bucket,
+            week_start_ts,
+            week_start_iso,
+            transaction_count as usize,
+            total_fees_sats as u64,
+            avg_fee_sats,
+            total_script_bytes as u64,
+        ))
+    })?;
 
-        let mut weekly_data: Vec<WeeklyStampsFeeStats> = Vec::new();
-        let mut total_transactions: usize = 0;
-        let mut total_fees_sats: u64 = 0;
-        let mut total_script_bytes: u64 = 0;
+    let mut weekly_data: Vec<WeeklyStampsFeeStats> = Vec::new();
+    let mut total_transactions: usize = 0;
+    let mut total_fees_sats: u64 = 0;
+    let mut total_script_bytes: u64 = 0;
 
-        for row_result in rows {
-            let (
-                week_bucket,
-                week_start_ts,
-                week_start_iso_db,
-                tx_count,
-                fees_sats,
-                avg_fee,
-                script_bytes,
-            ) = row_result?;
+    for row_result in rows {
+        let (
+            week_bucket,
+            week_start_ts,
+            week_start_iso_db,
+            tx_count,
+            fees_sats,
+            avg_fee,
+            script_bytes,
+        ) = row_result?;
 
-            // Calculate week_end_iso: week_start_ts + 604799 (6 days, 23:59:59)
-            let week_end_ts = week_start_ts + SECONDS_PER_WEEK - 1;
-            let week_end_iso = timestamp_to_iso(week_end_ts);
+        // Calculate week_end_iso: week_start_ts + 604799 (6 days, 23:59:59)
+        let week_end_ts = week_start_ts + SECONDS_PER_WEEK - 1;
+        let week_end_iso = timestamp_to_iso(week_end_ts);
 
-            // Clean up week_start_iso (remove time portion if present)
-            let week_start_iso = extract_date_from_datetime(&week_start_iso_db);
+        // Clean up week_start_iso (remove time portion if present)
+        let week_start_iso = extract_date_from_datetime(&week_start_iso_db);
 
-            // Calculate avg_fee_per_byte_sats (handle div-by-zero)
-            let avg_fee_per_byte_sats = if script_bytes > 0 {
-                fees_sats as f64 / script_bytes as f64
-            } else {
-                0.0
-            };
-
-            total_transactions += tx_count;
-            total_fees_sats += fees_sats;
-            total_script_bytes += script_bytes;
-
-            weekly_data.push(WeeklyStampsFeeStats {
-                week_bucket,
-                week_start_ts,
-                week_start_iso,
-                week_end_iso,
-                transaction_count: tx_count,
-                total_fees_sats: fees_sats,
-                avg_fee_sats: avg_fee,
-                total_script_bytes: script_bytes,
-                avg_fee_per_byte_sats,
-            });
-        }
-
-        // Handle empty report case
-        if weekly_data.is_empty() {
-            return Ok(StampsWeeklyFeeReport::default());
-        }
-
-        // Calculate summary statistics
-        let date_range_start = weekly_data
-            .first()
-            .map(|w| w.week_start_iso.clone())
-            .unwrap_or_default();
-        let date_range_end = weekly_data
-            .last()
-            .map(|w| w.week_end_iso.clone())
-            .unwrap_or_default();
-
-        let total_fees_btc = total_fees_sats as f64 / 100_000_000.0;
-        let avg_fee_per_tx_sats = if total_transactions > 0 {
-            total_fees_sats as f64 / total_transactions as f64
-        } else {
-            0.0
-        };
-        let avg_fee_per_byte_sats = if total_script_bytes > 0 {
-            total_fees_sats as f64 / total_script_bytes as f64
+        // Calculate avg_fee_per_byte_sats (handle div-by-zero)
+        let avg_fee_per_byte_sats = if script_bytes > 0 {
+            fees_sats as f64 / script_bytes as f64
         } else {
             0.0
         };
 
-        Ok(StampsWeeklyFeeReport {
-            total_weeks: weekly_data.len(),
-            total_transactions,
-            total_fees_sats,
-            weekly_data,
-            summary: StampsFeeSummary {
-                date_range_start,
-                date_range_end,
-                total_fees_btc,
-                avg_fee_per_tx_sats,
-                avg_fee_per_byte_sats,
-            },
-        })
+        total_transactions += tx_count;
+        total_fees_sats += fees_sats;
+        total_script_bytes += script_bytes;
+
+        weekly_data.push(WeeklyStampsFeeStats {
+            week_bucket,
+            week_start_ts,
+            week_start_iso,
+            week_end_iso,
+            transaction_count: tx_count,
+            total_fees_sats: fees_sats,
+            avg_fee_sats: avg_fee,
+            total_script_bytes: script_bytes,
+            avg_fee_per_byte_sats,
+        });
     }
+
+    // Handle empty report case
+    if weekly_data.is_empty() {
+        return Ok(StampsWeeklyFeeReport::default());
+    }
+
+    // Calculate summary statistics
+    let date_range_start = weekly_data
+        .first()
+        .map(|w| w.week_start_iso.clone())
+        .unwrap_or_default();
+    let date_range_end = weekly_data
+        .last()
+        .map(|w| w.week_end_iso.clone())
+        .unwrap_or_default();
+
+    let total_fees_btc = total_fees_sats as f64 / 100_000_000.0;
+    let avg_fee_per_tx_sats = if total_transactions > 0 {
+        total_fees_sats as f64 / total_transactions as f64
+    } else {
+        0.0
+    };
+    let avg_fee_per_byte_sats = if total_script_bytes > 0 {
+        total_fees_sats as f64 / total_script_bytes as f64
+    } else {
+        0.0
+    };
+
+    Ok(StampsWeeklyFeeReport {
+        total_weeks: weekly_data.len(),
+        total_transactions,
+        total_fees_sats,
+        weekly_data,
+        summary: StampsFeeSummary {
+            date_range_start,
+            date_range_end,
+            total_fees_btc,
+            avg_fee_per_tx_sats,
+            avg_fee_per_byte_sats,
+        },
+    })
 }
 
 impl StampsWeeklyFeeReport {

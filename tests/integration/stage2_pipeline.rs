@@ -1,6 +1,5 @@
 use anyhow::Result;
-use data_carry_research::analysis::BurnPatternDetector;
-use data_carry_research::analysis::TransactionFeeCalculator;
+use data_carry_research::analysis::{detect_burn_patterns, analyse_fees};
 use data_carry_research::config::BitcoinRpcConfig;
 use data_carry_research::database::traits::{
     Stage1Operations, Stage2Operations, StatisticsOperations,
@@ -135,7 +134,7 @@ fn test_burn_pattern_detection_comprehensive() {
     ];
 
     // Test burn pattern detection
-    let patterns = BurnPatternDetector::detect_burn_patterns(&test_cases);
+    let patterns = detect_burn_patterns(&test_cases);
 
     // Should detect 4 burn patterns (one for each type)
     assert_eq!(patterns.len(), 4);
@@ -221,7 +220,7 @@ fn test_fee_analysis_comprehensive() {
         2,
     )];
 
-    let analysis = TransactionFeeCalculator::analyse_fees(&transaction, &tx_inputs, &p2ms_outputs);
+    let analysis = analyse_fees(&transaction, &tx_inputs, &p2ms_outputs);
 
     // Verify fee calculations
     assert_eq!(analysis.total_input_value, 5000);
@@ -332,19 +331,19 @@ fn test_stage2_stats_calculations() {
 fn test_burn_pattern_edge_cases() {
     // Test empty P2MS outputs
     let empty_outputs: Vec<TransactionOutput> = vec![];
-    let patterns = BurnPatternDetector::detect_burn_patterns(&empty_outputs);
+    let patterns = detect_burn_patterns(&empty_outputs);
     assert!(patterns.is_empty());
 
     // Test P2MS output with no pubkeys
     let no_pubkey_output = create_test_p2ms("test", 0, vec![], 1, 0);
 
-    let patterns = BurnPatternDetector::detect_burn_patterns(&[no_pubkey_output]);
+    let patterns = detect_burn_patterns(&[no_pubkey_output]);
     assert!(patterns.is_empty());
 
     // Test P2MS output with invalid pubkey length
     let invalid_pubkey_output = create_test_p2ms("test", 0, vec!["short".to_string()], 1, 1);
 
-    let patterns = BurnPatternDetector::detect_burn_patterns(&[invalid_pubkey_output]);
+    let patterns = detect_burn_patterns(&[invalid_pubkey_output]);
     assert!(patterns.is_empty());
 }
 
@@ -375,7 +374,7 @@ fn test_fee_analysis_edge_cases() {
         5000000000,
     )];
 
-    let analysis = TransactionFeeCalculator::analyse_fees(&coinbase_tx, &inputs, &p2ms_outputs);
+    let analysis = analyse_fees(&coinbase_tx, &inputs, &p2ms_outputs);
 
     // Coinbase should have zero fee
     assert_eq!(analysis.transaction_fee, 0);
@@ -422,7 +421,7 @@ fn test_stage2_performance() {
 
     // Time burn pattern detection
     let start = Instant::now();
-    let patterns = BurnPatternDetector::detect_burn_patterns(&outputs);
+    let patterns = detect_burn_patterns(&outputs);
     let detection_time = start.elapsed();
 
     // Should complete in reasonable time (less than 1 second for 1000 outputs)

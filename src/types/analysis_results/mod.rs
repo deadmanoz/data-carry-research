@@ -50,9 +50,7 @@ pub use output_count::{
     GlobalOutputCountDistribution, OutputCountDistributionReport, OutputCountPercentiles,
     ProtocolOutputCountDistribution,
 };
-pub use signatures::{
-    BurnPatternCorrelation, PatternProtocolCorrelation, SignatureAnalysisReport,
-};
+pub use signatures::{BurnPatternCorrelation, PatternProtocolCorrelation, SignatureAnalysisReport};
 pub use spendability::{
     KeyCountDistribution, KeyCountStats, OverallSpendability, ProtocolSpendabilityStats,
     ReasonStats, SpendabilityStatsReport, SpendabilityTemporalReport, TransactionSpendabilityStats,

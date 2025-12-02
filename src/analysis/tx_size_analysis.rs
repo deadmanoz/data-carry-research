@@ -30,28 +30,24 @@ pub const TX_SIZE_BUCKET_RANGES: &[(u32, u32)] = &[
     (100_000, u32::MAX), // [100000, ∞) - Exceptional (open-ended)
 ];
 
-/// Transaction size distribution analyser
-pub struct TxSizeAnalyser;
+/// Analyse transaction size distribution across all P2MS transactions
+///
+/// Returns histogram data suitable for understanding fee patterns:
+/// - Global distribution across all P2MS transactions
+/// - Per-protocol distributions (sorted by canonical ProtocolType order)
+/// - Percentiles for size distribution analysis
+///
+/// # Arguments
+/// * `db` - Database connection
+///
+/// # Returns
+/// * `AppResult<TxSizeDistributionReport>` - Comprehensive size distribution
+pub fn analyse_tx_sizes(db: &Database) -> AppResult<TxSizeDistributionReport> {
+    let conn = db.connection();
 
-impl TxSizeAnalyser {
-    /// Analyse transaction size distribution across all P2MS transactions
-    ///
-    /// Returns histogram data suitable for understanding fee patterns:
-    /// - Global distribution across all P2MS transactions
-    /// - Per-protocol distributions (sorted by canonical ProtocolType order)
-    /// - Percentiles for size distribution analysis
-    ///
-    /// # Arguments
-    /// * `db` - Database connection
-    ///
-    /// # Returns
-    /// * `AppResult<TxSizeDistributionReport>` - Comprehensive size distribution
-    pub fn analyse_tx_sizes(db: &Database) -> AppResult<TxSizeDistributionReport> {
-        let conn = db.connection();
-
-        // Global aggregates
-        let global_stats: (usize, u64, u64, Option<u32>, Option<u32>) = conn.query_row(
-            "SELECT
+    // Global aggregates
+    let global_stats: (usize, u64, u64, Option<u32>, Option<u32>) = conn.query_row(
+        "SELECT
                 COUNT(*) as total_transactions,
                 COALESCE(SUM(transaction_size_bytes), 0) as total_size_bytes,
                 COALESCE(SUM(transaction_fee), 0) as total_fees_sats,
@@ -63,59 +59,230 @@ impl TxSizeAnalyser {
               AND transaction_size_bytes IS NOT NULL
               AND transaction_size_bytes > 0
               AND transaction_fee IS NOT NULL",
-            [],
-            |row| {
-                Ok((
-                    row.get::<_, i64>(0)? as usize,
-                    row.get::<_, i64>(1)? as u64,
-                    row.get::<_, i64>(2)? as u64,
-                    row.get::<_, Option<i64>>(3)?.map(|v| v as u32),
-                    row.get::<_, Option<i64>>(4)?.map(|v| v as u32),
-                ))
-            },
-        )?;
+        [],
+        |row| {
+            Ok((
+                row.get::<_, i64>(0)? as usize,
+                row.get::<_, i64>(1)? as u64,
+                row.get::<_, i64>(2)? as u64,
+                row.get::<_, Option<i64>>(3)?.map(|v| v as u32),
+                row.get::<_, Option<i64>>(4)?.map(|v| v as u32),
+            ))
+        },
+    )?;
 
-        let (total_transactions, total_size_bytes, total_fees_sats, min_size_bytes, max_size_bytes) =
-            global_stats;
+    let (total_transactions, total_size_bytes, total_fees_sats, min_size_bytes, max_size_bytes) =
+        global_stats;
 
-        // Excluded count (NULL/zero size or NULL fee)
-        let excluded_null_count: usize = conn.query_row(
-            "SELECT COUNT(*) FROM enriched_transactions
+    // Excluded count (NULL/zero size or NULL fee)
+    let excluded_null_count: usize = conn.query_row(
+        "SELECT COUNT(*) FROM enriched_transactions
             WHERE p2ms_outputs_count > 0
               AND is_coinbase = 0
               AND (transaction_size_bytes IS NULL
                    OR transaction_size_bytes = 0
                    OR transaction_fee IS NULL)",
-            [],
-            |row| Ok(row.get::<_, i64>(0)? as usize),
-        )?;
+        [],
+        |row| Ok(row.get::<_, i64>(0)? as usize),
+    )?;
 
-        // Collect raw data for bucket assignment and percentiles
-        let mut stmt = conn.prepare(
-            "SELECT transaction_size_bytes, transaction_fee
+    // Collect raw data for bucket assignment and percentiles
+    let mut stmt = conn.prepare(
+        "SELECT transaction_size_bytes, transaction_fee
             FROM enriched_transactions
             WHERE p2ms_outputs_count > 0
               AND is_coinbase = 0
               AND transaction_size_bytes IS NOT NULL
               AND transaction_size_bytes > 0
               AND transaction_fee IS NOT NULL",
+    )?;
+
+    let mut sizes: Vec<u32> = Vec::with_capacity(total_transactions);
+    let mut buckets = init_buckets();
+
+    let rows = stmt.query_map([], |row| {
+        let size = row.get::<_, i64>(0)? as u32;
+        let fee = row.get::<_, i64>(1)? as u64;
+        Ok((size, fee))
+    })?;
+
+    for row_result in rows {
+        let (size, fee) = row_result?;
+        sizes.push(size);
+
+        // Assign to bucket
+        let bucket_idx = assign_bucket(size);
+        buckets[bucket_idx].count += 1;
+        buckets[bucket_idx].value += fee;
+    }
+
+    // Compute bucket percentages after aggregation
+    for bucket in &mut buckets {
+        bucket.compute_percentages(total_transactions, total_fees_sats);
+    }
+
+    // Calculate percentiles
+    let percentiles = calculate_percentiles(&mut sizes);
+
+    // Calculate average
+    let avg_size_bytes = if total_transactions > 0 {
+        total_size_bytes as f64 / total_transactions as f64
+    } else {
+        0.0
+    };
+
+    let global_distribution = GlobalTxSizeDistribution {
+        total_transactions,
+        total_fees_sats,
+        total_size_bytes,
+        buckets,
+        percentiles,
+        min_size_bytes,
+        max_size_bytes,
+        avg_size_bytes,
+        excluded_null_count,
+    };
+
+    // Per-protocol distributions
+    let protocol_distributions = analyse_per_protocol(conn)?;
+
+    Ok(TxSizeDistributionReport {
+        global_distribution,
+        protocol_distributions,
+    })
+}
+
+/// Initialise empty buckets from the constant ranges
+fn init_buckets() -> Vec<TxSizeBucket> {
+    TX_SIZE_BUCKET_RANGES
+        .iter()
+        .map(|(min, max)| TxSizeBucket::new_zeroed(*min, *max))
+        .collect()
+}
+
+/// Assign a transaction size to a bucket index
+/// Bucket semantics: [min, max) except last bucket is [min, ∞)
+fn assign_bucket(size_bytes: u32) -> usize {
+    TX_SIZE_BUCKET_RANGES
+        .iter()
+        .enumerate()
+        .find_map(|(i, (min, max))| {
+            let is_last = i == TX_SIZE_BUCKET_RANGES.len() - 1;
+            if size_bytes >= *min && (is_last || size_bytes < *max) {
+                Some(i)
+            } else {
+                None
+            }
+        })
+        .expect("bucket ranges must cover all u32 values")
+}
+
+/// Calculate percentiles from sorted size data
+/// Uses in-memory sort: sorted_vec[(n - 1) * p / 100]
+fn calculate_percentiles(sizes: &mut [u32]) -> Option<TxSizePercentiles> {
+    if sizes.is_empty() {
+        return None;
+    }
+
+    sizes.sort_unstable();
+    let n = sizes.len();
+
+    // Percentile calculation: index = (n - 1) * p / 100
+    let p25_idx = (n - 1) * 25 / 100;
+    let p50_idx = (n - 1) * 50 / 100;
+    let p75_idx = (n - 1) * 75 / 100;
+    let p90_idx = (n - 1) * 90 / 100;
+    let p95_idx = (n - 1) * 95 / 100;
+    let p99_idx = (n - 1) * 99 / 100;
+
+    Some(TxSizePercentiles {
+        p25: sizes[p25_idx],
+        p50: sizes[p50_idx],
+        p75: sizes[p75_idx],
+        p90: sizes[p90_idx],
+        p95: sizes[p95_idx],
+        p99: sizes[p99_idx],
+    })
+}
+
+/// Analyse per-protocol transaction size distributions
+fn analyse_per_protocol(conn: &rusqlite::Connection) -> AppResult<Vec<ProtocolTxSizeDistribution>> {
+    // Get list of protocols with P2MS transactions
+    let mut proto_stmt = conn.prepare(
+        "SELECT DISTINCT tc.protocol
+            FROM transaction_classifications tc
+            INNER JOIN enriched_transactions e ON tc.txid = e.txid
+            WHERE e.p2ms_outputs_count > 0
+              AND e.is_coinbase = 0
+            ORDER BY tc.protocol",
+    )?;
+
+    let protocols: Vec<String> = proto_stmt
+        .query_map([], |row| row.get(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let mut distributions: Vec<ProtocolTxSizeDistribution> = Vec::new();
+
+    for protocol_str in protocols {
+        // Parse protocol string to enum
+        let protocol = match ProtocolType::from_str(&protocol_str) {
+            Ok(p) => p,
+            Err(_) => {
+                tracing::warn!(
+                    "Unknown protocol string in tx size analysis: {}",
+                    protocol_str
+                );
+                ProtocolType::Unknown
+            }
+        };
+
+        // Get excluded count for this protocol
+        let excluded_null_count: usize = conn.query_row(
+            "SELECT COUNT(DISTINCT e.txid) FROM enriched_transactions e
+                INNER JOIN transaction_classifications tc ON e.txid = tc.txid
+                WHERE e.p2ms_outputs_count > 0
+                  AND e.is_coinbase = 0
+                  AND tc.protocol = ?
+                  AND (e.transaction_size_bytes IS NULL
+                       OR e.transaction_size_bytes = 0
+                       OR e.transaction_fee IS NULL)",
+            [&protocol_str],
+            |row| Ok(row.get::<_, i64>(0)? as usize),
         )?;
 
-        let mut sizes: Vec<u32> = Vec::with_capacity(total_transactions);
-        let mut buckets = Self::init_buckets();
+        // Query per-protocol data (DISTINCT to avoid multi-output double-counting)
+        let mut stmt = conn.prepare(
+            "SELECT DISTINCT e.txid, e.transaction_size_bytes, e.transaction_fee
+                FROM enriched_transactions e
+                INNER JOIN transaction_classifications tc ON e.txid = tc.txid
+                WHERE e.p2ms_outputs_count > 0
+                  AND e.is_coinbase = 0
+                  AND tc.protocol = ?
+                  AND e.transaction_size_bytes IS NOT NULL
+                  AND e.transaction_size_bytes > 0
+                  AND e.transaction_fee IS NOT NULL",
+        )?;
 
-        let rows = stmt.query_map([], |row| {
-            let size = row.get::<_, i64>(0)? as u32;
-            let fee = row.get::<_, i64>(1)? as u64;
+        let mut sizes: Vec<u32> = Vec::new();
+        let mut buckets = init_buckets();
+        let mut total_transactions = 0usize;
+        let mut total_fees_sats = 0u64;
+        let mut total_size_bytes = 0u64;
+
+        let rows = stmt.query_map([&protocol_str], |row| {
+            let size = row.get::<_, i64>(1)? as u32;
+            let fee = row.get::<_, i64>(2)? as u64;
             Ok((size, fee))
         })?;
 
         for row_result in rows {
             let (size, fee) = row_result?;
             sizes.push(size);
+            total_transactions += 1;
+            total_fees_sats += fee;
+            total_size_bytes += size as u64;
 
-            // Assign to bucket
-            let bucket_idx = Self::assign_bucket(size);
+            let bucket_idx = assign_bucket(size);
             buckets[bucket_idx].count += 1;
             buckets[bucket_idx].value += fee;
         }
@@ -125,210 +292,36 @@ impl TxSizeAnalyser {
             bucket.compute_percentages(total_transactions, total_fees_sats);
         }
 
-        // Calculate percentiles
-        let percentiles = Self::calculate_percentiles(&mut sizes);
+        let percentiles = calculate_percentiles(&mut sizes);
 
-        // Calculate average
         let avg_size_bytes = if total_transactions > 0 {
             total_size_bytes as f64 / total_transactions as f64
         } else {
             0.0
         };
 
-        let global_distribution = GlobalTxSizeDistribution {
-            total_transactions,
-            total_fees_sats,
-            total_size_bytes,
-            buckets,
-            percentiles,
-            min_size_bytes,
-            max_size_bytes,
-            avg_size_bytes,
-            excluded_null_count,
+        let avg_fee_per_byte = if total_size_bytes > 0 {
+            total_fees_sats as f64 / total_size_bytes as f64
+        } else {
+            0.0
         };
 
-        // Per-protocol distributions
-        let protocol_distributions = Self::analyse_per_protocol(conn)?;
-
-        Ok(TxSizeDistributionReport {
-            global_distribution,
-            protocol_distributions,
-        })
+        distributions.push(ProtocolTxSizeDistribution {
+            protocol,
+            total_transactions,
+            total_fees_sats,
+            buckets,
+            percentiles,
+            avg_size_bytes,
+            avg_fee_per_byte,
+            excluded_null_count,
+        });
     }
 
-    /// Initialise empty buckets from the constant ranges
-    fn init_buckets() -> Vec<TxSizeBucket> {
-        TX_SIZE_BUCKET_RANGES
-            .iter()
-            .map(|(min, max)| TxSizeBucket::new_zeroed(*min, *max))
-            .collect()
-    }
+    // Sort by canonical ProtocolType enum discriminant order
+    distributions.sort_by_key(|d| d.protocol as u8);
 
-    /// Assign a transaction size to a bucket index
-    /// Bucket semantics: [min, max) except last bucket is [min, ∞)
-    fn assign_bucket(size_bytes: u32) -> usize {
-        TX_SIZE_BUCKET_RANGES
-            .iter()
-            .enumerate()
-            .find_map(|(i, (min, max))| {
-                let is_last = i == TX_SIZE_BUCKET_RANGES.len() - 1;
-                if size_bytes >= *min && (is_last || size_bytes < *max) {
-                    Some(i)
-                } else {
-                    None
-                }
-            })
-            .expect("bucket ranges must cover all u32 values")
-    }
-
-    /// Calculate percentiles from sorted size data
-    /// Uses in-memory sort: sorted_vec[(n - 1) * p / 100]
-    fn calculate_percentiles(sizes: &mut [u32]) -> Option<TxSizePercentiles> {
-        if sizes.is_empty() {
-            return None;
-        }
-
-        sizes.sort_unstable();
-        let n = sizes.len();
-
-        // Percentile calculation: index = (n - 1) * p / 100
-        let p25_idx = (n - 1) * 25 / 100;
-        let p50_idx = (n - 1) * 50 / 100;
-        let p75_idx = (n - 1) * 75 / 100;
-        let p90_idx = (n - 1) * 90 / 100;
-        let p95_idx = (n - 1) * 95 / 100;
-        let p99_idx = (n - 1) * 99 / 100;
-
-        Some(TxSizePercentiles {
-            p25: sizes[p25_idx],
-            p50: sizes[p50_idx],
-            p75: sizes[p75_idx],
-            p90: sizes[p90_idx],
-            p95: sizes[p95_idx],
-            p99: sizes[p99_idx],
-        })
-    }
-
-    /// Analyse per-protocol transaction size distributions
-    fn analyse_per_protocol(
-        conn: &rusqlite::Connection,
-    ) -> AppResult<Vec<ProtocolTxSizeDistribution>> {
-        // Get list of protocols with P2MS transactions
-        let mut proto_stmt = conn.prepare(
-            "SELECT DISTINCT tc.protocol
-            FROM transaction_classifications tc
-            INNER JOIN enriched_transactions e ON tc.txid = e.txid
-            WHERE e.p2ms_outputs_count > 0
-              AND e.is_coinbase = 0
-            ORDER BY tc.protocol",
-        )?;
-
-        let protocols: Vec<String> = proto_stmt
-            .query_map([], |row| row.get(0))?
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let mut distributions: Vec<ProtocolTxSizeDistribution> = Vec::new();
-
-        for protocol_str in protocols {
-            // Parse protocol string to enum
-            let protocol = match ProtocolType::from_str(&protocol_str) {
-                Ok(p) => p,
-                Err(_) => {
-                    tracing::warn!(
-                        "Unknown protocol string in tx size analysis: {}",
-                        protocol_str
-                    );
-                    ProtocolType::Unknown
-                }
-            };
-
-            // Get excluded count for this protocol
-            let excluded_null_count: usize = conn.query_row(
-                "SELECT COUNT(DISTINCT e.txid) FROM enriched_transactions e
-                INNER JOIN transaction_classifications tc ON e.txid = tc.txid
-                WHERE e.p2ms_outputs_count > 0
-                  AND e.is_coinbase = 0
-                  AND tc.protocol = ?
-                  AND (e.transaction_size_bytes IS NULL
-                       OR e.transaction_size_bytes = 0
-                       OR e.transaction_fee IS NULL)",
-                [&protocol_str],
-                |row| Ok(row.get::<_, i64>(0)? as usize),
-            )?;
-
-            // Query per-protocol data (DISTINCT to avoid multi-output double-counting)
-            let mut stmt = conn.prepare(
-                "SELECT DISTINCT e.txid, e.transaction_size_bytes, e.transaction_fee
-                FROM enriched_transactions e
-                INNER JOIN transaction_classifications tc ON e.txid = tc.txid
-                WHERE e.p2ms_outputs_count > 0
-                  AND e.is_coinbase = 0
-                  AND tc.protocol = ?
-                  AND e.transaction_size_bytes IS NOT NULL
-                  AND e.transaction_size_bytes > 0
-                  AND e.transaction_fee IS NOT NULL",
-            )?;
-
-            let mut sizes: Vec<u32> = Vec::new();
-            let mut buckets = Self::init_buckets();
-            let mut total_transactions = 0usize;
-            let mut total_fees_sats = 0u64;
-            let mut total_size_bytes = 0u64;
-
-            let rows = stmt.query_map([&protocol_str], |row| {
-                let size = row.get::<_, i64>(1)? as u32;
-                let fee = row.get::<_, i64>(2)? as u64;
-                Ok((size, fee))
-            })?;
-
-            for row_result in rows {
-                let (size, fee) = row_result?;
-                sizes.push(size);
-                total_transactions += 1;
-                total_fees_sats += fee;
-                total_size_bytes += size as u64;
-
-                let bucket_idx = Self::assign_bucket(size);
-                buckets[bucket_idx].count += 1;
-                buckets[bucket_idx].value += fee;
-            }
-
-            // Compute bucket percentages after aggregation
-            for bucket in &mut buckets {
-                bucket.compute_percentages(total_transactions, total_fees_sats);
-            }
-
-            let percentiles = Self::calculate_percentiles(&mut sizes);
-
-            let avg_size_bytes = if total_transactions > 0 {
-                total_size_bytes as f64 / total_transactions as f64
-            } else {
-                0.0
-            };
-
-            let avg_fee_per_byte = if total_size_bytes > 0 {
-                total_fees_sats as f64 / total_size_bytes as f64
-            } else {
-                0.0
-            };
-
-            distributions.push(ProtocolTxSizeDistribution {
-                protocol,
-                total_transactions,
-                total_fees_sats,
-                buckets,
-                percentiles,
-                avg_size_bytes,
-                avg_fee_per_byte,
-                excluded_null_count,
-            });
-        }
-
-        // Sort by canonical ProtocolType enum discriminant order
-        distributions.sort_by_key(|d| d.protocol as u8);
-
-        Ok(distributions)
-    }
+    Ok(distributions)
 }
 
 impl TxSizeDistributionReport {
@@ -424,32 +417,32 @@ mod tests {
     #[test]
     fn test_bucket_assignment_boundaries() {
         // Test [min, max) semantics
-        assert_eq!(TxSizeAnalyser::assign_bucket(0), 0); // [0, 250)
-        assert_eq!(TxSizeAnalyser::assign_bucket(249), 0); // Just under boundary
-        assert_eq!(TxSizeAnalyser::assign_bucket(250), 1); // [250, 500) - boundary crosses
-        assert_eq!(TxSizeAnalyser::assign_bucket(499), 1);
-        assert_eq!(TxSizeAnalyser::assign_bucket(500), 2); // [500, 1000)
-        assert_eq!(TxSizeAnalyser::assign_bucket(999), 2);
-        assert_eq!(TxSizeAnalyser::assign_bucket(1000), 3); // [1000, 2000)
+        assert_eq!(assign_bucket(0), 0); // [0, 250)
+        assert_eq!(assign_bucket(249), 0); // Just under boundary
+        assert_eq!(assign_bucket(250), 1); // [250, 500) - boundary crosses
+        assert_eq!(assign_bucket(499), 1);
+        assert_eq!(assign_bucket(500), 2); // [500, 1000)
+        assert_eq!(assign_bucket(999), 2);
+        assert_eq!(assign_bucket(1000), 3); // [1000, 2000)
 
         // Last bucket is open-ended [100000, ∞)
-        assert_eq!(TxSizeAnalyser::assign_bucket(99_999), 8); // [50000, 100000)
-        assert_eq!(TxSizeAnalyser::assign_bucket(100_000), 9); // [100000, ∞)
-        assert_eq!(TxSizeAnalyser::assign_bucket(1_000_000), 9); // Large value
-        assert_eq!(TxSizeAnalyser::assign_bucket(u32::MAX), 9); // Maximum
+        assert_eq!(assign_bucket(99_999), 8); // [50000, 100000)
+        assert_eq!(assign_bucket(100_000), 9); // [100000, ∞)
+        assert_eq!(assign_bucket(1_000_000), 9); // Large value
+        assert_eq!(assign_bucket(u32::MAX), 9); // Maximum
     }
 
     #[test]
     fn test_percentile_calculation_empty() {
         let mut sizes: Vec<u32> = Vec::new();
-        let result = TxSizeAnalyser::calculate_percentiles(&mut sizes);
+        let result = calculate_percentiles(&mut sizes);
         assert!(result.is_none());
     }
 
     #[test]
     fn test_percentile_calculation_single() {
         let mut sizes = vec![1000];
-        let result = TxSizeAnalyser::calculate_percentiles(&mut sizes);
+        let result = calculate_percentiles(&mut sizes);
         assert!(result.is_some());
         let p = result.unwrap();
         // All percentiles should be the same for single element
@@ -465,7 +458,7 @@ mod tests {
     fn test_percentile_calculation_known_distribution() {
         // 100 values from 1 to 100
         let mut sizes: Vec<u32> = (1..=100).collect();
-        let result = TxSizeAnalyser::calculate_percentiles(&mut sizes);
+        let result = calculate_percentiles(&mut sizes);
         assert!(result.is_some());
         let p = result.unwrap();
 
@@ -486,7 +479,7 @@ mod tests {
 
     #[test]
     fn test_init_buckets() {
-        let buckets = TxSizeAnalyser::init_buckets();
+        let buckets = init_buckets();
         assert_eq!(buckets.len(), TX_SIZE_BUCKET_RANGES.len());
 
         // Verify first bucket

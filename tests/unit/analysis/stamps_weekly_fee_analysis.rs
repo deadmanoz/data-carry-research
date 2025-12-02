@@ -4,7 +4,7 @@
 //! for Bitcoin Stamps at the week level with proper de-duplication.
 
 use crate::common::analysis_test_setup::create_analysis_test_db;
-use data_carry_research::analysis::StampsWeeklyFeeAnalyser;
+use data_carry_research::analysis::analyse_weekly_fees;
 use data_carry_research::errors::AppResult;
 
 /// Seed a single Bitcoin Stamps transaction with associated data
@@ -110,7 +110,7 @@ fn seed_stamps_transaction(
 fn test_empty_database() -> AppResult<()> {
     let db = create_analysis_test_db()?;
 
-    let report = StampsWeeklyFeeAnalyser::analyse_weekly_fees(&db)?;
+    let report = analyse_weekly_fees(&db)?;
 
     // All counts should be zero
     assert_eq!(report.total_weeks, 0, "Should have 0 weeks");
@@ -164,7 +164,7 @@ fn test_single_week_single_transaction() -> AppResult<()> {
         1,
     )?;
 
-    let report = StampsWeeklyFeeAnalyser::analyse_weekly_fees(&db)?;
+    let report = analyse_weekly_fees(&db)?;
 
     assert_eq!(report.total_weeks, 1, "Should have 1 week");
     assert_eq!(report.total_transactions, 1, "Should have 1 transaction");
@@ -261,7 +261,7 @@ fn test_multi_week_aggregation() -> AppResult<()> {
         1,
     )?;
 
-    let report = StampsWeeklyFeeAnalyser::analyse_weekly_fees(&db)?;
+    let report = analyse_weekly_fees(&db)?;
 
     assert_eq!(report.total_weeks, 3, "Should have 3 weeks");
     assert_eq!(report.total_transactions, 5, "Should have 5 transactions");
@@ -312,7 +312,7 @@ fn test_multi_output_deduplication() -> AppResult<()> {
         3,
     )?;
 
-    let report = StampsWeeklyFeeAnalyser::analyse_weekly_fees(&db)?;
+    let report = analyse_weekly_fees(&db)?;
 
     assert_eq!(
         report.total_transactions, 1,
@@ -356,7 +356,7 @@ fn test_null_timestamp_exclusion() -> AppResult<()> {
     // Transaction with NULL timestamp (should be excluded)
     seed_stamps_transaction(conn, "null_ts_tx", 800001, None, 20000, 100, false, 1)?;
 
-    let report = StampsWeeklyFeeAnalyser::analyse_weekly_fees(&db)?;
+    let report = analyse_weekly_fees(&db)?;
 
     assert_eq!(
         report.total_transactions, 1,
@@ -400,7 +400,7 @@ fn test_zero_script_bytes_division() -> AppResult<()> {
 
     // Note: NO p2ms_output_classifications or transaction_outputs rows
 
-    let report = StampsWeeklyFeeAnalyser::analyse_weekly_fees(&db)?;
+    let report = analyse_weekly_fees(&db)?;
 
     assert_eq!(report.total_transactions, 1, "Should have 1 transaction");
     assert_eq!(report.total_fees_sats, 10000, "Fee should be counted");
@@ -448,7 +448,7 @@ fn test_coinbase_exclusion() -> AppResult<()> {
         1,
     )?;
 
-    let report = StampsWeeklyFeeAnalyser::analyse_weekly_fees(&db)?;
+    let report = analyse_weekly_fees(&db)?;
 
     assert_eq!(
         report.total_transactions, 1,
@@ -498,7 +498,7 @@ fn test_non_stamps_protocols_excluded() -> AppResult<()> {
         [],
     )?;
 
-    let report = StampsWeeklyFeeAnalyser::analyse_weekly_fees(&db)?;
+    let report = analyse_weekly_fees(&db)?;
 
     assert_eq!(
         report.total_transactions, 1,
@@ -542,7 +542,7 @@ fn test_week_boundary_calculation() -> AppResult<()> {
         1,
     )?;
 
-    let report = StampsWeeklyFeeAnalyser::analyse_weekly_fees(&db)?;
+    let report = analyse_weekly_fees(&db)?;
 
     assert_eq!(report.total_weeks, 2, "Should have 2 weeks");
 
@@ -564,7 +564,7 @@ fn test_plotly_chart_generation() -> AppResult<()> {
     seed_stamps_transaction(conn, "tx1", 800000, Some(1704931200), 10000, 100, false, 1)?;
     seed_stamps_transaction(conn, "tx2", 800001, Some(1705536000), 20000, 200, false, 1)?;
 
-    let report = StampsWeeklyFeeAnalyser::analyse_weekly_fees(&db)?;
+    let report = analyse_weekly_fees(&db)?;
     let chart = report.to_plotly_chart();
 
     // Should have 3 traces
@@ -641,7 +641,7 @@ fn test_summary_calculations() -> AppResult<()> {
         1,
     )?;
 
-    let report = StampsWeeklyFeeAnalyser::analyse_weekly_fees(&db)?;
+    let report = analyse_weekly_fees(&db)?;
 
     // Total: 3 tx, 60000 sats, 300 bytes
     assert_eq!(report.total_transactions, 3);

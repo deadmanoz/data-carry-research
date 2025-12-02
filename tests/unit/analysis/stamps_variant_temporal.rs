@@ -4,7 +4,7 @@
 //! by variant over weekly time buckets.
 
 use crate::common::analysis_test_setup::create_analysis_test_db;
-use data_carry_research::analysis::StampsVariantTemporalAnalyser;
+use data_carry_research::analysis::analyse_stamps_variant_temporal_distribution;
 use data_carry_research::errors::AppResult;
 
 /// Seed a Bitcoin Stamps output with specified variant
@@ -86,7 +86,7 @@ fn seed_stamps_output(
 fn test_empty_database() -> AppResult<()> {
     let db = create_analysis_test_db()?;
 
-    let report = StampsVariantTemporalAnalyser::analyse_temporal_distribution(&db)?;
+    let report = analyse_stamps_variant_temporal_distribution(&db)?;
 
     assert_eq!(report.total_outputs, 0, "Should have 0 outputs");
     assert_eq!(report.total_value_sats, 0, "Should have 0 value");
@@ -127,7 +127,7 @@ fn test_single_variant_single_week() -> AppResult<()> {
         Some("Classic"),
     )?;
 
-    let report = StampsVariantTemporalAnalyser::analyse_temporal_distribution(&db)?;
+    let report = analyse_stamps_variant_temporal_distribution(&db)?;
 
     assert_eq!(report.total_outputs, 1, "Should have 1 output");
     assert_eq!(report.total_value_sats, 1000, "Value should be 1000");
@@ -186,7 +186,7 @@ fn test_multiple_variants_single_week() -> AppResult<()> {
         Some("Classic"),
     )?;
 
-    let report = StampsVariantTemporalAnalyser::analyse_temporal_distribution(&db)?;
+    let report = analyse_stamps_variant_temporal_distribution(&db)?;
 
     assert_eq!(report.total_outputs, 3, "Should have 3 outputs");
     assert_eq!(report.total_value_sats, 6000, "Total value should be 6000");
@@ -244,7 +244,7 @@ fn test_multiple_weeks() -> AppResult<()> {
         Some("Classic"),
     )?;
 
-    let report = StampsVariantTemporalAnalyser::analyse_temporal_distribution(&db)?;
+    let report = analyse_stamps_variant_temporal_distribution(&db)?;
 
     assert_eq!(report.total_outputs, 3, "Should have 3 outputs");
 
@@ -287,7 +287,7 @@ fn test_null_variant_detection() -> AppResult<()> {
     // NULL variant (bug indicator)
     seed_stamps_output(conn, "tx2", 0, 800001, Some(timestamp + 100), 2000, None)?;
 
-    let report = StampsVariantTemporalAnalyser::analyse_temporal_distribution(&db)?;
+    let report = analyse_stamps_variant_temporal_distribution(&db)?;
 
     // Main report should only include valid variants
     assert_eq!(report.total_outputs, 1, "Should have 1 valid output");
@@ -315,7 +315,7 @@ fn test_null_only_dataset() -> AppResult<()> {
     seed_stamps_output(conn, "tx1", 0, 800000, Some(timestamp), 1000, None)?;
     seed_stamps_output(conn, "tx2", 0, 800001, Some(timestamp + 100), 2000, None)?;
 
-    let report = StampsVariantTemporalAnalyser::analyse_temporal_distribution(&db)?;
+    let report = analyse_stamps_variant_temporal_distribution(&db)?;
 
     // Main report should have 0 outputs (NULL variants excluded from weekly data)
     assert_eq!(report.total_outputs, 0, "Should have 0 valid outputs");
@@ -353,7 +353,7 @@ fn test_null_timestamp_exclusion() -> AppResult<()> {
     // NULL timestamp (should be excluded from temporal analysis)
     seed_stamps_output(conn, "tx2", 0, 800001, None, 2000, Some("SRC-20"))?;
 
-    let report = StampsVariantTemporalAnalyser::analyse_temporal_distribution(&db)?;
+    let report = analyse_stamps_variant_temporal_distribution(&db)?;
 
     // Main report should only include outputs with valid timestamps
     assert_eq!(
@@ -393,7 +393,7 @@ fn test_first_appearance_deterministic_tie_breaking() -> AppResult<()> {
         Some("Classic"),
     )?;
 
-    let report = StampsVariantTemporalAnalyser::analyse_temporal_distribution(&db)?;
+    let report = analyse_stamps_variant_temporal_distribution(&db)?;
 
     assert_eq!(report.first_appearances.len(), 1);
     assert_eq!(report.first_appearances[0].variant, "Classic");
@@ -434,7 +434,7 @@ fn test_variant_names_canonical() -> AppResult<()> {
         )?;
     }
 
-    let report = StampsVariantTemporalAnalyser::analyse_temporal_distribution(&db)?;
+    let report = analyse_stamps_variant_temporal_distribution(&db)?;
 
     assert_eq!(
         report.total_outputs,
@@ -497,7 +497,7 @@ fn test_percentage_calculation() -> AppResult<()> {
         )?;
     }
 
-    let report = StampsVariantTemporalAnalyser::analyse_temporal_distribution(&db)?;
+    let report = analyse_stamps_variant_temporal_distribution(&db)?;
 
     assert_eq!(report.total_outputs, 10);
 
@@ -570,7 +570,7 @@ fn test_plotly_chart_generation() -> AppResult<()> {
         Some("Classic"),
     )?;
 
-    let report = StampsVariantTemporalAnalyser::analyse_temporal_distribution(&db)?;
+    let report = analyse_stamps_variant_temporal_distribution(&db)?;
     let chart = report.to_plotly_chart();
 
     // Should have one trace per variant
@@ -657,7 +657,7 @@ fn test_spent_outputs_excluded() -> AppResult<()> {
         [],
     )?;
 
-    let report = StampsVariantTemporalAnalyser::analyse_temporal_distribution(&db)?;
+    let report = analyse_stamps_variant_temporal_distribution(&db)?;
 
     // Only unspent output should be included
     assert_eq!(

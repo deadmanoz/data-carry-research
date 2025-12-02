@@ -27,25 +27,23 @@ use crate::types::visualisation::{
 use crate::utils::time::{extract_date_from_datetime, week_bucket_dates};
 use std::collections::HashMap;
 
-/// Bitcoin Stamps variant temporal distribution analyser
-pub struct StampsVariantTemporalAnalyser;
+/// Analyse temporal distribution of Bitcoin Stamps variants
+///
+/// Uses weekly aggregation with fixed 7-day buckets (Thursday-Wednesday).
+/// Reports NULL variants separately as they indicate a classification bug.
+///
+/// # Arguments
+/// * `db` - Database connection
+///
+/// # Returns
+/// * `AppResult<StampsVariantTemporalReport>` - Temporal distribution report
+pub fn analyse_stamps_variant_temporal_distribution(
+    db: &Database,
+) -> AppResult<StampsVariantTemporalReport> {
+    let conn = db.connection();
 
-impl StampsVariantTemporalAnalyser {
-    /// Analyse temporal distribution of Bitcoin Stamps variants
-    ///
-    /// Uses weekly aggregation with fixed 7-day buckets (Thursday-Wednesday).
-    /// Reports NULL variants separately as they indicate a classification bug.
-    ///
-    /// # Arguments
-    /// * `db` - Database connection
-    ///
-    /// # Returns
-    /// * `AppResult<StampsVariantTemporalReport>` - Temporal distribution report
-    pub fn analyse_temporal_distribution(db: &Database) -> AppResult<StampsVariantTemporalReport> {
-        let conn = db.connection();
-
-        // Query 1: Weekly variant aggregation
-        let weekly_query = r#"
+    // Query 1: Weekly variant aggregation
+    let weekly_query = r#"
             SELECT
                 (b.timestamp / 604800) AS week_bucket,
                 (b.timestamp - (b.timestamp % 604800)) AS week_start_ts,
@@ -66,57 +64,57 @@ impl StampsVariantTemporalAnalyser {
             ORDER BY week_bucket, poc.variant
         "#;
 
-        let mut stmt = conn.prepare(weekly_query)?;
-        let rows = stmt.query_map([], |row| {
-            let week_bucket: i64 = row.get(0)?;
-            let week_start_ts: i64 = row.get(1)?;
-            let variant: String = row.get(2)?;
-            let output_count: i64 = row.get(3)?;
-            let total_sats: i64 = row.get(4)?;
+    let mut stmt = conn.prepare(weekly_query)?;
+    let rows = stmt.query_map([], |row| {
+        let week_bucket: i64 = row.get(0)?;
+        let week_start_ts: i64 = row.get(1)?;
+        let variant: String = row.get(2)?;
+        let output_count: i64 = row.get(3)?;
+        let total_sats: i64 = row.get(4)?;
 
-            Ok((
-                week_bucket,
-                week_start_ts,
-                variant,
-                output_count,
-                total_sats,
-            ))
-        })?;
+        Ok((
+            week_bucket,
+            week_start_ts,
+            variant,
+            output_count,
+            total_sats,
+        ))
+    })?;
 
-        let mut weekly_data: Vec<WeeklyVariantStats> = Vec::new();
-        let mut variant_totals_map: HashMap<String, (usize, u64)> = HashMap::new();
-        let mut total_outputs: usize = 0;
-        let mut total_value_sats: u64 = 0;
+    let mut weekly_data: Vec<WeeklyVariantStats> = Vec::new();
+    let mut variant_totals_map: HashMap<String, (usize, u64)> = HashMap::new();
+    let mut total_outputs: usize = 0;
+    let mut total_value_sats: u64 = 0;
 
-        for row_result in rows {
-            let (week_bucket, week_start_ts, variant, output_count, total_sats) = row_result?;
+    for row_result in rows {
+        let (week_bucket, week_start_ts, variant, output_count, total_sats) = row_result?;
 
-            let (week_start_iso, week_end_iso) = week_bucket_dates(week_start_ts);
+        let (week_start_iso, week_end_iso) = week_bucket_dates(week_start_ts);
 
-            let count = output_count as usize;
-            let value = total_sats as u64;
+        let count = output_count as usize;
+        let value = total_sats as u64;
 
-            // Accumulate variant totals
-            let entry = variant_totals_map.entry(variant.clone()).or_insert((0, 0));
-            entry.0 += count;
-            entry.1 += value;
+        // Accumulate variant totals
+        let entry = variant_totals_map.entry(variant.clone()).or_insert((0, 0));
+        entry.0 += count;
+        entry.1 += value;
 
-            total_outputs += count;
-            total_value_sats += value;
+        total_outputs += count;
+        total_value_sats += value;
 
-            weekly_data.push(WeeklyVariantStats {
-                week_bucket,
-                week_start_iso,
-                week_end_iso,
-                variant,
-                count,
-                value_sats: value,
-            });
-        }
+        weekly_data.push(WeeklyVariantStats {
+            week_bucket,
+            week_start_iso,
+            week_end_iso,
+            variant,
+            count,
+            value_sats: value,
+        });
+    }
 
-        // Query 2: NULL variant count (bug indicator)
-        // Run BEFORE early return so null-only datasets are surfaced
-        let null_count_query = r#"
+    // Query 2: NULL variant count (bug indicator)
+    // Run BEFORE early return so null-only datasets are surfaced
+    let null_count_query = r#"
             SELECT COUNT(*) as null_count
             FROM p2ms_output_classifications poc
             JOIN transaction_outputs tout
@@ -128,18 +126,18 @@ impl StampsVariantTemporalAnalyser {
               AND poc.variant IS NULL
         "#;
 
-        let null_variant_count: i64 = conn.query_row(null_count_query, [], |row| row.get(0))?;
+    let null_variant_count: i64 = conn.query_row(null_count_query, [], |row| row.get(0))?;
 
-        // Handle empty report case (but still include null_variant_count)
-        if weekly_data.is_empty() {
-            return Ok(StampsVariantTemporalReport {
-                null_variant_count: null_variant_count as usize,
-                ..Default::default()
-            });
-        }
+    // Handle empty report case (but still include null_variant_count)
+    if weekly_data.is_empty() {
+        return Ok(StampsVariantTemporalReport {
+            null_variant_count: null_variant_count as usize,
+            ..Default::default()
+        });
+    }
 
-        // Query 3: First appearances (CTE with ROW_NUMBER for deterministic tie-breaking)
-        let first_appearance_query = r#"
+    // Query 3: First appearances (CTE with ROW_NUMBER for deterministic tie-breaking)
+    let first_appearance_query = r#"
             WITH ranked AS (
                 SELECT
                     poc.variant,
@@ -167,71 +165,70 @@ impl StampsVariantTemporalAnalyser {
             ORDER BY first_height ASC
         "#;
 
-        let mut first_stmt = conn.prepare(first_appearance_query)?;
-        let first_rows = first_stmt.query_map([], |row| {
-            let variant: String = row.get(0)?;
-            let first_height: i64 = row.get(1)?;
-            let first_date_raw: String = row.get(2)?;
-            let first_txid: String = row.get(3)?;
+    let mut first_stmt = conn.prepare(first_appearance_query)?;
+    let first_rows = first_stmt.query_map([], |row| {
+        let variant: String = row.get(0)?;
+        let first_height: i64 = row.get(1)?;
+        let first_date_raw: String = row.get(2)?;
+        let first_txid: String = row.get(3)?;
 
-            Ok((variant, first_height, first_date_raw, first_txid))
-        })?;
+        Ok((variant, first_height, first_date_raw, first_txid))
+    })?;
 
-        let mut first_appearances: Vec<VariantFirstSeen> = Vec::new();
-        for row_result in first_rows {
-            let (variant, first_height, first_date_raw, first_txid) = row_result?;
-            let first_date = extract_date_from_datetime(&first_date_raw);
+    let mut first_appearances: Vec<VariantFirstSeen> = Vec::new();
+    for row_result in first_rows {
+        let (variant, first_height, first_date_raw, first_txid) = row_result?;
+        let first_date = extract_date_from_datetime(&first_date_raw);
 
-            first_appearances.push(VariantFirstSeen {
-                variant,
-                first_height: first_height as u64,
-                first_date,
-                first_txid,
-            });
-        }
-
-        // Build variant totals with percentages
-        let mut variant_totals: Vec<VariantTotal> = variant_totals_map
-            .into_iter()
-            .map(|(variant, (count, value))| {
-                let percentage = if total_outputs > 0 {
-                    (count as f64 / total_outputs as f64) * 100.0
-                } else {
-                    0.0
-                };
-                VariantTotal {
-                    variant,
-                    count,
-                    percentage,
-                    total_value_sats: value,
-                }
-            })
-            .collect();
-
-        // Sort by count descending for consistent display
-        variant_totals.sort_by(|a, b| b.count.cmp(&a.count));
-
-        // Extract date range from weekly data
-        let date_range_start = weekly_data
-            .first()
-            .map(|w| w.week_start_iso.clone())
-            .unwrap_or_default();
-        let date_range_end = weekly_data
-            .last()
-            .map(|w| w.week_end_iso.clone())
-            .unwrap_or_default();
-
-        Ok(StampsVariantTemporalReport {
-            total_outputs,
-            total_value_sats,
-            date_range_start,
-            date_range_end,
-            variant_totals,
-            weekly_data,
-            first_appearances,
-            null_variant_count: null_variant_count as usize,
-        })
+        first_appearances.push(VariantFirstSeen {
+            variant,
+            first_height: first_height as u64,
+            first_date,
+            first_txid,
+        });
     }
+
+    // Build variant totals with percentages
+    let mut variant_totals: Vec<VariantTotal> = variant_totals_map
+        .into_iter()
+        .map(|(variant, (count, value))| {
+            let percentage = if total_outputs > 0 {
+                (count as f64 / total_outputs as f64) * 100.0
+            } else {
+                0.0
+            };
+            VariantTotal {
+                variant,
+                count,
+                percentage,
+                total_value_sats: value,
+            }
+        })
+        .collect();
+
+    // Sort by count descending for consistent display
+    variant_totals.sort_by(|a, b| b.count.cmp(&a.count));
+
+    // Extract date range from weekly data
+    let date_range_start = weekly_data
+        .first()
+        .map(|w| w.week_start_iso.clone())
+        .unwrap_or_default();
+    let date_range_end = weekly_data
+        .last()
+        .map(|w| w.week_end_iso.clone())
+        .unwrap_or_default();
+
+    Ok(StampsVariantTemporalReport {
+        total_outputs,
+        total_value_sats,
+        date_range_start,
+        date_range_end,
+        variant_totals,
+        weekly_data,
+        first_appearances,
+        null_variant_count: null_variant_count as usize,
+    })
 }
 
 impl StampsVariantTemporalReport {

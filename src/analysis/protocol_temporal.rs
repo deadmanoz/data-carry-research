@@ -24,24 +24,20 @@ use crate::utils::time::week_bucket_dates;
 use std::collections::HashMap;
 use std::str::FromStr;
 
-/// Protocol temporal distribution analyser
-pub struct ProtocolTemporalAnalyser;
+/// Analyse temporal distribution of P2MS protocols
+///
+/// Uses weekly aggregation with fixed 7-day buckets (Thursday-Wednesday).
+///
+/// # Arguments
+/// * `db` - Database connection
+///
+/// # Returns
+/// * `AppResult<ProtocolTemporalReport>` - Temporal distribution report
+pub fn analyse_temporal_distribution(db: &Database) -> AppResult<ProtocolTemporalReport> {
+    let conn = db.connection();
 
-impl ProtocolTemporalAnalyser {
-    /// Analyse temporal distribution of P2MS protocols
-    ///
-    /// Uses weekly aggregation with fixed 7-day buckets (Thursday-Wednesday).
-    ///
-    /// # Arguments
-    /// * `db` - Database connection
-    ///
-    /// # Returns
-    /// * `AppResult<ProtocolTemporalReport>` - Temporal distribution report
-    pub fn analyse_temporal_distribution(db: &Database) -> AppResult<ProtocolTemporalReport> {
-        let conn = db.connection();
-
-        // Weekly protocol aggregation
-        let weekly_query = r#"
+    // Weekly protocol aggregation
+    let weekly_query = r#"
             SELECT
                 (b.timestamp / 604800) AS week_bucket,
                 (b.timestamp - (b.timestamp % 604800)) AS week_start_ts,
@@ -60,85 +56,84 @@ impl ProtocolTemporalAnalyser {
             ORDER BY week_bucket, poc.protocol
         "#;
 
-        let mut stmt = conn.prepare(weekly_query)?;
-        let rows = stmt.query_map([], |row| {
-            let week_bucket: i64 = row.get(0)?;
-            let week_start_ts: i64 = row.get(1)?;
-            let protocol: String = row.get(2)?;
-            let output_count: i64 = row.get(3)?;
-            let total_sats: i64 = row.get(4)?;
+    let mut stmt = conn.prepare(weekly_query)?;
+    let rows = stmt.query_map([], |row| {
+        let week_bucket: i64 = row.get(0)?;
+        let week_start_ts: i64 = row.get(1)?;
+        let protocol: String = row.get(2)?;
+        let output_count: i64 = row.get(3)?;
+        let total_sats: i64 = row.get(4)?;
 
-            Ok((
-                week_bucket,
-                week_start_ts,
-                protocol,
-                output_count,
-                total_sats,
-            ))
-        })?;
+        Ok((
+            week_bucket,
+            week_start_ts,
+            protocol,
+            output_count,
+            total_sats,
+        ))
+    })?;
 
-        let mut weekly_data: Vec<WeeklyProtocolStats> = Vec::new();
-        let mut protocol_totals_map: HashMap<ProtocolType, (usize, u64)> = HashMap::new();
-        let mut total_outputs: usize = 0;
-        let mut total_value_sats: u64 = 0;
-        let mut unique_weeks: std::collections::HashSet<i64> = std::collections::HashSet::new();
+    let mut weekly_data: Vec<WeeklyProtocolStats> = Vec::new();
+    let mut protocol_totals_map: HashMap<ProtocolType, (usize, u64)> = HashMap::new();
+    let mut total_outputs: usize = 0;
+    let mut total_value_sats: u64 = 0;
+    let mut unique_weeks: std::collections::HashSet<i64> = std::collections::HashSet::new();
 
-        for row_result in rows {
-            let (week_bucket, week_start_ts, protocol_str, output_count, total_sats) = row_result?;
+    for row_result in rows {
+        let (week_bucket, week_start_ts, protocol_str, output_count, total_sats) = row_result?;
 
-            let (week_start_iso, week_end_iso) = week_bucket_dates(week_start_ts);
+        let (week_start_iso, week_end_iso) = week_bucket_dates(week_start_ts);
 
-            let count = output_count as usize;
-            let value = total_sats as u64;
+        let count = output_count as usize;
+        let value = total_sats as u64;
 
-            // Parse protocol string to enum (parse once at DB boundary)
-            let protocol = ProtocolType::from_str(&protocol_str).unwrap_or_default();
+        // Parse protocol string to enum (parse once at DB boundary)
+        let protocol = ProtocolType::from_str(&protocol_str).unwrap_or_default();
 
-            // Accumulate protocol totals
-            let entry = protocol_totals_map.entry(protocol).or_insert((0, 0));
-            entry.0 += count;
-            entry.1 += value;
+        // Accumulate protocol totals
+        let entry = protocol_totals_map.entry(protocol).or_insert((0, 0));
+        entry.0 += count;
+        entry.1 += value;
 
-            total_outputs += count;
-            total_value_sats += value;
-            unique_weeks.insert(week_bucket);
+        total_outputs += count;
+        total_value_sats += value;
+        unique_weeks.insert(week_bucket);
 
-            weekly_data.push(WeeklyProtocolStats {
-                week_bucket,
-                week_start_iso,
-                week_end_iso,
-                protocol,
-                count,
-                value_sats: value,
-            });
-        }
-
-        // Handle empty report case
-        if weekly_data.is_empty() {
-            return Ok(ProtocolTemporalReport::default());
-        }
-
-        // Convert protocol totals map to sorted vec (by protocol enum order)
-        let mut protocol_totals: Vec<ProtocolTotal> = protocol_totals_map
-            .into_iter()
-            .map(|(protocol, (count, value_sats))| ProtocolTotal {
-                protocol,
-                count,
-                value_sats,
-            })
-            .collect();
-
-        // Sort by protocol enum order (direct comparison, no string parsing)
-        protocol_totals.sort_by_key(|p| p.protocol as u8);
-
-        Ok(ProtocolTemporalReport {
-            total_outputs,
-            total_value_sats,
-            week_count: unique_weeks.len(),
-            protocol_totals,
-            weekly_data,
-        })
+        weekly_data.push(WeeklyProtocolStats {
+            week_bucket,
+            week_start_iso,
+            week_end_iso,
+            protocol,
+            count,
+            value_sats: value,
+        });
     }
+
+    // Handle empty report case
+    if weekly_data.is_empty() {
+        return Ok(ProtocolTemporalReport::default());
+    }
+
+    // Convert protocol totals map to sorted vec (by protocol enum order)
+    let mut protocol_totals: Vec<ProtocolTotal> = protocol_totals_map
+        .into_iter()
+        .map(|(protocol, (count, value_sats))| ProtocolTotal {
+            protocol,
+            count,
+            value_sats,
+        })
+        .collect();
+
+    // Sort by protocol enum order (direct comparison, no string parsing)
+    protocol_totals.sort_by_key(|p| p.protocol as u8);
+
+    Ok(ProtocolTemporalReport {
+        total_outputs,
+        total_value_sats,
+        week_count: unique_weeks.len(),
+        protocol_totals,
+        weekly_data,
+    })
 }
 
 impl ProtocolTemporalReport {

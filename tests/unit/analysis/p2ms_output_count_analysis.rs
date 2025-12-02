@@ -5,7 +5,7 @@
 //! Tracks total satoshi value per bucket (USER DIRECTIVE).
 
 use crate::common::analysis_test_setup::create_analysis_test_db;
-use data_carry_research::analysis::P2msOutputCountAnalyser;
+use data_carry_research::analysis::analyse_output_counts;
 use data_carry_research::database::Database;
 use data_carry_research::errors::AppResult;
 use data_carry_research::types::ProtocolType;
@@ -243,7 +243,7 @@ fn test_global_distribution_bucket_assignment() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_output_count_test_data(&db)?;
 
-    let report = P2msOutputCountAnalyser::analyse_output_counts(&db)?;
+    let report = analyse_output_counts(&db)?;
 
     // Verify total transactions (7 transactions with outputs)
     assert_eq!(
@@ -308,7 +308,7 @@ fn test_total_value_in_buckets() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_output_count_test_data(&db)?;
 
-    let report = P2msOutputCountAnalyser::analyse_output_counts(&db)?;
+    let report = analyse_output_counts(&db)?;
 
     // Total value: 1000 + 1000 + 999 + 1000 + 1000 + 1000 + 1500 = 7499 sats
     assert_eq!(
@@ -336,7 +336,7 @@ fn test_percentiles_calculation() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_output_count_test_data(&db)?;
 
-    let report = P2msOutputCountAnalyser::analyse_output_counts(&db)?;
+    let report = analyse_output_counts(&db)?;
 
     // With 7 transactions with output counts: 1, 2, 3, 5, 8, 50, 150 (sorted)
     // Percentile indices: (n-1) * p / 100 where n=7
@@ -367,7 +367,7 @@ fn test_per_protocol_distribution() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_classified_test_data(&db)?;
 
-    let report = P2msOutputCountAnalyser::analyse_output_counts(&db)?;
+    let report = analyse_output_counts(&db)?;
 
     // Should have 2 protocols: BitcoinStamps and Counterparty
     assert_eq!(
@@ -422,7 +422,7 @@ fn test_protocol_ordering() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_classified_test_data(&db)?;
 
-    let report = P2msOutputCountAnalyser::analyse_output_counts(&db)?;
+    let report = analyse_output_counts(&db)?;
 
     // Protocols should be sorted by canonical ProtocolType enum discriminant order
     // BitcoinStamps comes before Counterparty in the enum
@@ -444,7 +444,7 @@ fn test_empty_database() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     // Don't seed any data
 
-    let report = P2msOutputCountAnalyser::analyse_output_counts(&db)?;
+    let report = analyse_output_counts(&db)?;
 
     // All counts should be zero
     assert_eq!(report.global_distribution.total_transactions, 0);
@@ -472,7 +472,7 @@ fn test_min_max_avg_output_counts() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_output_count_test_data(&db)?;
 
-    let report = P2msOutputCountAnalyser::analyse_output_counts(&db)?;
+    let report = analyse_output_counts(&db)?;
 
     // Min: 1, Max: 150
     assert_eq!(
@@ -504,7 +504,7 @@ fn test_unclassified_count() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_output_count_test_data(&db)?;
 
-    let report = P2msOutputCountAnalyser::analyse_output_counts(&db)?;
+    let report = analyse_output_counts(&db)?;
 
     // All 7 transactions are unclassified (no classifications inserted)
     assert_eq!(
@@ -520,7 +520,7 @@ fn test_bucket_ranges_consistency() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_output_count_test_data(&db)?;
 
-    let report = P2msOutputCountAnalyser::analyse_output_counts(&db)?;
+    let report = analyse_output_counts(&db)?;
 
     // Verify bucket ranges are contiguous
     for i in 0..report.global_distribution.buckets.len() - 1 {
@@ -559,7 +559,7 @@ fn test_bucket_count_consistency() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_output_count_test_data(&db)?;
 
-    let report = P2msOutputCountAnalyser::analyse_output_counts(&db)?;
+    let report = analyse_output_counts(&db)?;
 
     // Sum of all bucket counts should equal total transactions
     let bucket_sum: usize = report
@@ -622,7 +622,7 @@ fn test_spent_outputs_excluded() -> AppResult<()> {
         [],
     )?;
 
-    let report = P2msOutputCountAnalyser::analyse_output_counts(&db)?;
+    let report = analyse_output_counts(&db)?;
 
     // Should only have 1 transaction (spent excluded)
     assert_eq!(
@@ -666,7 +666,7 @@ fn test_non_multisig_excluded() -> AppResult<()> {
         [],
     )?;
 
-    let report = P2msOutputCountAnalyser::analyse_output_counts(&db)?;
+    let report = analyse_output_counts(&db)?;
 
     // Should only have 1 transaction (p2pkh excluded)
     assert_eq!(

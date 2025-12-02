@@ -573,7 +573,7 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
             mime_type,
         } => {
             let db_path = get_db_path_from_config(database_path, &app_config)?;
-            use crate::analysis::ContentTypeAnalyser;
+            use crate::analysis::content_type_analysis;
             use crate::database::Database;
             let db = Database::new(&db_path)?;
 
@@ -581,7 +581,7 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
             if let Some(protocol_str) = protocol {
                 // Protocol-specific analysis
                 let analysis =
-                    ContentTypeAnalyser::analyse_protocol_content_types(&db, protocol_str)?;
+                    content_type_analysis::analyse_protocol_content_types(&db, protocol_str)?;
                 match parse_format(format) {
                     OutputFormat::Json | OutputFormat::Plotly => {
                         println!("{}", serde_json::to_string_pretty(&analysis)?);
@@ -609,7 +609,7 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
                 }
             } else if let Some(mime_str) = mime_type {
                 // MIME type usage analysis
-                let analysis = ContentTypeAnalyser::analyse_mime_type_usage(&db, mime_str)?;
+                let analysis = content_type_analysis::analyse_mime_type_usage(&db, mime_str)?;
                 match parse_format(format) {
                     OutputFormat::Json | OutputFormat::Plotly => {
                         println!("{}", serde_json::to_string_pretty(&analysis)?);
@@ -630,7 +630,7 @@ pub fn run_analysis(analysis_type: &AnalysisCommands) -> AppResult<()> {
                 }
             } else {
                 // Full content type analysis
-                let analysis = ContentTypeAnalyser::analyse_content_types(&db)?;
+                let analysis = content_type_analysis::analyse_content_types(&db)?;
                 match parse_format(format) {
                     OutputFormat::Json | OutputFormat::Plotly => {
                         println!("{}", serde_json::to_string_pretty(&analysis)?);

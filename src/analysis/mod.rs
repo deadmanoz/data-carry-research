@@ -78,32 +78,43 @@ pub use crate::types::analysis_results::{
     WeeklySpendabilityStats, WeeklyStampsFeeStats, WeeklyVariantStats, UNCLASSIFIED_SENTINEL,
 };
 pub use crate::types::visualisation::PlotlyChart;
-pub use burn_detector::BurnPatternDetector;
-pub use burn_patterns::BurnPatternAnalyser;
-pub use content_type_analysis::ContentTypeAnalyser;
-pub use data_size_stats::DataSizeAnalyser;
-pub use dust_analysis::DustAnalyser;
-pub use fee_analysis::FeeAnalysisEngine;
-pub use file_extension_stats::FileExtensionAnalyser;
-pub use multisig_config_stats::MultisigConfigAnalyser;
-pub use p2ms_output_count_analysis::P2msOutputCountAnalyser;
-pub use protocol_stats::ProtocolStatsAnalyser;
-pub use protocol_temporal::ProtocolTemporalAnalyser;
+pub use burn_detector::detect_burn_patterns;
+pub use burn_patterns::{analyse_patterns, get_pattern_breakdown, get_sample_patterns};
+pub use content_type_analysis::{
+    analyse_content_types, analyse_mime_type_usage, analyse_protocol_content_types,
+};
+pub use data_size_stats::{
+    analyse_comprehensive_data_sizes, analyse_content_type_spendability,
+    analyse_protocol_data_sizes, analyse_spendability_data_sizes,
+};
+pub use dust_analysis::analyse_dust_thresholds;
+pub use fee_analysis::{analyse_transaction_fees, get_fee_statistics, get_storage_costs};
+pub use file_extension_stats::analyse_file_types;
+pub use multisig_config_stats::{analyse_multisig_configurations, determine_configuration};
+pub use p2ms_output_count_analysis::analyse_output_counts;
+pub use protocol_stats::{
+    analyse_classifications, get_protocol_breakdown, get_signature_detection_stats,
+};
+pub use protocol_temporal::analyse_temporal_distribution;
 pub use pubkey_validator::{
     aggregate_validation_for_outputs, validate_from_metadata, validate_pubkeys,
     PubkeyValidationResult,
 };
 pub use reports::{OutputFormat, ReportFormatter};
-pub use signature_analysis::SignatureAnalyser;
-pub use spendability_stats::SpendabilityStatsAnalyser;
-pub use spendability_temporal::SpendabilityTemporalAnalyser;
-pub use stamps_signature_stats::{StampsSignatureAnalyser, StampsSignatureAnalysis};
-pub use stamps_transport_stats::{StampsTransportAnalyser, StampsTransportAnalysis};
-pub use stamps_variant_temporal::StampsVariantTemporalAnalyser;
-pub use stamps_weekly_fee_analysis::StampsWeeklyFeeAnalyser;
-pub use tx_fee_calculator::TransactionFeeCalculator;
-pub use tx_size_analysis::TxSizeAnalyser;
-pub use value_analysis::ValueAnalysisEngine;
+pub use signature_analysis::{analyse_burn_pattern_correlation, analyse_signatures};
+pub use spendability_stats::{
+    analyse_spendability, get_key_count_distributions, get_overall_breakdown,
+    get_protocol_breakdown as get_spendability_protocol_breakdown, get_reason_distribution,
+    get_transaction_level_stats,
+};
+pub use spendability_temporal::analyse_spendability_temporal_distribution;
+pub use stamps_signature_stats::{analyse_signature_distribution, StampsSignatureAnalysis};
+pub use stamps_transport_stats::{analyse_transport_breakdown, StampsTransportAnalysis};
+pub use stamps_variant_temporal::analyse_stamps_variant_temporal_distribution;
+pub use stamps_weekly_fee_analysis::analyse_weekly_fees;
+pub use tx_fee_calculator::analyse_fees;
+pub use tx_size_analysis::analyse_tx_sizes;
+pub use value_analysis::{analyse_value_distribution, analyse_value_distributions};
 
 use crate::database::Database;
 use crate::errors::AppResult;
@@ -142,7 +153,7 @@ impl AnalysisEngine {
     /// # Returns
     /// * `AppResult<BurnPatternAnalysis>` - Comprehensive burn pattern insights
     pub fn analyse_burn_patterns(&self) -> AppResult<BurnPatternAnalysis> {
-        BurnPatternAnalyser::analyse_patterns(&self.database)
+        burn_patterns::analyse_patterns(&self.database)
     }
 
     /// Analyse transaction fees and storage costs
@@ -158,7 +169,7 @@ impl AnalysisEngine {
     /// # Returns
     /// * `AppResult<FeeAnalysisReport>` - Comprehensive fee analysis
     pub fn analyse_fees(&self) -> AppResult<FeeAnalysisReport> {
-        FeeAnalysisEngine::analyse_transaction_fees(&self.database)
+        fee_analysis::analyse_transaction_fees(&self.database)
     }
 
     /// Analyse value distribution across protocols
@@ -177,7 +188,7 @@ impl AnalysisEngine {
         // First get fee analysis for context
         let fee_report = self.analyse_fees()?;
         // Then perform value analysis with fee context
-        ValueAnalysisEngine::analyse_value_distribution(&self.database, fee_report)
+        value_analysis::analyse_value_distribution(&self.database, fee_report)
     }
 
     /// Analyse detailed value distribution histograms
@@ -191,7 +202,7 @@ impl AnalysisEngine {
     /// # Returns
     /// * `AppResult<ValueDistributionReport>` - Comprehensive value distribution histograms
     pub fn analyse_value_distributions(&self) -> AppResult<ValueDistributionReport> {
-        ValueAnalysisEngine::analyse_value_distributions(&self.database)
+        value_analysis::analyse_value_distributions(&self.database)
     }
 
     /// Analyse protocol classification statistics
@@ -207,7 +218,7 @@ impl AnalysisEngine {
     /// # Returns
     /// * `AppResult<ClassificationStatsReport>` - Comprehensive classification analysis
     pub fn analyse_classifications(&self) -> AppResult<ClassificationStatsReport> {
-        ProtocolStatsAnalyser::analyse_classifications(&self.database)
+        protocol_stats::analyse_classifications(&self.database)
     }
 
     /// Analyse protocol signature detection
@@ -223,7 +234,7 @@ impl AnalysisEngine {
     /// # Returns
     /// * `AppResult<SignatureAnalysisReport>` - Comprehensive signature analysis
     pub fn analyse_signatures(&self) -> AppResult<SignatureAnalysisReport> {
-        SignatureAnalyser::analyse_signatures(&self.database)
+        signature_analysis::analyse_signatures(&self.database)
     }
 
     /// AnalyseP2MS output spendability
@@ -240,12 +251,12 @@ impl AnalysisEngine {
     /// # Returns
     /// * `AppResult<SpendabilityStatsReport>` - Comprehensive spendability analysis
     pub fn analyse_spendability(&self) -> AppResult<SpendabilityStatsReport> {
-        SpendabilityStatsAnalyser::analyse_spendability(&self.database)
+        spendability_stats::analyse_spendability(&self.database)
     }
 
     /// Analyse file extensions and data-size usage across classified transactions
     pub fn analyse_file_extensions(&self) -> AppResult<FileExtensionReport> {
-        FileExtensionAnalyser::analyse_file_types(&self.database)
+        file_extension_stats::analyse_file_types(&self.database)
     }
 
     /// Analyse Bitcoin Stamps transport mechanism breakdown
@@ -260,7 +271,7 @@ impl AnalysisEngine {
     /// # Returns
     /// * `AppResult<StampsTransportAnalysis>` - Complete transport breakdown
     pub fn analyse_stamps_transport(&self) -> AppResult<StampsTransportAnalysis> {
-        StampsTransportAnalyser::analyse_transport_breakdown(&self.database)
+        stamps_transport_stats::analyse_transport_breakdown(&self.database)
     }
 
     /// Analyse Bitcoin Stamps signature variant distribution
@@ -274,7 +285,7 @@ impl AnalysisEngine {
     /// # Returns
     /// * `AppResult<StampsSignatureAnalysis>` - Complete signature variant breakdown
     pub fn analyse_stamps_signatures(&self) -> AppResult<StampsSignatureAnalysis> {
-        StampsSignatureAnalyser::analyse_signature_distribution(&self.database)
+        stamps_signature_stats::analyse_signature_distribution(&self.database)
     }
 
     /// Analyse data sizes across protocols with spendability breakdown
@@ -288,7 +299,7 @@ impl AnalysisEngine {
     /// # Returns
     /// * `AppResult<ProtocolDataSizeReport>` - Protocol-level data size analysis
     pub fn analyse_protocol_data_sizes(&self) -> AppResult<ProtocolDataSizeReport> {
-        DataSizeAnalyser::analyse_protocol_data_sizes(&self.database)
+        data_size_stats::analyse_protocol_data_sizes(&self.database)
     }
 
     /// Analyse data sizes by spendability
@@ -301,7 +312,7 @@ impl AnalysisEngine {
     /// # Returns
     /// * `AppResult<SpendabilityDataSizeReport>` - Spendability-level data size analysis
     pub fn analyse_spendability_data_sizes(&self) -> AppResult<SpendabilityDataSizeReport> {
-        DataSizeAnalyser::analyse_spendability_data_sizes(&self.database)
+        data_size_stats::analyse_spendability_data_sizes(&self.database)
     }
 
     /// Analyse data sizes by content type with spendability cross-analysis
@@ -315,7 +326,7 @@ impl AnalysisEngine {
     /// # Returns
     /// * `AppResult<ContentTypeSpendabilityReport>` - Content type data size analysis
     pub fn analyse_content_type_spendability(&self) -> AppResult<ContentTypeSpendabilityReport> {
-        DataSizeAnalyser::analyse_content_type_spendability(&self.database)
+        data_size_stats::analyse_content_type_spendability(&self.database)
     }
 
     /// Analyse comprehensive data sizes across all dimensions
@@ -326,7 +337,7 @@ impl AnalysisEngine {
     /// # Returns
     /// * `AppResult<ComprehensiveDataSizeReport>` - Complete data size analysis
     pub fn analyse_comprehensive_data_sizes(&self) -> AppResult<ComprehensiveDataSizeReport> {
-        DataSizeAnalyser::analyse_comprehensive_data_sizes(&self.database)
+        data_size_stats::analyse_comprehensive_data_sizes(&self.database)
     }
 
     /// Analyse multisig configurations with exhaustive breakdown
@@ -340,7 +351,7 @@ impl AnalysisEngine {
     /// # Returns
     /// * `AppResult<MultisigConfigReport>` - Comprehensive multisig configuration analysis
     pub fn analyse_multisig_configurations(&self) -> AppResult<MultisigConfigReport> {
-        MultisigConfigAnalyser::analyse_multisig_configurations(&self.database)
+        multisig_config_stats::analyse_multisig_configurations(&self.database)
     }
 
     /// Analyse content type (MIME type) distribution across protocols
@@ -361,7 +372,7 @@ impl AnalysisEngine {
     /// # Returns
     /// * `AppResult<ContentTypeAnalysisReport>` - Comprehensive content type analysis
     pub fn analyse_content_types(&self) -> AppResult<ContentTypeAnalysisReport> {
-        ContentTypeAnalyser::analyse_content_types(&self.database)
+        content_type_analysis::analyse_content_types(&self.database)
     }
 
     /// Analyse dust thresholds across all P2MS outputs
@@ -380,7 +391,7 @@ impl AnalysisEngine {
     /// # Returns
     /// * `AppResult<DustAnalysisReport>` - Comprehensive dust threshold analysis
     pub fn analyse_dust_thresholds(&self) -> AppResult<DustAnalysisReport> {
-        DustAnalyser::analyse_dust_thresholds(&self.database)
+        dust_analysis::analyse_dust_thresholds(&self.database)
     }
 
     /// Analyse Bitcoin Stamps transaction fees aggregated by week
@@ -399,7 +410,7 @@ impl AnalysisEngine {
     /// # Returns
     /// * `AppResult<StampsWeeklyFeeReport>` - Weekly fee statistics with Plotly support
     pub fn analyse_stamps_weekly_fees(&self) -> AppResult<StampsWeeklyFeeReport> {
-        StampsWeeklyFeeAnalyser::analyse_weekly_fees(&self.database)
+        stamps_weekly_fee_analysis::analyse_weekly_fees(&self.database)
     }
 
     /// Analyse Bitcoin Stamps variant distribution over time
@@ -415,7 +426,7 @@ impl AnalysisEngine {
     /// # Returns
     /// * `AppResult<StampsVariantTemporalReport>` - Variant temporal distribution
     pub fn analyse_stamps_variant_temporal(&self) -> AppResult<StampsVariantTemporalReport> {
-        StampsVariantTemporalAnalyser::analyse_temporal_distribution(&self.database)
+        stamps_variant_temporal::analyse_stamps_variant_temporal_distribution(&self.database)
     }
 
     /// Analyse protocol distribution over time
@@ -431,7 +442,7 @@ impl AnalysisEngine {
     /// # Returns
     /// * `AppResult<ProtocolTemporalReport>` - Protocol temporal distribution
     pub fn analyse_protocol_temporal(&self) -> AppResult<ProtocolTemporalReport> {
-        ProtocolTemporalAnalyser::analyse_temporal_distribution(&self.database)
+        protocol_temporal::analyse_temporal_distribution(&self.database)
     }
 
     /// Analyse spendability distribution over time
@@ -447,7 +458,7 @@ impl AnalysisEngine {
     /// # Returns
     /// * `AppResult<SpendabilityTemporalReport>` - Spendability temporal distribution
     pub fn analyse_spendability_temporal(&self) -> AppResult<SpendabilityTemporalReport> {
-        SpendabilityTemporalAnalyser::analyse_temporal_distribution(&self.database)
+        spendability_temporal::analyse_spendability_temporal_distribution(&self.database)
     }
 
     /// Analyse transaction size distribution across all P2MS transactions
@@ -466,7 +477,7 @@ impl AnalysisEngine {
     /// # Returns
     /// * `AppResult<TxSizeDistributionReport>` - Comprehensive size distribution
     pub fn analyse_tx_sizes(&self) -> AppResult<TxSizeDistributionReport> {
-        TxSizeAnalyser::analyse_tx_sizes(&self.database)
+        tx_size_analysis::analyse_tx_sizes(&self.database)
     }
 
     /// Analyse P2MS output count distribution across all transactions
@@ -480,7 +491,7 @@ impl AnalysisEngine {
     /// # Returns
     /// * `AppResult<OutputCountDistributionReport>` - Comprehensive output count distribution
     pub fn analyse_output_counts(&self) -> AppResult<OutputCountDistributionReport> {
-        P2msOutputCountAnalyser::analyse_output_counts(&self.database)
+        p2ms_output_count_analysis::analyse_output_counts(&self.database)
     }
 
     /// Generate a comprehensive analysis report including all analysis types

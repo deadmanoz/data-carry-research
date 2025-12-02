@@ -6,7 +6,10 @@ use crate::common::analysis_test_setup::{
     insert_test_tx_classification, seed_analysis_blocks, TestClassificationParams,
     TestOutputClassificationParams, TestOutputParams, TestP2msOutputParams,
 };
-use data_carry_research::analysis::DataSizeAnalyser;
+use data_carry_research::analysis::{
+    analyse_comprehensive_data_sizes, analyse_content_type_spendability,
+    analyse_protocol_data_sizes, analyse_spendability_data_sizes,
+};
 use data_carry_research::database::Database;
 use data_carry_research::errors::AppResult;
 use data_carry_research::types::ProtocolType;
@@ -98,7 +101,7 @@ fn test_analyse_protocol_data_sizes() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_test_data(&db)?;
 
-    let report = DataSizeAnalyser::analyse_protocol_data_sizes(&db)?;
+    let report = analyse_protocol_data_sizes(&db)?;
 
     // Verify overall totals
     assert_eq!(report.total_outputs, 5, "Should have 5 total outputs");
@@ -166,7 +169,7 @@ fn test_analyse_spendability_data_sizes() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_test_data(&db)?;
 
-    let report = DataSizeAnalyser::analyse_spendability_data_sizes(&db)?;
+    let report = analyse_spendability_data_sizes(&db)?;
 
     // Verify overall metrics
     assert_eq!(
@@ -214,7 +217,7 @@ fn test_analyse_content_type_spendability() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_test_data(&db)?;
 
-    let report = DataSizeAnalyser::analyse_content_type_spendability(&db)?;
+    let report = analyse_content_type_spendability(&db)?;
 
     // Verify overall totals
     assert_eq!(report.total_bytes, 2600, "Total bytes");
@@ -262,7 +265,7 @@ fn test_analyse_comprehensive_data_sizes() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_test_data(&db)?;
 
-    let report = DataSizeAnalyser::analyse_comprehensive_data_sizes(&db)?;
+    let report = analyse_comprehensive_data_sizes(&db)?;
 
     // Verify overall summary
     assert_eq!(
@@ -324,7 +327,7 @@ fn test_empty_database() -> AppResult<()> {
 
     // Don't seed any data - test with empty database
 
-    let protocol_report = DataSizeAnalyser::analyse_protocol_data_sizes(&db)?;
+    let protocol_report = analyse_protocol_data_sizes(&db)?;
     assert_eq!(
         protocol_report.total_bytes, 0,
         "Empty DB should have 0 bytes"
@@ -339,13 +342,13 @@ fn test_empty_database() -> AppResult<()> {
         "Empty DB should have no protocols"
     );
 
-    let spendability_report = DataSizeAnalyser::analyse_spendability_data_sizes(&db)?;
+    let spendability_report = analyse_spendability_data_sizes(&db)?;
     assert_eq!(
         spendability_report.overall.total_bytes, 0,
         "Empty DB spendability total"
     );
 
-    let content_report = DataSizeAnalyser::analyse_content_type_spendability(&db)?;
+    let content_report = analyse_content_type_spendability(&db)?;
     assert_eq!(content_report.total_bytes, 0, "Empty DB content type total");
 
     Ok(())
@@ -369,7 +372,7 @@ fn test_null_content_types() -> AppResult<()> {
             .without_content_type(),
     )?;
 
-    let report = DataSizeAnalyser::analyse_content_type_spendability(&db)?;
+    let report = analyse_content_type_spendability(&db)?;
 
     // Should have "Unclassified" category for NULL content_type
     let unclassified = report
@@ -418,7 +421,7 @@ fn test_spent_outputs_excluded() -> AppResult<()> {
             .with_content_type("image/png"),
     )?;
 
-    let report = DataSizeAnalyser::analyse_protocol_data_sizes(&db)?;
+    let report = analyse_protocol_data_sizes(&db)?;
 
     // Should only count the unspent output (500 bytes, not 1100)
     assert_eq!(report.total_bytes, 500, "Should only count unspent outputs");

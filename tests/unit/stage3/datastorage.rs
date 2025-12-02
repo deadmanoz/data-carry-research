@@ -19,9 +19,7 @@
 
 use data_carry_research::processor::stage3::datastorage::DataStorageClassifier;
 use data_carry_research::processor::stage3::ProtocolSpecificClassifier;
-use data_carry_research::shared::datastorage_helpers::{
-    detect_binary_signature, is_burn_pattern,
-};
+use data_carry_research::shared::datastorage_helpers::{detect_binary_signature, is_burn_pattern};
 use data_carry_research::types::{
     EnrichedTransaction, ProtocolType, ProtocolVariant, TransactionOutput,
 };

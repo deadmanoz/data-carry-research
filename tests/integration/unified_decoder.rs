@@ -650,7 +650,9 @@ async fn test_decode_bitcoin_stamps_image_c129cc() -> anyhow::Result<()> {
         }
     };
 
-    println!("Testing Bitcoin Stamps SRC-20 JSON decoding (Counterparty-embedded, missing padding)");
+    println!(
+        "Testing Bitcoin Stamps SRC-20 JSON decoding (Counterparty-embedded, missing padding)"
+    );
     println!("Transaction: {}", STAMPS_IMAGE_C129CC_TXID);
 
     let result = decoder.decode_txid(STAMPS_IMAGE_C129CC_TXID).await?;
@@ -1586,7 +1588,10 @@ async fn test_decode_nonexistent_transaction() -> anyhow::Result<()> {
     // Should return an error for non-existent transaction
     match result {
         Err(e) => {
-            println!("Correctly returned error for non-existent transaction: {}", e);
+            println!(
+                "Correctly returned error for non-existent transaction: {}",
+                e
+            );
             println!("Non-existent transaction handling works correctly");
         }
         Ok(Some(data)) => {

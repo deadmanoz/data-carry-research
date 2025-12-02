@@ -8,7 +8,7 @@ use crate::common::analysis_test_setup::{
     insert_test_tx_classification, seed_analysis_blocks, TestClassificationParams,
     TestOutputClassificationParams,
 };
-use data_carry_research::analysis::TxSizeAnalyser;
+use data_carry_research::analysis::analyse_tx_sizes;
 use data_carry_research::errors::AppResult;
 use data_carry_research::types::ProtocolType;
 
@@ -125,7 +125,7 @@ fn test_global_distribution_bucket_assignment() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_size_test_data(&db)?;
 
-    let report = TxSizeAnalyser::analyse_tx_sizes(&db)?;
+    let report = analyse_tx_sizes(&db)?;
 
     // Verify total transactions
     assert_eq!(
@@ -166,7 +166,7 @@ fn test_total_fees_in_buckets() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_size_test_data(&db)?;
 
-    let report = TxSizeAnalyser::analyse_tx_sizes(&db)?;
+    let report = analyse_tx_sizes(&db)?;
 
     // Total fees: 1000 + 2000 + 9000 + 199000 = 211000 sats
     assert_eq!(
@@ -194,7 +194,7 @@ fn test_percentiles_calculation() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_size_test_data(&db)?;
 
-    let report = TxSizeAnalyser::analyse_tx_sizes(&db)?;
+    let report = analyse_tx_sizes(&db)?;
 
     // With 4 transactions: 100, 300, 6000, 150000 (sorted)
     // Percentile indices: (n-1) * p / 100 where n=4
@@ -227,7 +227,7 @@ fn test_per_protocol_distribution() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_size_test_data(&db)?;
 
-    let report = TxSizeAnalyser::analyse_tx_sizes(&db)?;
+    let report = analyse_tx_sizes(&db)?;
 
     // Should have 2 protocols: BitcoinStamps and Counterparty
     assert_eq!(
@@ -271,7 +271,7 @@ fn test_protocol_ordering() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_size_test_data(&db)?;
 
-    let report = TxSizeAnalyser::analyse_tx_sizes(&db)?;
+    let report = analyse_tx_sizes(&db)?;
 
     // Protocols should be sorted by canonical ProtocolType enum discriminant order
     // BitcoinStamps comes before Counterparty in the enum
@@ -293,7 +293,7 @@ fn test_empty_database() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     // Don't seed any data
 
-    let report = TxSizeAnalyser::analyse_tx_sizes(&db)?;
+    let report = analyse_tx_sizes(&db)?;
 
     // All counts should be zero
     assert_eq!(report.global_distribution.total_transactions, 0);
@@ -318,7 +318,7 @@ fn test_min_max_avg_sizes() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_size_test_data(&db)?;
 
-    let report = TxSizeAnalyser::analyse_tx_sizes(&db)?;
+    let report = analyse_tx_sizes(&db)?;
 
     // Min: 100, Max: 150000
     assert_eq!(
@@ -370,7 +370,7 @@ fn test_excluded_zero_size_count() -> AppResult<()> {
         [],
     )?;
 
-    let report = TxSizeAnalyser::analyse_tx_sizes(&db)?;
+    let report = analyse_tx_sizes(&db)?;
 
     // Should still have 4 transactions (zero-size excluded)
     assert_eq!(
@@ -400,7 +400,7 @@ fn test_coinbase_excluded() -> AppResult<()> {
     insert_complete_p2ms_output(&db, "coinbase_tx", 0, 100000, 5000000, 200)?;
     insert_size_test_enriched_tx(&db, "coinbase_tx", 100000, 200, 0, true)?;
 
-    let report = TxSizeAnalyser::analyse_tx_sizes(&db)?;
+    let report = analyse_tx_sizes(&db)?;
 
     // Should only have 1 transaction (coinbase excluded)
     assert_eq!(
@@ -420,7 +420,7 @@ fn test_per_protocol_avg_fee_per_byte() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_size_test_data(&db)?;
 
-    let report = TxSizeAnalyser::analyse_tx_sizes(&db)?;
+    let report = analyse_tx_sizes(&db)?;
 
     // BitcoinStamps: total_fees = 202000, total_size = 100 + 300 + 150000 = 150400
     // avg_fee_per_byte = 202000 / 150400 ≈ 1.343
@@ -460,7 +460,7 @@ fn test_bucket_ranges_consistency() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_size_test_data(&db)?;
 
-    let report = TxSizeAnalyser::analyse_tx_sizes(&db)?;
+    let report = analyse_tx_sizes(&db)?;
 
     // Verify bucket ranges are contiguous
     for i in 0..report.global_distribution.buckets.len() - 1 {
@@ -499,7 +499,7 @@ fn test_bucket_count_consistency() -> AppResult<()> {
     let db = create_analysis_test_db()?;
     seed_size_test_data(&db)?;
 
-    let report = TxSizeAnalyser::analyse_tx_sizes(&db)?;
+    let report = analyse_tx_sizes(&db)?;
 
     // Sum of all bucket counts should equal total transactions
     let bucket_sum: usize = report
