@@ -100,36 +100,6 @@ impl Stage1Operations for Database {
         })
     }
 
-    fn save_checkpoint(&mut self, last_count: u64, total_processed: usize) -> AppResult<()> {
-        self.connection().execute(
-            r#"INSERT OR REPLACE INTO processing_checkpoints
-               (id, stage, last_processed_count, total_processed)
-               VALUES (1, 'stage1', ?1, ?2)"#,
-            params![last_count, total_processed],
-        )?;
-
-        debug!(
-            "Checkpoint saved: count={}, total={}",
-            last_count, total_processed
-        );
-        Ok(())
-    }
-
-    fn get_last_checkpoint(&self) -> AppResult<Option<(u64, usize)>> {
-        let mut stmt = self.connection().prepare(
-            "SELECT last_processed_count, total_processed FROM processing_checkpoints WHERE stage = 'stage1'"
-        )?;
-
-        let mut rows = stmt.query_map([], |row| {
-            Ok((row.get::<_, u64>(0)?, row.get::<_, usize>(1)?))
-        })?;
-
-        match rows.next() {
-            Some(result) => Ok(Some(result?)),
-            None => Ok(None),
-        }
-    }
-
     /// Get P2MS outputs for a transaction (with JOIN to p2ms_outputs).
     ///
     /// Joins `transaction_outputs` and `p2ms_outputs` to reconstruct TransactionOutput

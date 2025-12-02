@@ -12,16 +12,13 @@ use crate::types::{
 
 /// Stage 1 database operations - P2MS detection and storage
 pub trait Stage1Operations {
-    /// Insert a batch of P2MS outputs (legacy method)
+    /// Insert a batch of P2MS outputs
     fn insert_p2ms_batch(&mut self, batch: &[TransactionOutput]) -> AppResult<()>;
 
-    /// Insert a batch of transaction outputs (new generic method)
+    /// Insert a batch of transaction outputs
     fn insert_transaction_output_batch(&mut self, batch: &[TransactionOutput]) -> AppResult<()>;
 
-    /// Save processing checkpoint (legacy method - kept for backward compatibility)
-    fn save_checkpoint(&mut self, last_count: u64, total_processed: usize) -> AppResult<()>;
-
-    /// Save enhanced checkpoint with CSV line number for Stage 1 resume
+    /// Save checkpoint with CSV line number for Stage 1 resume
     fn save_checkpoint_enhanced(
         &mut self,
         last_count: u64,
@@ -30,10 +27,7 @@ pub trait Stage1Operations {
         batch_number: usize,
     ) -> AppResult<()>;
 
-    /// Get the last checkpoint (legacy method - returns simple tuple)
-    fn get_last_checkpoint(&self) -> AppResult<Option<(u64, usize)>>;
-
-    /// Get enhanced checkpoint with CSV line number for resuming
+    /// Get checkpoint with CSV line number for resuming
     fn get_checkpoint_enhanced(&self) -> AppResult<Option<Stage1Checkpoint>>;
 
     /// Clear checkpoint (call after successful completion)

@@ -15,16 +15,6 @@ use crate::shared::PubkeyExtractor;
 pub struct OmniClassifier;
 
 impl OmniClassifier {
-    #[allow(dead_code)]
-    pub async fn classify_with_rpc(
-        &self,
-        _tx: &EnrichedTransaction,
-        _database: &Database,
-        _rpc_client: &crate::rpc::BitcoinRpcClient,
-    ) -> Option<ClassificationResult> {
-        None
-    }
-
     fn has_exodus_address_output(&self, tx: &EnrichedTransaction, database: &Database) -> bool {
         use crate::types::omni::EXODUS_ADDRESS;
         database

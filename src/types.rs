@@ -53,22 +53,19 @@ pub mod visualisation;
 // Debug display types
 pub mod debug;
 
-// Re-export everything for backward compatibility
+// Public API re-exports
 pub use common::*;
 pub use stage1::*;
 pub use stage2::*;
 pub use stage3::*;
 
-// Re-export shared parsing functions from script_metadata
 pub use script_metadata::{
     is_multisig_script, is_opreturn_script, parse_multisig_anomaly, parse_nonstandard_script,
     parse_opreturn_script, parse_p2ms_script, OpReturnData, ScriptType,
 };
 
-// Re-export statistics types for convenience
 pub use statistics::{ProcessingStats, Stage2Stats, Stage3Results};
 
-// Re-export protocol variant types for convenience
 pub use ascii_identifier::AsciiIdentifierVariant;
 pub use datastorage::DataStorageVariant;
 pub use likely_data_storage::LikelyDataStorageVariant;

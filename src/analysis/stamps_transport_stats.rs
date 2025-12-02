@@ -12,9 +12,6 @@ pub use crate::types::analysis_results::{
     StampsTransportAnalysis, TransportStats, TransportVariantStats,
 };
 
-// Re-export with original name for backward compatibility
-pub use TransportVariantStats as VariantStats;
-
 /// Analyse Bitcoin Stamps transport mechanism breakdown
 ///
 /// Provides comprehensive statistics on:
@@ -162,10 +159,13 @@ pub fn analyse_transport_breakdown(db: &Database) -> AppResult<StampsTransportAn
 }
 
 /// Build variant statistics list sorted by count (descending)
-fn build_variant_list(variants: &HashMap<String, usize>, total_count: usize) -> Vec<VariantStats> {
-    let mut variant_list: Vec<VariantStats> = variants
+fn build_variant_list(
+    variants: &HashMap<String, usize>,
+    total_count: usize,
+) -> Vec<TransportVariantStats> {
+    let mut variant_list: Vec<TransportVariantStats> = variants
         .iter()
-        .map(|(variant, count)| VariantStats {
+        .map(|(variant, count)| TransportVariantStats {
             variant: variant.clone(),
             count: *count,
             percentage: if total_count > 0 {

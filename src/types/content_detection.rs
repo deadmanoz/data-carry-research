@@ -173,7 +173,7 @@ impl ContentType {
         }
 
         // Check binary signatures first (most specific)
-        if let Some(img) = Self::detect_image(data) {
+        if let Some(img) = detect_image_format(data) {
             return Some(ContentType::Image(img));
         }
 
@@ -333,11 +333,6 @@ impl ContentType {
             "application/octet-stream" => Some(ContentType::Binary),
             _ => None,
         }
-    }
-
-    /// Detect image formats (delegates to standalone detect_image_format function)
-    fn detect_image(data: &[u8]) -> Option<ImageFormat> {
-        detect_image_format(data)
     }
 
     /// Detect document formats

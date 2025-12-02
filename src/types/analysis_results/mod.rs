@@ -21,7 +21,7 @@ mod temporal;
 mod tx_size;
 mod value;
 
-// Re-export all types for backwards compatibility with existing imports
+// Public API re-exports
 pub use burn_patterns::{BurnPatternAnalysis, BurnPatternSample, PatternTypeStats};
 pub use classification::{
     ClassificationSample, ClassificationStatsReport, MethodStats, ProtocolBreakdown, ProtocolStats,

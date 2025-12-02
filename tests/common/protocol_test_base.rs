@@ -313,7 +313,7 @@ pub fn load_p2ms_outputs_from_json(json_path: &str, txid: &str) -> Result<Vec<Tr
                 if is_multisig || is_nonstandard_multisig {
                     let script_hex = spk["hex"].as_str().unwrap_or("").to_string();
                     let (pubkeys, required_sigs, total_pubkeys) =
-                        TransactionOutput::parse_p2ms_script(&script_hex)
+                        data_carry_research::types::parse_p2ms_script(&script_hex)
                             .unwrap_or_else(|_| (Vec::new(), 0, 0));
 
                     use data_carry_research::types::script_metadata::MultisigInfo;

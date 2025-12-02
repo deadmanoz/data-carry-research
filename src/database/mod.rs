@@ -143,21 +143,25 @@ mod tests {
         let mut db = Database::new(":memory:").unwrap();
 
         // Initially no checkpoint
-        assert!(db.get_last_checkpoint().unwrap().is_none());
+        assert!(db.get_checkpoint_enhanced().unwrap().is_none());
 
         // Save a checkpoint
-        db.save_checkpoint(12345, 100).unwrap();
+        db.save_checkpoint_enhanced(12345, 100, 12346, 10).unwrap();
 
         // Retrieve checkpoint
-        let checkpoint = db.get_last_checkpoint().unwrap().unwrap();
-        assert_eq!(checkpoint.0, 12345); // last_count
-        assert_eq!(checkpoint.1, 100); // total_processed
+        let checkpoint = db.get_checkpoint_enhanced().unwrap().unwrap();
+        assert_eq!(checkpoint.last_processed_count, 12345);
+        assert_eq!(checkpoint.total_processed, 100);
+        assert_eq!(checkpoint.csv_line_number, 12346);
+        assert_eq!(checkpoint.batch_number, 10);
 
         // Update checkpoint
-        db.save_checkpoint(67890, 200).unwrap();
+        db.save_checkpoint_enhanced(67890, 200, 67891, 20).unwrap();
 
-        let checkpoint = db.get_last_checkpoint().unwrap().unwrap();
-        assert_eq!(checkpoint.0, 67890);
-        assert_eq!(checkpoint.1, 200);
+        let checkpoint = db.get_checkpoint_enhanced().unwrap().unwrap();
+        assert_eq!(checkpoint.last_processed_count, 67890);
+        assert_eq!(checkpoint.total_processed, 200);
+        assert_eq!(checkpoint.csv_line_number, 67891);
+        assert_eq!(checkpoint.batch_number, 20);
     }
 }

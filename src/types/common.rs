@@ -137,16 +137,6 @@ impl TransactionOutput {
     pub fn is_nonstandard(&self) -> bool {
         self.script_type == "nonstandard"
     }
-
-    /// Parse P2MS script to extract multisig parameters (backward compatibility shim)
-    ///
-    /// This method forwards to the shared parser in script_metadata module.
-    /// New code should use `crate::types::parse_p2ms_script()` directly.
-    pub fn parse_p2ms_script(
-        script_hex: &str,
-    ) -> Result<(Vec<String>, u32, u32), crate::errors::AppError> {
-        crate::types::script_metadata::parse_p2ms_script(script_hex)
-    }
 }
 
 /// Fee analysis results for a transaction
@@ -253,10 +243,12 @@ mod tests {
 
     #[test]
     fn test_p2ms_script_parsing() {
+        use crate::types::parse_p2ms_script;
+
         // Test a valid 1-of-2 P2MS script: OP_1 <pubkey1> <pubkey2> OP_2 OP_CHECKMULTISIG
         let valid_script = "51210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179852ae";
 
-        let result = TransactionOutput::parse_p2ms_script(valid_script);
+        let result = parse_p2ms_script(valid_script);
         assert!(result.is_ok());
 
         let (pubkeys, required_sigs, total_pubkeys) = result.unwrap();
@@ -266,19 +258,21 @@ mod tests {
 
         // Test invalid script
         let invalid_script = "invalid_hex";
-        let result = TransactionOutput::parse_p2ms_script(invalid_script);
+        let result = parse_p2ms_script(invalid_script);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_nonstandard_multisig_classification() {
+        use crate::types::parse_p2ms_script;
+
         // Real nonstandard multisig script from blockchain (TXID: 72590fcf0d8021bad77826c5008eaca3541f81d212d55bb7c02ec6a4bf584404)
         // This is a 1-of-3 structure but uses OP_PUSHDATA1 with 120-byte data chunks instead of standard pubkeys
         // Bitcoin Core classifies this as "nonstandard", not "multisig"
         let nonstandard_script = "514c78ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff4c78ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff4c78ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff53ae";
 
         // Parser should fail on this (it only handles 0x21/0x41 pubkey markers)
-        let parse_result = TransactionOutput::parse_p2ms_script(nonstandard_script);
+        let parse_result = parse_p2ms_script(nonstandard_script);
         assert!(
             parse_result.is_err(),
             "Parser should fail on nonstandard multisig with OP_PUSHDATA1"
@@ -318,9 +312,11 @@ mod tests {
 
 #[test]
 fn test_omni_property_managed_script_parsing() {
+    use crate::types::parse_p2ms_script;
+
     let script_hex = "514104dc82c5812af7e44e40f16e5e03607935c0d3e531096e94deae1263f3b464a898232f90f7f3d747ff693dd796ea9df9df3b7c838591bf570db160f858b0130e7621024a0fe93b27241f8d449a2bba5ba7e55890ebe02155508d18499db3d18bc7d2902102b344aa1859ad54fa42c4fc97842b7ddd9fa65d86ba1e80af84e53cee3e4b55d153ae";
 
-    let result = TransactionOutput::parse_p2ms_script(script_hex);
+    let result = parse_p2ms_script(script_hex);
     println!("Parsing result: {:?}", result);
 
     match result {

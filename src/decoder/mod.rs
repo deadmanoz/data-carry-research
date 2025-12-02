@@ -846,7 +846,7 @@ impl ProtocolDecoder {
         let chancecoin_data = ChancecoinData {
             txid: txid.clone(),
             file_path: output_path,
-            message_type: message.message_type.clone(),
+            message_type: message.message_type,
             data: message.data.clone(),
         };
 
