@@ -319,6 +319,9 @@ pub mod analysis_test_setup;
 /// Common assertion helpers for protocol tests
 pub mod assertion_helpers;
 
+/// DecodedData unwrap helpers for decoder tests
+pub mod decoded_data_helpers;
+
 /// Fixture registry for protocol classification tests
 pub mod fixture_registry;
 
