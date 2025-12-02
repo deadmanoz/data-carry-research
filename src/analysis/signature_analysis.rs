@@ -5,9 +5,7 @@
 
 use crate::database::{Database, QueryHelper};
 use crate::errors::AppResult;
-use crate::types::analysis_results::{
-    BurnPatternCorrelation, ConfidenceStats, SignatureAnalysisReport,
-};
+use crate::types::analysis_results::{BurnPatternCorrelation, SignatureAnalysisReport};
 use crate::types::ProtocolType;
 use std::str::FromStr;
 
@@ -42,13 +40,9 @@ impl SignatureAnalyser {
         // Get burn pattern correlation
         let burn_pattern_analysis = Self::analyse_burn_pattern_correlation(db)?;
 
-        // Get confidence analysis
-        let confidence_analysis = Self::analyse_confidence_levels(db)?;
-
         Ok(SignatureAnalysisReport {
             classification_methods,
             burn_pattern_analysis,
-            confidence_analysis,
         })
     }
 
@@ -83,34 +77,5 @@ impl SignatureAnalyser {
         )?;
 
         Ok(BurnPatternCorrelation { correlations })
-    }
-
-    /// Analyse confidence levels in classifications
-    pub fn analyse_confidence_levels(db: &Database) -> AppResult<ConfidenceStats> {
-        let conn = db.connection();
-
-        // Use signature detection as a proxy for confidence
-        // High confidence = definitive signatures found
-        // Medium confidence = heuristic detection
-        // Low confidence = unknown or uncertain
-
-        // Use count_rows for cleaner queries
-        let high_confidence = conn.count_rows(
-            "transaction_classifications",
-            Some("protocol_signature_found = 1"),
-        )?;
-
-        let total_count = conn.count_rows("transaction_classifications", None)?;
-
-        let low_confidence =
-            conn.count_rows("transaction_classifications", Some("protocol = 'Unknown'"))?;
-
-        let medium_confidence = total_count - high_confidence - low_confidence;
-
-        Ok(ConfidenceStats {
-            high_confidence: high_confidence as usize,
-            medium_confidence: medium_confidence as usize,
-            low_confidence: low_confidence as usize,
-        })
     }
 }

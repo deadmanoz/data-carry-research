@@ -212,7 +212,6 @@ pub fn setup_schema(connection: &Connection) -> AppResult<()> {
             pubkey_index INTEGER NOT NULL,
             pattern_type TEXT NOT NULL,
             pattern_data TEXT NOT NULL,
-            confidence TEXT NOT NULL,
 
             PRIMARY KEY (txid, vout, pubkey_index, pattern_type),
             FOREIGN KEY (txid) REFERENCES enriched_transactions(txid) ON DELETE CASCADE,
@@ -221,7 +220,6 @@ pub fn setup_schema(connection: &Connection) -> AppResult<()> {
 
         CREATE INDEX IF NOT EXISTS idx_burn_txid ON burn_patterns(txid);
         CREATE INDEX IF NOT EXISTS idx_burn_type ON burn_patterns(pattern_type);
-        CREATE INDEX IF NOT EXISTS idx_burn_confidence ON burn_patterns(confidence);
 
         -- ═══════════════════════════════════════════════════════════════════════════
         -- PHASE 4: Classification Tables

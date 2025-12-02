@@ -6,7 +6,7 @@ use data_carry_research::database::traits::{
     Stage1Operations, Stage2Operations, StatisticsOperations,
 };
 use data_carry_research::database::Database;
-use data_carry_research::types::burn_patterns::{BurnConfidence, BurnPattern, BurnPatternType};
+use data_carry_research::types::burn_patterns::{BurnPattern, BurnPatternType};
 use data_carry_research::types::statistics::StatisticsCollector;
 use data_carry_research::types::*;
 use std::collections::HashMap;
@@ -257,7 +257,6 @@ async fn test_stage2_database_operations() -> Result<()> {
             pubkey_index: 0,
             pattern_data: "022222222222222222222222222222222222222222222222222222222222222222"
                 .to_string(),
-            confidence: BurnConfidence::High,
         }],
         input_count: 1,
         output_count: 2,

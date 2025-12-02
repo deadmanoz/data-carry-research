@@ -705,7 +705,6 @@ mod tests {
                 vout: 1,
                 pubkey_index: 2,
                 pattern_data: "0222222222...".to_string(),
-                confidence: crate::types::burn_patterns::BurnConfidence::High,
             }]
         } else {
             Vec::new()

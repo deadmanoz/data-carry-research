@@ -98,7 +98,7 @@ pub mod database {
 
 /// Test fixture utilities
 pub mod fixtures {
-    use data_carry_research::types::burn_patterns::{BurnConfidence, BurnPattern, BurnPatternType};
+    use data_carry_research::types::burn_patterns::{BurnPattern, BurnPatternType};
     use data_carry_research::types::{EnrichedTransaction, TransactionInput, TransactionOutput};
 
     /// Create a minimal test P2MS output for testing
@@ -252,7 +252,6 @@ pub mod fixtures {
                 pubkey_index: 0,
                 pattern_data: "022222222222222222222222222222222222222222222222222222222222222222"
                     .to_string(),
-                confidence: BurnConfidence::High,
             },
             BurnPattern {
                 pattern_type: BurnPatternType::Stamps33Pattern,
@@ -260,7 +259,6 @@ pub mod fixtures {
                 pubkey_index: 1,
                 pattern_data: "033333333333333333333333333333333333333333333333333333333333333333"
                     .to_string(),
-                confidence: BurnConfidence::High,
             },
         ]
     }
@@ -273,7 +271,6 @@ pub mod fixtures {
             pubkey_index: 0,
             pattern_data: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
                 .to_string(),
-            confidence: BurnConfidence::Medium,
         }]
     }
 

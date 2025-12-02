@@ -478,7 +478,7 @@ impl Database {
             .connection()
             .prepare(
                 r#"
-            SELECT bp.pattern_type, bp.vout, bp.pubkey_index, bp.pattern_data, bp.confidence
+            SELECT bp.pattern_type, bp.vout, bp.pubkey_index, bp.pattern_data
             FROM burn_patterns bp
             WHERE bp.txid = ?1
             "#,
@@ -488,7 +488,6 @@ impl Database {
         let rows = stmt
             .query_map(params![txid], |row| {
                 let pattern_type_str: String = row.get(0)?;
-                let confidence_str: String = row.get(4)?;
 
                 Ok(crate::types::burn_patterns::BurnPattern {
                     pattern_type: match pattern_type_str.as_str() {
@@ -510,11 +509,6 @@ impl Database {
                     vout: row.get(1)?,
                     pubkey_index: row.get(2)?,
                     pattern_data: row.get(3)?,
-                    confidence: match confidence_str.as_str() {
-                        "High" => crate::types::burn_patterns::BurnConfidence::High,
-                        "Medium" => crate::types::burn_patterns::BurnConfidence::Medium,
-                        _ => crate::types::burn_patterns::BurnConfidence::Low,
-                    },
                 })
             })
             .map_err(AppError::Database)?;

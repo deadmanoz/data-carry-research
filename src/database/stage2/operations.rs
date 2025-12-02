@@ -140,8 +140,8 @@ impl Stage2Operations for Database {
 
             let mut insert_pattern_stmt = tx.prepare(
                 r#"
-                INSERT INTO burn_patterns (txid, pattern_type, vout, pubkey_index, pattern_data, confidence)
-                VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                INSERT INTO burn_patterns (txid, pattern_type, vout, pubkey_index, pattern_data)
+                VALUES (?1, ?2, ?3, ?4, ?5)
                 "#
             ).map_err(AppError::Database)?;
 
@@ -280,7 +280,6 @@ impl Stage2Operations for Database {
                             pattern.vout,
                             pattern.pubkey_index,
                             pattern.pattern_data,
-                            format!("{:?}", pattern.confidence),
                         ])
                         .map_err(AppError::Database)?;
                 }

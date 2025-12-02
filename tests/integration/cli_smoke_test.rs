@@ -7,7 +7,7 @@
 use data_carry_research::analysis::{AnalysisEngine, OutputFormat, ReportFormatter};
 use data_carry_research::database::traits::{Stage2Operations, Stage3Operations};
 use data_carry_research::database::Database;
-use data_carry_research::types::burn_patterns::{BurnConfidence, BurnPattern, BurnPatternType};
+use data_carry_research::types::burn_patterns::{BurnPattern, BurnPatternType};
 use data_carry_research::types::{
     ClassificationDetails, ClassificationResult, EnrichedTransaction, OutputClassificationData,
     OutputClassificationDetails, ProtocolType, ProtocolVariant,
@@ -40,7 +40,6 @@ fn create_populated_test_db() -> (Database, String) {
                 pubkey_index: 0,
                 pattern_data: "022222222222222222222222222222222222222222222222222222222222222222"
                     .to_string(),
-                confidence: BurnConfidence::High,
             }],
             true, // is_spendable
             "AllValidECPoints",
@@ -86,7 +85,6 @@ fn create_populated_test_db() -> (Database, String) {
                 pubkey_index: 0,
                 pattern_data: "033333333333333333333333333333333333333333333333333333333333333333"
                     .to_string(),
-                confidence: BurnConfidence::High,
             }],
             false, // is_spendable
             "AllBurnKeys",

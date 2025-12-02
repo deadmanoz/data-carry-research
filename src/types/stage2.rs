@@ -272,7 +272,7 @@ mod tests {
 
     #[test]
     fn test_dominant_burn_pattern() {
-        use super::burn_patterns::{BurnConfidence, BurnPattern, BurnPatternType};
+        use super::burn_patterns::{BurnPattern, BurnPatternType};
 
         let patterns = vec![
             BurnPattern {
@@ -280,21 +280,18 @@ mod tests {
                 vout: 0,
                 pubkey_index: 0,
                 pattern_data: "test".to_string(),
-                confidence: BurnConfidence::High,
             },
             BurnPattern {
                 pattern_type: BurnPatternType::Stamps22Pattern,
                 vout: 0,
                 pubkey_index: 1,
                 pattern_data: "test".to_string(),
-                confidence: BurnConfidence::High,
             },
             BurnPattern {
                 pattern_type: BurnPatternType::ProofOfBurn,
                 vout: 1,
                 pubkey_index: 0,
                 pattern_data: "test".to_string(),
-                confidence: BurnConfidence::High,
             },
         ];
 

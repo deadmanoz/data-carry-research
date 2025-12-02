@@ -3,7 +3,7 @@ use data_carry_research::database::traits::{
     Stage1Operations, Stage2Operations, StatisticsOperations,
 };
 use data_carry_research::database::Database;
-use data_carry_research::types::burn_patterns::{BurnConfidence, BurnPattern, BurnPatternType};
+use data_carry_research::types::burn_patterns::{BurnPattern, BurnPatternType};
 use data_carry_research::types::*;
 use rusqlite::params;
 
@@ -178,7 +178,6 @@ async fn test_enriched_transaction_batch_insertion() -> Result<()> {
                 pubkey_index: 0,
                 pattern_data: "022222222222222222222222222222222222222222222222222222222222222222"
                     .to_string(),
-                confidence: BurnConfidence::High,
             }];
         } else {
             tx.burn_patterns_detected = vec![];
@@ -386,7 +385,6 @@ async fn test_burn_pattern_statistics() -> Result<()> {
                 vout: 0,
                 pubkey_index: i as u8,
                 pattern_data: format!("pubkey_for_{}", pattern_type),
-                confidence: BurnConfidence::High,
             })
             .collect();
 
@@ -460,7 +458,6 @@ async fn test_database_performance_batch_operations() -> Result<()> {
                 vout: 0,
                 pubkey_index: 0,
                 pattern_data: "burn_key".to_string(),
-                confidence: BurnConfidence::High,
             }];
         } else {
             tx.burn_patterns_detected = vec![];
@@ -556,7 +553,6 @@ fn create_test_enriched_transaction() -> EnrichedTransaction {
                 pubkey_index: 0,
                 pattern_data: "022222222222222222222222222222222222222222222222222222222222222222"
                     .to_string(),
-                confidence: BurnConfidence::High,
             },
             BurnPattern {
                 pattern_type: BurnPatternType::Stamps33Pattern,
@@ -564,7 +560,6 @@ fn create_test_enriched_transaction() -> EnrichedTransaction {
                 pubkey_index: 0,
                 pattern_data: "023333333333333333333333333333333333333333333333333333333333333333"
                     .to_string(),
-                confidence: BurnConfidence::High,
             },
         ],
         input_count: 1,

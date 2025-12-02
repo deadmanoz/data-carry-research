@@ -51,7 +51,7 @@ pub use output_count::{
     ProtocolOutputCountDistribution,
 };
 pub use signatures::{
-    BurnPatternCorrelation, ConfidenceStats, PatternProtocolCorrelation, SignatureAnalysisReport,
+    BurnPatternCorrelation, PatternProtocolCorrelation, SignatureAnalysisReport,
 };
 pub use spendability::{
     KeyCountDistribution, KeyCountStats, OverallSpendability, ProtocolSpendabilityStats,

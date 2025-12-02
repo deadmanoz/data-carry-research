@@ -1,6 +1,7 @@
-use crate::types::burn_patterns::{
-    classify_burn_pattern, BurnConfidence, BurnPattern, BurnPatternType,
-};
+use crate::types::burn_patterns::{classify_burn_pattern, BurnPattern};
+
+#[cfg(test)]
+use crate::types::burn_patterns::BurnPatternType;
 use crate::types::TransactionOutput;
 use tracing::debug;
 
@@ -31,13 +32,12 @@ impl BurnPatternDetector {
         // Try to get multisig info from metadata
         if let Some(multisig_info) = output.multisig_info() {
             for (index, pubkey) in multisig_info.pubkeys.iter().enumerate() {
-                if let Some(classified) = Self::classify_burn_pattern_internal(pubkey) {
+                if let Some(pattern_type) = classify_burn_pattern(pubkey) {
                     patterns.push(BurnPattern {
-                        pattern_type: classified.pattern_type,
+                        pattern_type,
                         vout: output.vout,
                         pubkey_index: index as u8,
                         pattern_data: pubkey.clone(),
-                        confidence: classified.confidence,
                     });
                 }
             }
@@ -55,13 +55,12 @@ impl BurnPatternDetector {
                             index,
                             ..
                         } => {
-                            if let Some(classified) = Self::classify_burn_pattern_internal(hex) {
+                            if let Some(pattern_type) = classify_burn_pattern(hex) {
                                 patterns.push(BurnPattern {
-                                    pattern_type: classified.pattern_type,
+                                    pattern_type,
                                     vout: output.vout,
                                     pubkey_index: *index as u8,
                                     pattern_data: hex.clone(),
-                                    confidence: classified.confidence,
                                 });
                             }
                         }
@@ -75,32 +74,6 @@ impl BurnPatternDetector {
 
         patterns
     }
-
-    /// Classify a pubkey hex string to determine if it's a burn pattern
-    fn classify_burn_pattern_internal(pubkey_hex: &str) -> Option<ClassifiedPattern> {
-        // Use the centralised burn pattern classification
-        if let Some((pattern_type, confidence)) = classify_burn_pattern(pubkey_hex) {
-            return Some(ClassifiedPattern {
-                pattern_type,
-                confidence,
-            });
-        }
-        None
-    }
-
-    /// Check if a transaction has any high-confidence burn patterns
-    pub fn has_high_confidence_burns(patterns: &[BurnPattern]) -> bool {
-        patterns
-            .iter()
-            .any(|p| matches!(p.confidence, BurnConfidence::High))
-    }
-}
-
-/// Internal helper structure for pattern classification
-#[derive(Debug)]
-struct ClassifiedPattern {
-    pattern_type: BurnPatternType,
-    confidence: BurnConfidence,
 }
 
 #[cfg(test)]
@@ -159,7 +132,6 @@ mod tests {
             patterns[0].pattern_type,
             BurnPatternType::Stamps22Pattern
         ));
-        assert!(matches!(patterns[0].confidence, BurnConfidence::High));
     }
 
     #[test]
@@ -175,7 +147,6 @@ mod tests {
             patterns[0].pattern_type,
             BurnPatternType::Stamps33Pattern
         ));
-        assert!(matches!(patterns[0].confidence, BurnConfidence::High));
     }
 
     #[test]
@@ -191,7 +162,6 @@ mod tests {
             patterns[0].pattern_type,
             BurnPatternType::Stamps0202Pattern
         ));
-        assert!(matches!(patterns[0].confidence, BurnConfidence::High));
     }
 
     #[test]
@@ -207,7 +177,6 @@ mod tests {
             patterns[0].pattern_type,
             BurnPatternType::Stamps0303Pattern
         ));
-        assert!(matches!(patterns[0].confidence, BurnConfidence::High));
     }
 
     #[test]
@@ -224,7 +193,6 @@ mod tests {
             patterns[0].pattern_type,
             BurnPatternType::ProofOfBurn
         ));
-        assert!(matches!(patterns[0].confidence, BurnConfidence::High));
     }
 
     #[test]
@@ -241,7 +209,6 @@ mod tests {
             patterns[0].pattern_type,
             BurnPatternType::UnknownBurn
         ));
-        assert!(matches!(patterns[0].confidence, BurnConfidence::Low));
     }
 
     #[test]
@@ -266,7 +233,6 @@ mod tests {
             patterns[0].pattern_type,
             BurnPatternType::UnknownBurn
         ));
-        assert!(matches!(patterns[0].confidence, BurnConfidence::Low));
     }
 
     #[test]
@@ -322,23 +288,4 @@ mod tests {
         assert_eq!(counts.get(&BurnPatternType::Stamps33Pattern), Some(&1));
     }
 
-    #[test]
-    fn test_high_confidence_detection() {
-        let burn_key =
-            "022222222222222222222222222222222222222222222222222222222222222222".to_string();
-        let output = create_test_p2ms_output(vec![burn_key]);
-        let patterns = BurnPatternDetector::detect_burn_patterns(&[output]);
-
-        assert!(BurnPatternDetector::has_high_confidence_burns(&patterns));
-
-        // Test with low confidence pattern
-        let suspicious_key =
-            "020000000000000000000000000000000000000000000000000000000000000000".to_string();
-        let output_low = create_test_p2ms_output(vec![suspicious_key]);
-        let patterns_low = BurnPatternDetector::detect_burn_patterns(&[output_low]);
-
-        assert!(!BurnPatternDetector::has_high_confidence_burns(
-            &patterns_low
-        ));
-    }
 }

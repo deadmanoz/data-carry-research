@@ -33,15 +33,6 @@ pub struct BurnPattern {
     pub vout: u32,            // Which P2MS output contains this pattern
     pub pubkey_index: u8,     // Which pubkey within that output
     pub pattern_data: String, // The actual burn key hex
-    pub confidence: BurnConfidence,
-}
-
-/// Confidence level for burn pattern detection
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum BurnConfidence {
-    High,   // Perfect pattern match (exact match)
-    Medium, // Close pattern match with minor variations
-    Low,    // Suspicious pattern requiring verification
 }
 
 /// Bitcoin Stamps burn keys (5 distinct keys for 4 pattern types)
@@ -100,20 +91,20 @@ pub fn classify_stamps_burn(key: &str) -> Option<BurnPatternType> {
 }
 
 /// Classify any burn pattern type
-pub fn classify_burn_pattern(key: &str) -> Option<(BurnPatternType, BurnConfidence)> {
-    // Check for exact Stamps patterns first (highest confidence)
+pub fn classify_burn_pattern(key: &str) -> Option<BurnPatternType> {
+    // Check for exact Stamps patterns first
     if let Some(stamps_type) = classify_stamps_burn(key) {
-        return Some((stamps_type, BurnConfidence::High));
+        return Some(stamps_type);
     }
 
     // Check for proof-of-burn pattern
     if is_proof_of_burn_key(key) {
-        return Some((BurnPatternType::ProofOfBurn, BurnConfidence::High));
+        return Some(BurnPatternType::ProofOfBurn);
     }
 
-    // Check for suspicious patterns (low confidence)
+    // Check for suspicious patterns
     if is_suspicious_pattern(key) {
-        return Some((BurnPatternType::UnknownBurn, BurnConfidence::Low));
+        return Some(BurnPatternType::UnknownBurn);
     }
 
     None
@@ -237,29 +228,26 @@ mod tests {
 
     #[test]
     fn test_burn_pattern_classification() {
-        // Stamps pattern - high confidence
-        let (pattern, confidence) = classify_burn_pattern(
+        // Stamps pattern
+        let pattern = classify_burn_pattern(
             "022222222222222222222222222222222222222222222222222222222222222222",
         )
         .unwrap();
         assert_eq!(pattern, BurnPatternType::Stamps22Pattern);
-        assert_eq!(confidence, BurnConfidence::High);
 
-        // Proof of burn - high confidence
-        let (pattern, confidence) = classify_burn_pattern(
+        // Proof of burn
+        let pattern = classify_burn_pattern(
             "02ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
         )
         .unwrap();
         assert_eq!(pattern, BurnPatternType::ProofOfBurn);
-        assert_eq!(confidence, BurnConfidence::High);
 
-        // Suspicious pattern - low confidence
-        let (pattern, confidence) = classify_burn_pattern(
+        // Suspicious pattern
+        let pattern = classify_burn_pattern(
             "020000000000000000000000000000000000000000000000000000000000000000",
         )
         .unwrap();
         assert_eq!(pattern, BurnPatternType::UnknownBurn);
-        assert_eq!(confidence, BurnConfidence::Low);
 
         // Normal key - no classification
         assert!(classify_burn_pattern(
