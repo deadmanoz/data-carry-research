@@ -228,6 +228,7 @@ fn print_compact_result(txid: &str, decoded_data: &DecodedData) {
 
 /// Print verbose result with file paths
 fn print_verbose_result(txid: &str, decoded_data: &DecodedData) {
+    info!("TXID: {}", txid);
     match decoded_data {
         DecodedData::BitcoinStamps { data } => match data {
             BitcoinStampsData::Image(decoded_image) => {
@@ -317,6 +318,4 @@ fn print_verbose_result(txid: &str, decoded_data: &DecodedData) {
             info!("Metadata file: {}", data.file_path.display());
         }
     }
-
-    let _ = txid; // Suppress unused warning
 }
