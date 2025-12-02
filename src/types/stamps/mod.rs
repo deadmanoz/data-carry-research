@@ -2,12 +2,14 @@
 //!
 //! Bitcoin Stamps embed digital art and files directly in the Bitcoin blockchain using
 //! P2MS (Pay-to-Multisig) outputs with specific burn patterns and ARC4 obfuscation.
+//!
+//! **NOTE**: Detection, extraction and processing logic has been moved to `crate::decoder::stamps`.
+//! This module now contains only type definitions and constants.
 
 pub mod burn_pattern;
 pub mod json;
 pub mod signature;
 pub mod src20;
-pub mod validation;
 pub mod variant;
 
 // Re-export main types at module level for convenience
@@ -15,12 +17,6 @@ pub use burn_pattern::StampsBurnPattern;
 pub use json::{classify_json_data, JsonType};
 pub use signature::StampSignature;
 pub use src20::{encoding, SRC20Operation};
-pub use validation::{
-    detect_compression_format, detect_content_type_from_payload, detect_stamps_variant,
-    detect_stamps_variant_with_content, extract_stamps_payload, find_stamp_signature,
-    is_stamps_burn_key, is_stamps_p2ms, process_multioutput_stamps, StampsProcessingResult,
-    BASE64_LENIENT,
-};
 pub use variant::{StampsTransport, StampsVariant};
 
 #[cfg(test)]

@@ -413,7 +413,7 @@ async fn test_no_null_spendability_in_database() {
         // CRITICAL: Insert transaction classification FIRST (FK constraint requirement)
         let tx_classification = ClassificationResult::new(
             txid.to_string(),
-            expected_protocol.clone(),
+            *expected_protocol,
             None,
             ClassificationDetails {
                 burn_patterns_detected: vec![],
@@ -430,7 +430,7 @@ async fn test_no_null_spendability_in_database() {
         // Insert a sample P2MS output for this transaction using batch API
         let output_data = OutputClassificationData::new(
             0, // vout
-            expected_protocol.clone(),
+            *expected_protocol,
             None,
             OutputClassificationDetails {
                 burn_patterns_detected: vec![],

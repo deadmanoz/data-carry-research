@@ -257,7 +257,7 @@ async fn test_stage3_classification_stats_calculations() {
 
         let classification_result = ClassificationResult {
             txid: txid.to_string(),
-            protocol: protocol_type.clone(),
+            protocol: *protocol_type,
             variant: match protocol_type {
                 ProtocolType::Counterparty => Some(ProtocolVariant::CounterpartyTransfer),
                 ProtocolType::AsciiIdentifierProtocols => {

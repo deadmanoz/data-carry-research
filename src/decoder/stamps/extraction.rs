@@ -2,7 +2,7 @@
 //!
 //! Functions for extracting and cleaning payload data from decrypted stamps.
 
-use super::super::signature::StampSignature;
+use crate::types::stamps::signature::StampSignature;
 
 /// Find stamp signature in decrypted data, returning offset and variant
 ///

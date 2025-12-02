@@ -6,9 +6,9 @@
 use crate::decoder::protocol_detection::{
     has_counterparty_signature, DecodedProtocol, TransactionData,
 };
+use crate::decoder::stamps;
 use crate::types::counterparty::COUNTERPARTY_PREFIX;
 use crate::types::debug::{P2MSOutputDebugInfo, TransactionDebugInfo};
-use crate::types::stamps::validation;
 use tracing::{debug, info};
 
 /// Enhanced Counterparty detection with detailed debug output
@@ -61,7 +61,7 @@ pub fn try_counterparty_verbose(
         {
             if has_counterparty_signature(&decrypted).is_some() {
                 // Check for Bitcoin Stamps
-                let stamp_sig = validation::find_stamp_signature(&decrypted);
+                let stamp_sig = stamps::find_stamp_signature(&decrypted);
 
                 if let Some((stamp_offset, variant)) = stamp_sig {
                     info!(
@@ -179,7 +179,7 @@ pub fn try_counterparty_verbose(
         {
             if has_counterparty_signature(&decrypted).is_some() {
                 // Check for Bitcoin Stamps
-                let stamp_sig = validation::find_stamp_signature(&decrypted);
+                let stamp_sig = stamps::find_stamp_signature(&decrypted);
 
                 if let Some((stamp_offset, variant)) = stamp_sig {
                     info!(

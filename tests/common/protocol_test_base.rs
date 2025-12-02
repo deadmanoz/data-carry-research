@@ -1155,7 +1155,7 @@ impl ProtocolTestBuilder {
         println!("\n╔══════════════════════════════════════════════════════════════");
         println!(
             "║ {} Protocol Classification Test",
-            protocol_display_name(self.fixture.protocol.clone())
+            protocol_display_name(self.fixture.protocol)
         );
         println!("╠══════════════════════════════════════════════════════════════");
         println!("║ Test: {}", test_name);
@@ -1222,13 +1222,13 @@ impl ProtocolTestBuilder {
         let expected_variant = self
             .fixture
             .variant
-            .map(|v| parse_variant_string(v, self.fixture.protocol.clone()));
+            .map(|v| parse_variant_string(v, self.fixture.protocol));
 
         // 8. Verify classification
         verify_classification(
             &test_db,
             txid,
-            self.fixture.protocol.clone(),
+            self.fixture.protocol,
             expected_variant.clone(),
         )?;
 
@@ -1282,7 +1282,7 @@ fn protocol_display_name(protocol: ProtocolType) -> &'static str {
 
 /// Parse variant string to ProtocolVariant enum
 fn parse_variant_string(variant_str: &str, protocol: ProtocolType) -> ProtocolVariant {
-    match (protocol.clone(), variant_str) {
+    match (protocol, variant_str) {
         // Bitcoin Stamps variants
         (ProtocolType::BitcoinStamps, "StampsClassic") => ProtocolVariant::StampsClassic,
         (ProtocolType::BitcoinStamps, "StampsSRC20") => ProtocolVariant::StampsSRC20,

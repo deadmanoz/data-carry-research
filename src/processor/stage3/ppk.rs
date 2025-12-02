@@ -3,17 +3,18 @@
 //! PPk is a blockchain infrastructure protocol with multiple applications.
 //! Primary detection: marker pubkey 0320a0de...3e12 in position 2 of multisig.
 //!
-//! This classifier delegates to the shared PPk detection module (src/types/ppk.rs)
+//! This classifier delegates to the shared PPk detection module (src/decoder/ppk.rs)
 //! to ensure consistency with decoder and adhere to DRY principles.
 
 use crate::database::{
     traits::{Stage1Operations, Stage3Operations},
     Database,
 };
+use crate::decoder::ppk::detect_ppk_variant;
 use crate::processor::stage3::spendability::SpendabilityAnalyser;
 use crate::types::{
-    ppk::detect_ppk_variant, ClassificationDetails, ClassificationResult, EnrichedTransaction,
-    OutputClassificationDetails, ProtocolType, ProtocolVariant, TransactionOutput,
+    ClassificationDetails, ClassificationResult, EnrichedTransaction, OutputClassificationDetails,
+    ProtocolType, ProtocolVariant, TransactionOutput,
 };
 
 pub struct PPkClassifier;
@@ -21,7 +22,7 @@ pub struct PPkClassifier;
 impl PPkClassifier {
     /// Classify transaction using shared PPk detection module
     ///
-    /// This method delegates to `detect_ppk_variant()` from `src/types/ppk.rs`
+    /// This method delegates to `detect_ppk_variant()` from `src/decoder/ppk.rs`
     /// which is the SINGLE SOURCE OF TRUTH for PPk protocol detection.
     pub fn classify(
         tx: &EnrichedTransaction,

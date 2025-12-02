@@ -30,10 +30,252 @@
 //! References:
 //! - https://github.com/chancecoin/chancecoinj/blob/master/src/Bet.java
 //! - https://github.com/chancecoin/chancecoinj/blob/master/src/Blocks.java
+//!
+//! NOTE: Message parsing logic has been moved here from types/chancecoin.rs
+//! to maintain separation of concerns (types vs business logic).
+
+use byteorder::{BigEndian, ReadBytesExt};
+use std::io::Cursor;
 
 use crate::decoder::protocol_detection::{DecodedProtocol, TransactionData};
-use crate::types::chancecoin::{ChancecoinMessage, CHANCECOIN_SIGNATURE};
+use crate::types::chancecoin::{
+    ChancecoinMessage, ChancecoinMessageContent, ChancecoinMessageType, CHANCECOIN_SIGNATURE,
+};
 use tracing::{debug, info, warn};
+
+// ===== MESSAGE PARSING FUNCTIONS =====
+// These were moved from types/chancecoin.rs to maintain separation of concerns.
+
+/// Parse raw Chancecoin data into a ChancecoinMessage
+///
+/// Expected format:
+/// - Bytes 0-7: "CHANCECO" signature
+/// - Bytes 8-11: Message ID (4-byte big-endian u32)
+/// - Bytes 12+: Message-specific data
+pub fn parse_chancecoin_message(txid: String, raw_data: Vec<u8>) -> Option<ChancecoinMessage> {
+    // Verify signature
+    if raw_data.len() < 8 || &raw_data[..8] != CHANCECOIN_SIGNATURE {
+        return None;
+    }
+
+    // Need at least signature + message_id
+    if raw_data.len() < 12 {
+        return None;
+    }
+
+    // Extract message ID (4 bytes after signature, big-endian)
+    let mut cursor = Cursor::new(&raw_data[8..12]);
+    let message_id = cursor.read_u32::<BigEndian>().ok()?;
+
+    // Determine message type
+    let message_type = ChancecoinMessageType::from_id(message_id);
+
+    // Extract message data (after signature + message_id)
+    let data = if raw_data.len() > 12 {
+        raw_data[12..].to_vec()
+    } else {
+        Vec::new()
+    };
+
+    // Parse message content based on type
+    let content = parse_content(&message_type, &data);
+
+    Some(ChancecoinMessage {
+        txid,
+        message_id,
+        message_type,
+        content,
+        data,
+        raw_data,
+    })
+}
+
+/// Parse message content based on message type
+fn parse_content(message_type: &ChancecoinMessageType, data: &[u8]) -> ChancecoinMessageContent {
+    match message_type {
+        ChancecoinMessageType::Send => {
+            parse_send(data).unwrap_or_else(|| ChancecoinMessageContent::Raw(data.to_vec()))
+        }
+        ChancecoinMessageType::Order => {
+            parse_order(data).unwrap_or_else(|| ChancecoinMessageContent::Raw(data.to_vec()))
+        }
+        ChancecoinMessageType::BTCPay => {
+            parse_btcpay(data).unwrap_or_else(|| ChancecoinMessageContent::Raw(data.to_vec()))
+        }
+        ChancecoinMessageType::Roll => {
+            parse_roll(data).unwrap_or_else(|| ChancecoinMessageContent::Raw(data.to_vec()))
+        }
+        ChancecoinMessageType::DiceBet => {
+            parse_dice_bet(data).unwrap_or_else(|| ChancecoinMessageContent::Raw(data.to_vec()))
+        }
+        ChancecoinMessageType::PokerBet => {
+            parse_poker_bet(data).unwrap_or_else(|| ChancecoinMessageContent::Raw(data.to_vec()))
+        }
+        ChancecoinMessageType::Cancel => {
+            parse_cancel(data).unwrap_or_else(|| ChancecoinMessageContent::Raw(data.to_vec()))
+        }
+        ChancecoinMessageType::Unknown => ChancecoinMessageContent::Raw(data.to_vec()),
+    }
+}
+
+/// Parse Send message data
+///
+/// Format (from Send.java:77-80):
+/// - Bytes 0-7: assetId (8-byte long)
+/// - Bytes 8-15: amount (8-byte long)
+fn parse_send(data: &[u8]) -> Option<ChancecoinMessageContent> {
+    if data.len() < 16 {
+        return None;
+    }
+
+    let mut cursor = Cursor::new(data);
+    let asset_id = cursor.read_u64::<BigEndian>().ok()?;
+    let amount = cursor.read_u64::<BigEndian>().ok()?;
+
+    Some(ChancecoinMessageContent::Send { asset_id, amount })
+}
+
+/// Parse Order message data
+///
+/// Format (from Order.java:90-97):
+/// - Bytes 0-7: giveId (8-byte long)
+/// - Bytes 8-15: giveAmount (8-byte long)
+/// - Bytes 16-23: getId (8-byte long)
+/// - Bytes 24-31: getAmount (8-byte long)
+/// - Bytes 32-33: expiration (2-byte short)
+/// - Bytes 34-41: feeRequired (8-byte long)
+fn parse_order(data: &[u8]) -> Option<ChancecoinMessageContent> {
+    if data.len() < 42 {
+        return None;
+    }
+
+    let mut cursor = Cursor::new(data);
+    let give_id = cursor.read_u64::<BigEndian>().ok()?;
+    let give_amount = cursor.read_u64::<BigEndian>().ok()?;
+    let get_id = cursor.read_u64::<BigEndian>().ok()?;
+    let get_amount = cursor.read_u64::<BigEndian>().ok()?;
+    let expiration = cursor.read_u16::<BigEndian>().ok()?;
+    let fee_required = cursor.read_u64::<BigEndian>().ok()?;
+
+    Some(ChancecoinMessageContent::Order {
+        give_id,
+        give_amount,
+        get_id,
+        get_amount,
+        expiration,
+        fee_required,
+    })
+}
+
+/// Parse BTCPay message data
+///
+/// Format (from BTCPay.java:121-124):
+/// - Bytes 0-31: tx0Hash (32 bytes)
+/// - Bytes 32-63: tx1Hash (32 bytes)
+fn parse_btcpay(data: &[u8]) -> Option<ChancecoinMessageContent> {
+    if data.len() < 64 {
+        return None;
+    }
+
+    let tx0_hash = hex::encode(&data[0..32]);
+    let tx1_hash = hex::encode(&data[32..64]);
+
+    Some(ChancecoinMessageContent::BTCPay { tx0_hash, tx1_hash })
+}
+
+/// Parse Roll message data
+///
+/// Format (from Roll.java:144-156):
+/// Version 1: rollTxHash (32) + roll (8) = 40 bytes
+/// Version 2: rollTxHash (32) + roll (8) + chaAmount (8) = 48 bytes
+fn parse_roll(data: &[u8]) -> Option<ChancecoinMessageContent> {
+    if data.len() < 40 {
+        return None;
+    }
+
+    let roll_tx_hash = hex::encode(&data[0..32]);
+
+    let mut cursor = Cursor::new(&data[32..]);
+    let roll = cursor.read_f64::<BigEndian>().ok()?;
+
+    let cha_amount = if data.len() >= 48 {
+        cursor.read_u64::<BigEndian>().ok()
+    } else {
+        None
+    };
+
+    Some(ChancecoinMessageContent::Roll {
+        roll_tx_hash,
+        roll,
+        cha_amount,
+    })
+}
+
+/// Parse Cancel message data
+///
+/// Format (from Cancel.java:83-85):
+/// - Bytes 0-31: offerHash (32 bytes)
+fn parse_cancel(data: &[u8]) -> Option<ChancecoinMessageContent> {
+    if data.len() < 32 {
+        return None;
+    }
+
+    let offer_hash = hex::encode(&data[0..32]);
+
+    Some(ChancecoinMessageContent::Cancel { offer_hash })
+}
+
+/// Parse Dice bet data
+///
+/// Format (from Bet.java:342-346):
+/// - Bytes 0-7: bet amount (8-byte long)
+/// - Bytes 8-15: chance (8-byte double, 0-100)
+/// - Bytes 16-23: payout multiplier (8-byte double)
+fn parse_dice_bet(data: &[u8]) -> Option<ChancecoinMessageContent> {
+    if data.len() < 24 {
+        return None;
+    }
+
+    let mut cursor = Cursor::new(data);
+
+    let bet = cursor.read_u64::<BigEndian>().ok()?;
+    let chance = cursor.read_f64::<BigEndian>().ok()?;
+    let payout = cursor.read_f64::<BigEndian>().ok()?;
+
+    Some(ChancecoinMessageContent::DiceBet {
+        bet,
+        chance,
+        payout,
+    })
+}
+
+/// Parse Poker bet data
+///
+/// Format (from Bet.java:422-428):
+/// - Bytes 0-7: bet amount (8-byte long)
+/// - Bytes 8-25: 9 cards (each 2-byte short)
+///   - Cards 0-1: Player cards
+///   - Cards 2-6: Board cards
+///   - Cards 7-8: Opponent cards
+fn parse_poker_bet(data: &[u8]) -> Option<ChancecoinMessageContent> {
+    if data.len() < 26 {
+        return None;
+    }
+
+    let mut cursor = Cursor::new(data);
+
+    let bet = cursor.read_u64::<BigEndian>().ok()?;
+
+    let mut cards = Vec::with_capacity(9);
+    for _ in 0..9 {
+        let card = cursor.read_u16::<BigEndian>().ok()?;
+        cards.push(card);
+    }
+
+    Some(ChancecoinMessageContent::PokerBet { bet, cards })
+}
+
+// ===== DECODER FUNCTIONS =====
 
 /// Try to decode transaction as Chancecoin
 ///
@@ -59,8 +301,8 @@ pub fn try_chancecoin(tx_data: &TransactionData) -> Option<DecodedProtocol> {
     info!("✅ Chancecoin signature detected!");
     info!("   • Total data length: {} bytes", concatenated_data.len());
 
-    // Create Chancecoin message
-    match ChancecoinMessage::new(tx_data.txid.clone(), concatenated_data) {
+    // Create Chancecoin message using parser
+    match parse_chancecoin_message(tx_data.txid.clone(), concatenated_data) {
         Some(message) => {
             info!("🎰 Chancecoin Message Decoded:");
             info!("   • Transaction: {}", tx_data.txid);

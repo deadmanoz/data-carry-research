@@ -1,5 +1,5 @@
 use anyhow::Result;
-use data_carry_research::analysis::{detect_burn_patterns, analyse_fees};
+use data_carry_research::analysis::{analyse_fees, detect_burn_patterns};
 use data_carry_research::config::BitcoinRpcConfig;
 use data_carry_research::database::traits::{
     Stage1Operations, Stage2Operations, StatisticsOperations,

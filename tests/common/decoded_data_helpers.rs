@@ -232,7 +232,7 @@ pub fn unwrap_likely_datastorage(result: Option<DecodedData>) -> LikelyDataStora
 
 /// Assert that the result is None
 pub fn assert_none(result: Option<DecodedData>) {
-    if let Some(_) = result {
+    if result.is_some() {
         panic!("Expected None, got {}", variant_name(&result));
     }
 }

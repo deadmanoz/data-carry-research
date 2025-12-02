@@ -1,8 +1,9 @@
 use crate::crypto::arc4;
 use crate::database::traits::Stage2Operations;
 use crate::database::Database;
+use crate::decoder::stamps;
 use crate::types::counterparty::COUNTERPARTY_PREFIX;
-use crate::types::stamps::{validation, StampsTransport};
+use crate::types::stamps::StampsTransport;
 use crate::types::{ClassificationResult, EnrichedTransaction, ProtocolType};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::trace;
@@ -63,7 +64,7 @@ impl ProtocolSpecificClassifier for BitcoinStampsClassifier {
 
         // Use the unified multi-output processing function (handles both pure and Counterparty-embedded)
         if let Some(ref key) = arc4_key_opt {
-            if let Some(result) = validation::process_multioutput_stamps(&p2ms_outputs, key) {
+            if let Some(result) = stamps::process_multioutput_stamps(&p2ms_outputs, key) {
                 // Check if this is Counterparty transport (has both CNTRPRTY and STAMP:)
                 let has_cntrprty = SignatureDetector::has_at_any_offset(
                     &result.decrypted_data,
@@ -129,7 +130,7 @@ impl ProtocolSpecificClassifier for BitcoinStampsClassifier {
 
                 // Detect variant and content type together using the new function
                 let (variant_opt, content_type_opt, _image_format) =
-                    validation::detect_stamps_variant_with_content(&result.decrypted_data);
+                    stamps::detect_stamps_variant_with_content(&result.decrypted_data);
 
                 let variant = variant_opt.map(|v| v.into());
                 let content_type = content_type_opt.map(|s| s.to_string());

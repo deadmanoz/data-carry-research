@@ -98,7 +98,7 @@ mod image_encoding {
     async fn test_stamps_arc4_decoding_with_structure_verification() {
         // Test ARC4 decoding with detailed Counterparty structure verification
         use data_carry_research::crypto::arc4;
-        use data_carry_research::types::stamps::validation;
+        use data_carry_research::decoder::stamps;
 
         let txid = "54fdeda90c4573f8a93fa45251a3c6214bcc79aa8549728dfb08ffe3e7dd3d81";
         let fixture_path = "tests/test_data/stamps/54fdeda90c4573f8a93fa45251a3c6214bcc79aa8549728dfb08ffe3e7dd3d81.json";
@@ -128,7 +128,7 @@ mod image_encoding {
         assert_eq!(arc4_key.len(), 32);
 
         // Process with production code
-        let stamps_result = validation::process_multioutput_stamps(&p2ms_outputs, &arc4_key)
+        let stamps_result = stamps::process_multioutput_stamps(&p2ms_outputs, &arc4_key)
             .expect("Production ARC4 decoding should succeed");
 
         println!("║ Production decoding results:");
@@ -161,7 +161,7 @@ mod image_encoding {
 
         // Verify stamp signature
         let (detected_offset, detected_variant) =
-            validation::find_stamp_signature(data).expect("Should find stamp signature");
+            stamps::find_stamp_signature(data).expect("Should find stamp signature");
         assert_eq!(detected_offset, stamps_result.stamp_signature_offset);
         assert_eq!(detected_variant, stamps_result.stamp_signature_variant);
         println!(
@@ -251,10 +251,10 @@ mod edge_cases {
 
 #[cfg(test)]
 mod variant_classification {
-    use data_carry_research::types::content_detection::ImageFormat;
-    use data_carry_research::types::stamps::validation::{
+    use data_carry_research::decoder::stamps::{
         check_zlib_at_offsets, detect_stamps_variant_with_content,
     };
+    use data_carry_research::types::content_detection::ImageFormat;
     use data_carry_research::types::StampsVariant;
 
     /// Helper function that mirrors real signature structure

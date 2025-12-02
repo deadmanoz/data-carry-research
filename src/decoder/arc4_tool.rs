@@ -14,10 +14,10 @@
 /// - Understanding how different protocols structure their P2MS data
 use crate::crypto::arc4;
 use crate::decoder::protocol_detection::TransactionData;
+use crate::decoder::stamps::{self, StampsProcessingResult};
 use crate::processor::stage3::counterparty::CounterpartyClassifier;
 use crate::rpc::BitcoinRpcClient;
 use crate::types::counterparty::COUNTERPARTY_PREFIX;
-use crate::types::stamps::validation::{self, StampsProcessingResult};
 use crate::types::stamps::StampsTransport;
 use crate::types::TransactionOutput;
 use anyhow::{Context, Result};
@@ -191,7 +191,7 @@ fn try_counterparty_path(
 /// - Counterparty-embedded Stamps (per-chunk decryption then Stamps validation)
 fn try_stamps_path(p2ms_outputs: &[TransactionOutput], arc4_key: &[u8]) -> Option<StampsArc4> {
     // Call production function (handles both pure and Counterparty-embedded)
-    let stamps_result = validation::process_multioutput_stamps(p2ms_outputs, arc4_key)?;
+    let stamps_result = stamps::process_multioutput_stamps(p2ms_outputs, arc4_key)?;
 
     // Destructure to avoid partial move
     let StampsProcessingResult {
@@ -235,7 +235,7 @@ fn extract_stamps_raw_data_from_valid_outputs(
 
     for output in valid_outputs {
         if let Some(info) = output.multisig_info() {
-            if let Some(chunk) = validation::extract_data_chunk(&info.pubkeys) {
+            if let Some(chunk) = stamps::extract_data_chunk(&info.pubkeys) {
                 concatenated.extend(chunk);
             }
         }
@@ -262,7 +262,7 @@ fn try_raw_arc4_fallback(p2ms_outputs: &[TransactionOutput], arc4_key: &[u8]) ->
     for output in p2ms_outputs {
         if let Some(info) = output.multisig_info() {
             // Use Stamps-style extraction (full pubkey payloads)
-            if let Some(chunk) = validation::extract_data_chunk(&info.pubkeys) {
+            if let Some(chunk) = stamps::extract_data_chunk(&info.pubkeys) {
                 raw_data.extend(chunk);
             }
         }

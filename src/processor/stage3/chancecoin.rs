@@ -10,6 +10,7 @@
 //! - Data in second pubkey slot (typically 16 bytes total: length + signature + data)
 
 use crate::database::Database;
+use crate::decoder::chancecoin::parse_chancecoin_message;
 use crate::types::chancecoin::{ChancecoinMessage, ChancecoinMessageType, CHANCECOIN_SIGNATURE};
 use crate::types::{
     ClassificationResult, EnrichedTransaction, ProtocolType, ProtocolVariant, TransactionOutput,
@@ -52,8 +53,8 @@ impl ChancecoinClassifier {
         debug!("✅ Chancecoin signature detected!");
         debug!("   • Total data length: {} bytes", concatenated_data.len());
 
-        // Create Chancecoin message
-        ChancecoinMessage::new(tx.txid.clone(), concatenated_data)
+        // Create Chancecoin message using parser from decoder module
+        parse_chancecoin_message(tx.txid.clone(), concatenated_data)
     }
 
     /// Extract data chunks from all P2MS outputs and concatenate them

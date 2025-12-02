@@ -179,7 +179,7 @@ fn create_populated_test_db() -> (Database, String) {
         // Insert transaction classification
         let tx_classification = ClassificationResult::new(
             txid.to_string(),
-            protocol.clone(),
+            protocol,
             variant.clone(),
             ClassificationDetails {
                 burn_patterns_detected: burn_patterns
@@ -199,7 +199,7 @@ fn create_populated_test_db() -> (Database, String) {
         // Insert output classification with spendability
         let output_data = OutputClassificationData::new(
             0,
-            protocol.clone(),
+            protocol,
             variant.clone(),
             OutputClassificationDetails {
                 burn_patterns_detected: burn_patterns

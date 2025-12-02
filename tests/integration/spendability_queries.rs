@@ -722,7 +722,7 @@ fn insert_test_transactions(db: &mut Database, data: &[(&str, bool, &str, Protoc
         // Insert transaction classification BEFORE output classification (FK requirement)
         let tx_classification = ClassificationResult::new(
             txid.to_string(),
-            protocol.clone(),
+            *protocol,
             None,
             ClassificationDetails {
                 burn_patterns_detected: vec![],
@@ -757,7 +757,7 @@ fn insert_test_transactions(db: &mut Database, data: &[(&str, bool, &str, Protoc
             data_key_count: data_count,
         };
 
-        let output_data = OutputClassificationData::new(0, protocol.clone(), None, details);
+        let output_data = OutputClassificationData::new(0, *protocol, None, details);
         db.insert_output_classifications_batch(txid, &[output_data])
             .unwrap();
     }

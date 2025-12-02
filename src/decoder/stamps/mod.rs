@@ -1,13 +1,14 @@
 //! Bitcoin Stamps validation and processing module
 //!
-//! Helper functions for Bitcoin Stamps protocol detection and validation.
+//! This module provides detection, extraction, and processing logic for Bitcoin Stamps.
+//! Moved from `types/stamps/validation/` to properly separate business logic from data types.
 
 pub mod detection;
 pub mod extraction;
 pub mod helpers;
 pub mod processing;
 
-// Re-export commonly used items at the validation level for convenience
+// Re-export commonly used items at the stamps decoder level for convenience
 pub use detection::{
     detect_compression_format, detect_content_type_from_payload, detect_stamps_variant,
     detect_stamps_variant_with_content,

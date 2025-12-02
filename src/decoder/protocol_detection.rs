@@ -10,10 +10,10 @@
 /// - No complex abstractions or priority logic
 /// - Protocol-agnostic transaction data (full transaction access)
 use crate::crypto::arc4;
+use crate::decoder::stamps;
 use crate::decoder::DecoderResult;
 use crate::rpc::BitcoinRpcClient;
 use crate::types::counterparty::COUNTERPARTY_PREFIX;
-use crate::types::stamps::validation;
 use crate::types::TransactionOutput;
 use corepc_client::bitcoin::Transaction;
 use hex;
@@ -386,9 +386,9 @@ pub fn try_bitcoin_stamps(tx_data: &TransactionData) -> Option<DecodedProtocol> 
     let arc4_key = tx_data.arc4_key()?;
 
     // Try multi-output Bitcoin Stamps processing (production code path)
-    if let Some(stamps_result) = validation::process_multioutput_stamps(&p2ms_outputs, &arc4_key) {
+    if let Some(stamps_result) = stamps::process_multioutput_stamps(&p2ms_outputs, &arc4_key) {
         if let Some((offset, variant)) =
-            validation::find_stamp_signature(&stamps_result.decrypted_data)
+            stamps::find_stamp_signature(&stamps_result.decrypted_data)
         {
             info!(
                 "✅ Bitcoin Stamps detected in {} ({} bytes, signature: {:?} at offset {})",
@@ -407,10 +407,10 @@ pub fn try_bitcoin_stamps(tx_data: &TransactionData) -> Option<DecodedProtocol> 
 
     // Try Counterparty-embedded Bitcoin Stamps (Stamps transported via Counterparty)
     if let Some(embedded_result) =
-        validation::process_counterparty_embedded_stamps(&p2ms_outputs, &arc4_key)
+        stamps::process_counterparty_embedded_stamps(&p2ms_outputs, &arc4_key)
     {
         if let Some((offset, variant)) =
-            validation::find_stamp_signature(&embedded_result.decrypted_data)
+            stamps::find_stamp_signature(&embedded_result.decrypted_data)
         {
             info!(
                 "✅ Bitcoin Stamps (via Counterparty transport) detected in {} ({} bytes, signature: {:?} at offset {})",
@@ -479,7 +479,7 @@ pub fn try_counterparty_verbose(
                     "First 60 bytes (hex): {}",
                     hex::encode(&decrypted[..decrypted.len().min(60)])
                 );
-                let stamp_sig = validation::find_stamp_signature(&decrypted);
+                let stamp_sig = stamps::find_stamp_signature(&decrypted);
                 debug!("Stamp signature check result: {:?}", stamp_sig);
 
                 if let Some((stamp_offset, variant)) = stamp_sig {
@@ -543,7 +543,7 @@ pub fn try_counterparty_verbose(
                     "First 60 bytes (hex): {}",
                     hex::encode(&decrypted[..decrypted.len().min(60)])
                 );
-                let stamp_sig = validation::find_stamp_signature(&decrypted);
+                let stamp_sig = stamps::find_stamp_signature(&decrypted);
                 debug!("Stamp signature check result: {:?}", stamp_sig);
 
                 if let Some((stamp_offset, variant)) = stamp_sig {

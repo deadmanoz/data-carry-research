@@ -2,10 +2,10 @@
 //!
 //! Functions for detecting and classifying Bitcoin Stamps content types.
 
-use super::super::variant::StampsVariant;
 use super::extraction::extract_stamps_payload;
 use super::helpers::{check_zlib_at_offsets, BASE64_LENIENT};
 use crate::types::content_detection::{detect_image_format, ImageFormat};
+use crate::types::stamps::variant::StampsVariant;
 use base64::Engine;
 
 /// Detect compression format (ZLIB or GZIP only)

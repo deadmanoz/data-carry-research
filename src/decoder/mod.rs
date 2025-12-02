@@ -26,19 +26,18 @@ use self::protocol_detection::{
 use crate::shared::is_base64_data;
 use crate::types::content_detection::{detect_image_format, DocumentFormat};
 use crate::types::stamps::classify_json_data;
-use crate::types::stamps::validation::{
-    detect_content_type_from_payload, extract_stamps_payload, find_stamp_signature,
-};
 use crate::types::StampsVariant;
 use base64::Engine;
 
-// Use the shared lenient base64 decoder from types::stamps::validation
-// This ensures consistent decoding behaviour across Stage 3 classification and decoder
-use crate::types::stamps::validation::BASE64_LENIENT;
+// Use stamps decoder module for detection, extraction and processing
+use stamps::{
+    detect_content_type_from_payload, extract_stamps_payload, find_stamp_signature, BASE64_LENIENT,
+};
 
 // Submodules
 pub mod arc4_tool;
 pub mod chancecoin;
+pub mod counterparty_parser;
 pub mod datastorage;
 pub mod debug_display;
 mod decoded_data;
@@ -49,6 +48,7 @@ pub mod output;
 pub mod ppk;
 pub mod protocol_detection;
 pub mod protocol_detection_verbose;
+pub mod stamps;
 
 // Re-export types from submodules
 pub use decoded_data::{
@@ -687,20 +687,21 @@ impl ProtocolDecoder {
             payload.len()
         );
 
-        // Parse the payload into structured data using our new parsing infrastructure
-        let parsed_message = match message_type.parse_payload(&payload) {
-            Ok(parsed) => Some(
-                serde_json::to_value(parsed)
-                    .map_err(|e| DecoderError::Io(std::io::Error::other(e)))?,
-            ),
-            Err(parse_err) => {
-                info!(
-                    "Failed to parse Counterparty payload for {}: {}",
-                    txid, parse_err
-                );
-                None
-            }
-        };
+        // Parse the payload into structured data using counterparty_parser module
+        let parsed_message =
+            match counterparty_parser::parse_counterparty_payload(&message_type, &payload) {
+                Ok(parsed) => Some(
+                    serde_json::to_value(parsed)
+                        .map_err(|e| DecoderError::Io(std::io::Error::other(e)))?,
+                ),
+                Err(parse_err) => {
+                    info!(
+                        "Failed to parse Counterparty payload for {}: {}",
+                        txid, parse_err
+                    );
+                    None
+                }
+            };
 
         // Write the structured JSON data instead of raw binary
         let output_path = self

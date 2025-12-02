@@ -2,10 +2,10 @@
 //!
 //! Functions for processing multiple P2MS outputs to extract Bitcoin Stamps data.
 
-use super::super::signature::StampSignature;
 use super::extraction::find_stamp_signature;
 use super::helpers::{extract_data_chunk, is_stamps_p2ms};
 use crate::crypto::arc4;
+use crate::types::stamps::signature::StampSignature;
 use crate::types::TransactionOutput;
 
 /// Result of processing multiple P2MS outputs for Bitcoin Stamps

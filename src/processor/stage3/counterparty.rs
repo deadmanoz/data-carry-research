@@ -1,11 +1,11 @@
 use crate::crypto::arc4;
 use crate::database::traits::Stage2Operations;
 use crate::database::Database;
+use crate::decoder::stamps;
 use crate::types::content_detection::ContentType;
 use crate::types::counterparty::{
     CounterpartyMessageType, CounterpartyP2msData, MultisigPattern, COUNTERPARTY_PREFIX,
 };
-use crate::types::stamps::validation as stamps_validation;
 use crate::types::{ClassificationResult, EnrichedTransaction, ProtocolType};
 use std::collections::HashSet;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -43,7 +43,7 @@ impl ProtocolSpecificClassifier for CounterpartyClassifier {
         // These are Bitcoin Stamps using Counterparty as transport, not true Counterparty transactions
         let has_stamps_burn_keys = p2ms_outputs.iter().any(|output| {
             if let Some(info) = output.multisig_info() {
-                info.pubkeys.len() >= 3 && stamps_validation::is_stamps_burn_key(&info.pubkeys[2])
+                info.pubkeys.len() >= 3 && stamps::is_stamps_burn_key(&info.pubkeys[2])
             } else {
                 false
             }

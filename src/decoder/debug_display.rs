@@ -87,8 +87,8 @@ impl P2MSOutputDebugInfo {
         }
 
         // Check for Bitcoin Stamps signature
-        use crate::types::stamps::validation;
-        if let Some((offset, variant)) = validation::find_stamp_signature(&decrypted) {
+        use crate::decoder::stamps;
+        if let Some((offset, variant)) = stamps::find_stamp_signature(&decrypted) {
             self.has_stamp_signature = true;
             self.stamp_signature = Some((format!("{:?}", variant), offset));
             self.notes.push(format!(
