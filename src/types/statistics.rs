@@ -360,10 +360,6 @@ impl crate::processor::StageMetrics for Stage3Results {
             self.unknown_classified
         )
     }
-
-    fn stage_prefix(&self) -> Option<&str> {
-        Some("[Stage 3]")
-    }
 }
 
 impl StatisticsCollector for Stage3Results {

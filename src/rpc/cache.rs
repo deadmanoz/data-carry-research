@@ -1,7 +1,7 @@
 use corepc_client::bitcoin::Transaction;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use tracing::{debug, info};
+use tracing::debug;
 
 /// Thread-safe transaction cache for avoiding duplicate RPC calls
 #[derive(Clone)]
@@ -52,9 +52,13 @@ impl TransactionCache {
         CacheStats { hits, misses }
     }
 
-    /// Clear the cache (useful for testing or memory management)
-    #[allow(dead_code)]
+}
+
+#[cfg(test)]
+impl TransactionCache {
+    /// Clear the cache (test-only)
     pub fn clear(&self) {
+        use tracing::info;
         let mut cache = self.cache.lock().unwrap();
         cache.clear();
         *self.hits.lock().unwrap() = 0;
@@ -62,8 +66,7 @@ impl TransactionCache {
         info!("Transaction cache cleared");
     }
 
-    /// Get the current cache size
-    #[allow(dead_code)]
+    /// Get the current cache size (test-only)
     pub fn size(&self) -> usize {
         let cache = self.cache.lock().unwrap();
         cache.len()

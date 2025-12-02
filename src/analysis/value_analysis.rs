@@ -116,7 +116,15 @@ impl ValueAnalysisEngine {
         let mut protocol_value_breakdown: Vec<ProtocolValueStats> = protocol_stats
             .into_iter()
             .map(
-                |(protocol_str, output_count, tx_count, total_sats, avg_sats, min_sats, max_sats)| {
+                |(
+                    protocol_str,
+                    output_count,
+                    tx_count,
+                    total_sats,
+                    avg_sats,
+                    min_sats,
+                    max_sats,
+                )| {
                     let percentage_of_total_value = if total_value_sats > 0 {
                         (total_sats as f64 / total_value_sats as f64) * 100.0
                     } else {
@@ -124,7 +132,8 @@ impl ValueAnalysisEngine {
                     };
 
                     // Get fee stats for this protocol, or use defaults if not found
-                    let protocol_fee_stats = fee_stats.get(&protocol_str).cloned().unwrap_or_default();
+                    let protocol_fee_stats =
+                        fee_stats.get(&protocol_str).cloned().unwrap_or_default();
 
                     // Parse protocol string to enum (parse once at DB boundary)
                     let protocol = ProtocolType::from_str(&protocol_str).unwrap_or_default();

@@ -184,41 +184,4 @@ impl ProtocolStatsAnalyser {
             method_breakdown,
         })
     }
-
-    /// Get detailed Bitcoin Stamps variant breakdown
-    ///
-    /// Returns statistics for all Bitcoin Stamps variants including the new
-    /// HTML, Compressed, and Data variants.
-    pub fn get_stamps_variant_breakdown(
-        db: &Database,
-    ) -> AppResult<Vec<crate::types::analysis_results::VariantStats>> {
-        let conn = db.connection();
-
-        let mut stmt = conn.prepare(
-            "SELECT
-                COALESCE(tc.variant, 'Unknown') as variant,
-                tc.classification_method,
-                COUNT(DISTINCT tc.txid) as count
-             FROM transaction_classifications tc
-             JOIN p2ms_output_classifications poc ON tc.txid = poc.txid
-             JOIN transaction_outputs toutputs ON poc.txid = toutputs.txid AND poc.vout = toutputs.vout
-             WHERE tc.protocol = 'BitcoinStamps'
-               AND toutputs.is_spent = 0
-               AND toutputs.script_type = 'multisig'
-             GROUP BY tc.variant, tc.classification_method
-             ORDER BY count DESC",
-        )?;
-
-        let variants = stmt
-            .query_map([], |row| {
-                Ok(crate::types::analysis_results::VariantStats {
-                    variant: row.get(0)?,
-                    classification_method: row.get(1)?,
-                    count: row.get::<_, i64>(2)? as usize,
-                })
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(variants)
-    }
 }

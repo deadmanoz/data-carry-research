@@ -63,19 +63,6 @@ impl DataStorageVariant {
             Self::Generic => "Generic",
         }
     }
-
-    /// Get the short identifier for this variant (used in logging/debugging)
-    pub fn short_name(&self) -> &'static str {
-        match self {
-            Self::ProofOfBurn => "DataStorageProofOfBurn",
-            Self::FileMetadata => "DataStorageFileMetadata",
-            Self::EmbeddedData => "DataStorageEmbeddedData",
-            Self::WikiLeaksCablegate => "DataStorageWikiLeaksCablegate",
-            Self::BitcoinWhitepaper => "DataStorageBitcoinWhitepaper",
-            Self::NullData => "DataStorageNullData",
-            Self::Generic => "DataStorageGeneric",
-        }
-    }
 }
 
 impl std::fmt::Display for DataStorageVariant {

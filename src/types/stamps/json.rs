@@ -20,6 +20,19 @@ pub enum JsonType {
     Generic,
 }
 
+impl JsonType {
+    /// Get a human-readable display name for the JSON type
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            JsonType::SRC20 => "SRC-20 token",
+            JsonType::SRC101 => "SRC-101 domain",
+            JsonType::SRC721 => "SRC-721 NFT",
+            JsonType::SRC721r => "SRC-721r recursive",
+            JsonType::Generic => "Generic JSON",
+        }
+    }
+}
+
 /// Classify JSON data based on protocol markers
 ///
 /// This is a pure helper function with no decoder dependencies, used by both

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 pub const COUNTERPARTY_PREFIX: &[u8] = b"CNTRPRTY"; // 8-byte protocol identifier
 
 /// Message type definitions from Counterparty Core codebase
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CounterpartyMessageType {
     Send = 0,         // versions/send1.py:15 - Basic asset transfer
     EnhancedSend = 2, // versions/enhancedsend.py:18 - Enhanced send with memo field

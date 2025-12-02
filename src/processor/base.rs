@@ -56,25 +56,6 @@ impl StandardProgressTracker {
     }
 }
 
-/// Batch processing utilities
-pub struct StandardBatchProcessor {
-    batch_size: usize,
-}
-
-impl StandardBatchProcessor {
-    pub fn new(batch_size: usize) -> Self {
-        Self { batch_size }
-    }
-
-    pub fn batch_size(&self) -> usize {
-        self.batch_size
-    }
-
-    pub fn should_process_batch(&self, current_batch_len: usize) -> bool {
-        current_batch_len >= self.batch_size
-    }
-}
-
 /// Configuration validation utilities
 pub struct ConfigValidator;
 
@@ -95,17 +76,6 @@ impl ConfigValidator {
                 "Large batch size: {} - this may impact memory usage",
                 batch_size
             );
-        }
-        Ok(())
-    }
-
-    pub fn validate_path_exists(path: &std::path::Path, description: &str) -> AppResult<()> {
-        if !path.exists() {
-            return Err(AppError::Config(format!(
-                "{} does not exist: {}",
-                description,
-                path.display()
-            )));
         }
         Ok(())
     }
@@ -131,12 +101,6 @@ pub trait StageMetrics {
     /// Format stage-specific metrics for progress display
     /// Returns a formatted string of metrics (e.g., "P2MS: 100 | Malformed: 5")
     fn format_custom_metrics(&self) -> String;
-
-    /// Optional stage prefix for progress messages (e.g., "[Stage 3]")
-    /// Default: no prefix
-    fn stage_prefix(&self) -> Option<&str> {
-        None
-    }
 }
 
 /// Progress reporting utilities
@@ -176,18 +140,6 @@ impl ProgressReporter {
                 days, hours, minutes, seconds, elapsed_secs
             )
         }
-    }
-
-    pub fn report_progress(operation: &str, processed: usize, found: usize, elapsed: f64) {
-        let rate = if elapsed > 0.0 {
-            processed as f64 / elapsed
-        } else {
-            0.0
-        };
-        info!(
-            "{}: {} processed, {} found ({:.1} items/sec)",
-            operation, processed, found, rate
-        );
     }
 
     pub fn report_completion(
@@ -260,18 +212,13 @@ impl ProgressReporter {
         };
 
         let custom_metrics = metrics.format_custom_metrics();
-        let mut progress_message = Self::format_standard_progress(
+        let progress_message = Self::format_standard_progress(
             processed_count,
             total_estimate,
             rate,
             elapsed_secs,
             &custom_metrics,
         );
-
-        // Add stage prefix if provided
-        if let Some(prefix) = metrics.stage_prefix() {
-            progress_message = format!("{} {}", prefix, progress_message);
-        }
 
         Self::print_progress_line(&progress_message)?;
         Ok(())

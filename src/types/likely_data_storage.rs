@@ -44,15 +44,6 @@ impl LikelyDataStorageVariant {
             Self::DustAmount => "Dust Amount",
         }
     }
-
-    /// Get the short identifier for this variant (used in logging/debugging)
-    pub fn short_name(&self) -> &'static str {
-        match self {
-            Self::InvalidECPoint => "InvalidECPoint",
-            Self::HighOutputCount => "HighOutputCount",
-            Self::DustAmount => "DustAmount",
-        }
-    }
 }
 
 impl std::fmt::Display for LikelyDataStorageVariant {

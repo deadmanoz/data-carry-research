@@ -78,32 +78,12 @@ impl ClassificationResult {
         }
     }
 
-    /// Check if this is a high-confidence classification
-    pub fn is_high_confidence(&self) -> bool {
-        self.classification_details.protocol_signature_found
-            && self.classification_details.height_check_passed
-    }
-
     /// Get a human-readable classification summary
     pub fn summary(&self) -> String {
-        let protocol_name = match self.protocol {
-            ProtocolType::BitcoinStamps => "Bitcoin Stamps",
-            ProtocolType::Counterparty => "Counterparty",
-            ProtocolType::AsciiIdentifierProtocols => "ASCII Identifier Protocols",
-            ProtocolType::OmniLayer => "Omni Layer",
-            ProtocolType::Chancecoin => "Chancecoin",
-            ProtocolType::PPk => "PPk",
-            ProtocolType::OpReturnSignalled => "OP_RETURN Signalled",
-            ProtocolType::DataStorage => "Data Storage",
-            ProtocolType::LikelyDataStorage => "Likely Data Storage",
-            ProtocolType::LikelyLegitimateMultisig => "Likely Legitimate Multisig",
-            ProtocolType::Unknown => "Unknown",
-        };
-
         if let Some(variant) = &self.variant {
-            format!("{} ({:?})", protocol_name, variant)
+            format!("{} ({:?})", self.protocol.display_name(), variant)
         } else {
-            protocol_name.to_string()
+            self.protocol.display_name().to_string()
         }
     }
 }
@@ -479,16 +459,6 @@ impl ClassificationDetails {
         self.content_type = Some(content_type.into());
         self
     }
-
-    /// Check if this is a strong classification (has protocol signature)
-    pub fn is_strong_classification(&self) -> bool {
-        self.protocol_signature_found
-    }
-
-    /// Check if this classification is based on burn patterns only
-    pub fn is_burn_pattern_only(&self) -> bool {
-        !self.burn_patterns_detected.is_empty() && !self.protocol_signature_found
-    }
 }
 
 #[cfg(test)]
@@ -559,7 +529,8 @@ mod tests {
         assert_eq!(result.txid, "test_txid");
         assert_eq!(result.protocol, ProtocolType::BitcoinStamps);
         assert_eq!(result.variant, Some(ProtocolVariant::StampsClassic));
-        assert!(result.is_high_confidence());
+        assert!(result.classification_details.protocol_signature_found);
+        assert!(result.classification_details.height_check_passed);
         assert_eq!(result.summary(), "Bitcoin Stamps (StampsClassic)");
     }
 
@@ -575,8 +546,8 @@ mod tests {
         )
         .with_metadata("{\"confidence\": \"medium\"}");
 
-        assert!(!details.is_strong_classification());
-        assert!(details.is_burn_pattern_only());
+        assert!(!details.protocol_signature_found);
+        assert!(!details.burn_patterns_detected.is_empty());
         assert!(details.additional_metadata.is_some());
     }
 

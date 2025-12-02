@@ -299,13 +299,8 @@ fn export_plotly_value_distributions(report: &ValueDistributionReport) -> AppRes
         let colour = get_protocol_colour(protocol_dist.protocol);
 
         traces.push(
-            PlotlyTrace::bar(
-                bucket_labels.clone(),
-                protocol_counts,
-                display_name,
-                colour,
-            )
-            .hidden_by_default(),
+            PlotlyTrace::bar(bucket_labels.clone(), protocol_counts, display_name, colour)
+                .hidden_by_default(),
         );
     }
 

@@ -40,15 +40,6 @@ impl LikelyLegitimateVariant {
             Self::WithNullKey => "Legitimate Multisig (Null-Padded)",
         }
     }
-
-    /// Get the short identifier for this variant (used in logging/debugging)
-    pub fn short_name(&self) -> &'static str {
-        match self {
-            Self::Standard => "LegitimateMultisig",
-            Self::DuplicateKeys => "LegitimateMultisigDupeKeys",
-            Self::WithNullKey => "LegitimateMultisigWithNullKey",
-        }
-    }
 }
 
 impl std::fmt::Display for LikelyLegitimateVariant {

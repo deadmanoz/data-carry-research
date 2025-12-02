@@ -1,6 +1,6 @@
 use anyhow::Result;
 use data_carry_research::analysis::BurnPatternDetector;
-use data_carry_research::analysis::FeeAnalyser;
+use data_carry_research::analysis::TransactionFeeCalculator;
 use data_carry_research::config::BitcoinRpcConfig;
 use data_carry_research::database::traits::{
     Stage1Operations, Stage2Operations, StatisticsOperations,
@@ -221,7 +221,7 @@ fn test_fee_analysis_comprehensive() {
         2,
     )];
 
-    let analysis = FeeAnalyser::analyse_fees(&transaction, &tx_inputs, &p2ms_outputs);
+    let analysis = TransactionFeeCalculator::analyse_fees(&transaction, &tx_inputs, &p2ms_outputs);
 
     // Verify fee calculations
     assert_eq!(analysis.total_input_value, 5000);
@@ -376,7 +376,7 @@ fn test_fee_analysis_edge_cases() {
         5000000000,
     )];
 
-    let analysis = FeeAnalyser::analyse_fees(&coinbase_tx, &inputs, &p2ms_outputs);
+    let analysis = TransactionFeeCalculator::analyse_fees(&coinbase_tx, &inputs, &p2ms_outputs);
 
     // Coinbase should have zero fee
     assert_eq!(analysis.transaction_fee, 0);

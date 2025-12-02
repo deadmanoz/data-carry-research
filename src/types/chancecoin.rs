@@ -61,7 +61,7 @@ pub struct ChancecoinMessage {
 
 /// Chancecoin message types based on message ID
 /// From chancecoinj source code
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ChancecoinMessageType {
     /// Send/transfer transaction (ID=0)
     /// Purpose: Transfer CHA tokens between addresses
@@ -98,8 +98,8 @@ pub enum ChancecoinMessageType {
     /// Data: offerHash (32 bytes)
     Cancel,
 
-    /// Unknown message type
-    Unknown(u32),
+    /// Unknown message type (message_id stored separately in ChancecoinMessage)
+    Unknown,
 }
 
 /// Chancecoin message content (parsed data)
@@ -160,7 +160,7 @@ impl ChancecoinMessageType {
             ChancecoinMessageType::DiceBet => "Chancecoin Dice Bet",
             ChancecoinMessageType::PokerBet => "Chancecoin Poker Bet",
             ChancecoinMessageType::Cancel => "Chancecoin Cancel",
-            ChancecoinMessageType::Unknown(_) => "Chancecoin Unknown",
+            ChancecoinMessageType::Unknown => "Chancecoin Unknown",
         }
     }
 
@@ -174,7 +174,7 @@ impl ChancecoinMessageType {
             MESSAGE_ID_DICE => ChancecoinMessageType::DiceBet,
             MESSAGE_ID_POKER => ChancecoinMessageType::PokerBet,
             MESSAGE_ID_CANCEL => ChancecoinMessageType::Cancel,
-            _ => ChancecoinMessageType::Unknown(id),
+            _ => ChancecoinMessageType::Unknown,
         }
     }
 }
@@ -244,7 +244,7 @@ impl ChancecoinMessage {
                 .unwrap_or_else(|| ChancecoinMessageContent::Raw(data.to_vec())),
             ChancecoinMessageType::Cancel => Self::parse_cancel(data)
                 .unwrap_or_else(|| ChancecoinMessageContent::Raw(data.to_vec())),
-            ChancecoinMessageType::Unknown(_) => ChancecoinMessageContent::Raw(data.to_vec()),
+            ChancecoinMessageType::Unknown => ChancecoinMessageContent::Raw(data.to_vec()),
         }
     }
 
@@ -566,7 +566,7 @@ mod tests {
         );
         assert_eq!(
             ChancecoinMessageType::from_id(999),
-            ChancecoinMessageType::Unknown(999)
+            ChancecoinMessageType::Unknown
         );
     }
 }

@@ -62,17 +62,6 @@ impl AsciiIdentifierVariant {
             Self::Unknown => "Unknown Variant",
         }
     }
-
-    /// Get the short identifier for this variant (used in logging/debugging)
-    pub fn short_name(&self) -> &'static str {
-        match self {
-            Self::TB0001 => "AsciiIdentifierTB0001",
-            Self::TEST01 => "AsciiIdentifierTEST01",
-            Self::Metronotes => "AsciiIdentifierMetronotes",
-            Self::Other => "AsciiIdentifierOther",
-            Self::Unknown => "AsciiIdentifierUnknown",
-        }
-    }
 }
 
 impl std::fmt::Display for AsciiIdentifierVariant {

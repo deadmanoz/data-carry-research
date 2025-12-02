@@ -59,7 +59,6 @@ pub const PROOF_OF_BURN_PATTERN: &str =
     "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
 
 /// Check if a pubkey is a known Bitcoin Stamps burn key
-#[allow(dead_code)]
 pub fn is_stamps_burn_key(key: &str) -> bool {
     STAMPS_BURN_KEYS
         .iter()

@@ -19,19 +19,6 @@ pub enum OutputError {
 // Re-export JsonType from types::stamps for consistency with Stage 3
 pub use crate::types::stamps::JsonType;
 
-impl JsonType {
-    /// Get a human-readable description of the JSON type
-    pub fn description(&self) -> &'static str {
-        match self {
-            JsonType::SRC20 => "SRC-20 token",
-            JsonType::SRC101 => "SRC-101 domain",
-            JsonType::SRC721 => "SRC-721 NFT",
-            JsonType::SRC721r => "SRC-721r recursive",
-            JsonType::Generic => "Generic JSON",
-        }
-    }
-}
-
 /// Unified output manager for all decoded Bitcoin Stamps data types
 ///
 /// Handles file output for images, JSON, and future file formats (PDF, video, etc.)
@@ -457,12 +444,12 @@ mod tests {
     }
 
     #[test]
-    fn test_json_type_description() {
-        assert_eq!(JsonType::SRC20.description(), "SRC-20 token");
-        assert_eq!(JsonType::SRC101.description(), "SRC-101 domain");
-        assert_eq!(JsonType::SRC721.description(), "SRC-721 NFT");
-        assert_eq!(JsonType::SRC721r.description(), "SRC-721r recursive");
-        assert_eq!(JsonType::Generic.description(), "Generic JSON");
+    fn test_json_type_display_name() {
+        assert_eq!(JsonType::SRC20.display_name(), "SRC-20 token");
+        assert_eq!(JsonType::SRC101.display_name(), "SRC-101 domain");
+        assert_eq!(JsonType::SRC721.display_name(), "SRC-721 NFT");
+        assert_eq!(JsonType::SRC721r.display_name(), "SRC-721r recursive");
+        assert_eq!(JsonType::Generic.display_name(), "Generic JSON");
     }
 
     #[test]

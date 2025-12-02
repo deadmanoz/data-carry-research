@@ -264,12 +264,3 @@ impl TransactionDebugInfo {
         info!("");
     }
 }
-
-/// Format a hex string for display (truncate if too long)
-pub fn format_hex_preview(data: &[u8], max_len: usize) -> String {
-    if data.len() <= max_len {
-        hex::encode(data)
-    } else {
-        format!("{}...", hex::encode(&data[..max_len]))
-    }
-}

@@ -111,7 +111,7 @@ mod tests {
     }
 
     #[test]
-    fn test_utxo_record_to_p2ms_output() {
+    fn test_utxo_record_to_transaction_output() {
         let p2ms_record = UtxoRecord {
             count: 1,
             txid: "test_txid".to_string(),
@@ -124,39 +124,15 @@ mod tests {
             address: "".to_string(),
         };
 
-        let p2ms_output = p2ms_record.to_p2ms_output().unwrap();
-        assert_eq!(p2ms_output.txid, "test_txid");
-        assert_eq!(p2ms_output.vout, 0);
-        assert_eq!(p2ms_output.height, 100000);
-        assert_eq!(p2ms_output.amount, 1000);
-        assert_eq!(p2ms_output.script_hex, "5121...53ae");
-        assert!(p2ms_output.is_coinbase);
-        // Script parsing will fail for invalid hex, so metadata will have default values
-        if let Some(info) = p2ms_output.multisig_info() {
-            assert_eq!(info.required_sigs, 0);
-            assert_eq!(info.total_pubkeys, 0);
-            assert_eq!(info.pubkeys.len(), 0);
-        }
-        assert_eq!(p2ms_output.script_size, 5); // "5121...53ae".len() / 2
-    }
-
-    #[test]
-    fn test_utxo_record_to_p2ms_output_fails_for_non_p2ms() {
-        let non_p2ms_record = UtxoRecord {
-            count: 2,
-            txid: "test_txid2".to_string(),
-            vout: 1,
-            height: 100001,
-            coinbase: 0,
-            amount: 2000,
-            script: "76a914...88ac".to_string(),
-            script_type: "p2pkh".to_string(),
-            address: "1ABC...".to_string(),
-        };
-
-        let result = non_p2ms_record.to_p2ms_output();
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("not P2MS type"));
+        let output = p2ms_record.to_transaction_output().unwrap();
+        assert_eq!(output.txid, "test_txid");
+        assert_eq!(output.vout, 0);
+        assert_eq!(output.height, 100000);
+        assert_eq!(output.amount, 1000);
+        assert_eq!(output.script_hex, "5121...53ae");
+        assert!(output.is_coinbase);
+        // Script parsing will fail for invalid hex, so it becomes nonstandard
+        assert_eq!(output.script_size, 5); // "5121...53ae".len() / 2
     }
 
     #[test]

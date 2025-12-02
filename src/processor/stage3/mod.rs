@@ -1,9 +1,7 @@
 use crate::database::traits::Stage3Operations;
 use crate::database::Database;
 use crate::errors::{AppError, AppResult};
-use crate::processor::{
-    ConfigValidator, ProgressReporter, StandardBatchProcessor, StandardProgressTracker,
-};
+use crate::processor::{ConfigValidator, ProgressReporter, StandardProgressTracker};
 use crate::types::statistics::StatisticsCollector;
 use crate::types::{
     ClassificationResult, EnrichedTransaction, ProtocolType, Stage3Config, Stage3Results,
@@ -38,7 +36,6 @@ pub struct Stage3Processor {
     config: Stage3Config,
     classifier: ProtocolClassificationEngine,
     progress_tracker: StandardProgressTracker,
-    _batch_processor: StandardBatchProcessor,
 }
 
 impl Stage3Processor {
@@ -56,7 +53,6 @@ impl Stage3Processor {
 
         // Initialise shared components
         let progress_tracker = StandardProgressTracker::new();
-        let batch_processor = StandardBatchProcessor::new(config.batch_size);
 
         // Use shared configuration logging
         ConfigValidator::log_config_summary(
@@ -74,7 +70,6 @@ impl Stage3Processor {
             config,
             classifier,
             progress_tracker,
-            _batch_processor: batch_processor,
         })
     }
 

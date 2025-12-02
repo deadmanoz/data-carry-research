@@ -3,7 +3,6 @@
 //! This module contains fundamental types that are used throughout the Bitcoin P2MS analysis pipeline,
 //! including UTXO records, P2MS outputs, and core data structures.
 
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 /// Raw UTXO record from CSV file - matches the exact CSV structure
@@ -31,16 +30,6 @@ impl UtxoRecord {
     /// Check if this UTXO record should be processed for data analysis
     pub fn should_process_for_data(&self) -> bool {
         matches!(self.script_type.as_str(), "p2ms" | "nonstandard")
-    }
-
-    /// Convert to P2MS output (backward compatibility - only works for P2MS types)
-    pub fn to_p2ms_output(&self) -> Result<TransactionOutput, crate::errors::AppError> {
-        if !self.is_p2ms() {
-            return Err(crate::errors::AppError::ScriptParse(
-                "Record is not P2MS type".to_string(),
-            ));
-        }
-        self.to_transaction_output()
     }
 
     /// Convert to TransactionOutput with proper metadata based on script type
@@ -139,11 +128,6 @@ impl TransactionOutput {
         serde_json::from_value(self.metadata.clone()).ok()
     }
 
-    /// Generic metadata access
-    pub fn get_metadata<T: DeserializeOwned>(&self) -> Option<T> {
-        serde_json::from_value(self.metadata.clone()).ok()
-    }
-
     /// Check if this output is a multisig type
     pub fn is_p2ms(&self) -> bool {
         self.script_type == "multisig"
@@ -152,11 +136,6 @@ impl TransactionOutput {
     /// Check if this output is nonstandard
     pub fn is_nonstandard(&self) -> bool {
         self.script_type == "nonstandard"
-    }
-
-    /// Check if this output could possibly be data-carrying
-    pub fn is_possible_data_carrying(&self) -> bool {
-        matches!(self.script_type.as_str(), "multisig" | "nonstandard")
     }
 
     /// Parse P2MS script to extract multisig parameters (backward compatibility shim)
@@ -230,7 +209,7 @@ mod tests {
     }
 
     #[test]
-    fn test_utxo_record_to_p2ms_output() {
+    fn test_utxo_record_to_transaction_output() {
         let p2ms_record = UtxoRecord {
             count: 1,
             txid: "test_txid".to_string(),
@@ -243,39 +222,15 @@ mod tests {
             address: "".to_string(),
         };
 
-        let p2ms_output = p2ms_record.to_p2ms_output().unwrap();
-        assert_eq!(p2ms_output.txid, "test_txid");
-        assert_eq!(p2ms_output.vout, 0);
-        assert_eq!(p2ms_output.height, 100000);
-        assert_eq!(p2ms_output.amount, 1000);
-        assert_eq!(p2ms_output.script_hex, "5121...53ae");
-        assert!(p2ms_output.is_coinbase);
-        // Script parsing will fail for invalid hex, so metadata will have default values
-        if let Some(info) = p2ms_output.multisig_info() {
-            assert_eq!(info.required_sigs, 0);
-            assert_eq!(info.total_pubkeys, 0);
-            assert_eq!(info.pubkeys.len(), 0);
-        }
-        assert_eq!(p2ms_output.script_size, 5); // "5121...53ae".len() / 2
-    }
-
-    #[test]
-    fn test_utxo_record_to_p2ms_output_fails_for_non_p2ms() {
-        let non_p2ms_record = UtxoRecord {
-            count: 2,
-            txid: "test_txid2".to_string(),
-            vout: 1,
-            height: 100001,
-            coinbase: 0,
-            amount: 2000,
-            script: "76a914...88ac".to_string(),
-            script_type: "p2pkh".to_string(),
-            address: "1ABC...".to_string(),
-        };
-
-        let result = non_p2ms_record.to_p2ms_output();
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("not P2MS type"));
+        let output = p2ms_record.to_transaction_output().unwrap();
+        assert_eq!(output.txid, "test_txid");
+        assert_eq!(output.vout, 0);
+        assert_eq!(output.height, 100000);
+        assert_eq!(output.amount, 1000);
+        assert_eq!(output.script_hex, "5121...53ae");
+        assert!(output.is_coinbase);
+        // Script parsing will fail for invalid hex, so it becomes nonstandard
+        assert_eq!(output.script_size, 5); // "5121...53ae".len() / 2
     }
 
     #[test]

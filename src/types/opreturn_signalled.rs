@@ -49,15 +49,6 @@ impl OpReturnVariant {
             Self::GenericASCII => "GenericASCII",
         }
     }
-
-    /// Get the short identifier for this variant (used in logging/debugging)
-    pub fn short_name(&self) -> &'static str {
-        match self {
-            Self::Protocol47930 => "OpReturnProtocol47930",
-            Self::CLIPPERZ => "OpReturnCLIPPERZ",
-            Self::GenericASCII => "OpReturnGenericASCII",
-        }
-    }
 }
 
 impl std::fmt::Display for OpReturnVariant {

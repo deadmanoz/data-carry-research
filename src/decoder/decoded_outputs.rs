@@ -47,7 +47,7 @@ impl DecodedJson {
         format!(
             "Transaction {}: {} ({} bytes) -> {}",
             &self.txid[..16], // Show first 16 chars of txid
-            self.json_type.description(),
+            self.json_type.display_name(),
             self.size_bytes,
             self.file_path.display()
         )

@@ -122,7 +122,7 @@ impl ChancecoinClassifier {
             ChancecoinMessageType::DiceBet => ProtocolVariant::ChancecoinBet,
             ChancecoinMessageType::PokerBet => ProtocolVariant::ChancecoinBet,
             ChancecoinMessageType::Cancel => ProtocolVariant::ChancecoinCancel,
-            ChancecoinMessageType::Unknown(_) => ProtocolVariant::ChancecoinUnknown,
+            ChancecoinMessageType::Unknown => ProtocolVariant::ChancecoinUnknown,
         }
     }
 }

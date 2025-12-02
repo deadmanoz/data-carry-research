@@ -12,7 +12,6 @@ use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
 
 /// RPC request types for the async worker pattern
-#[allow(dead_code)]
 #[derive(Debug)]
 pub enum RpcRequest {
     GetTransaction {

@@ -88,20 +88,6 @@ impl BurnPatternDetector {
         None
     }
 
-    /// Count total burn patterns by type for statistics
-    #[allow(dead_code)]
-    pub fn count_patterns_by_type(
-        patterns: &[BurnPattern],
-    ) -> std::collections::HashMap<BurnPatternType, usize> {
-        let mut counts = std::collections::HashMap::new();
-
-        for pattern in patterns {
-            *counts.entry(pattern.pattern_type.clone()).or_insert(0) += 1;
-        }
-
-        counts
-    }
-
     /// Check if a transaction has any high-confidence burn patterns
     pub fn has_high_confidence_burns(patterns: &[BurnPattern]) -> bool {
         patterns
@@ -115,6 +101,22 @@ impl BurnPatternDetector {
 struct ClassifiedPattern {
     pattern_type: BurnPatternType,
     confidence: BurnConfidence,
+}
+
+#[cfg(test)]
+impl BurnPatternDetector {
+    /// Count total burn patterns by type for statistics (test-only)
+    pub fn count_patterns_by_type(
+        patterns: &[BurnPattern],
+    ) -> std::collections::HashMap<BurnPatternType, usize> {
+        let mut counts = std::collections::HashMap::new();
+
+        for pattern in patterns {
+            *counts.entry(pattern.pattern_type.clone()).or_insert(0) += 1;
+        }
+
+        counts
+    }
 }
 
 #[cfg(test)]

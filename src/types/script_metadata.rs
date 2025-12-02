@@ -142,8 +142,9 @@ pub enum NonstandardClassification {
     AnyoneCanSpend(AnyoneCanSpendInfo),
     /// Custom push-only pattern that does not match a known template
     CustomPattern(CustomPatternInfo),
-    /// Scripts that could not be classified but we still record minimal context
-    Unknown(UnknownInfo),
+    /// Scripts that could not be classified
+    /// Note: Additional context (script bytes, hex) is available at the call site
+    Unknown,
 }
 
 /// Detailed information about a malformed or policy-breaking multisig script
@@ -263,15 +264,6 @@ pub struct CustomPatternInfo {
     /// Sizes of the pushed data segments
     pub push_sizes: Vec<usize>,
     /// Optional notes captured during analysis
-    pub notes: Option<String>,
-}
-
-/// Minimal information for scripts that could not be classified
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct UnknownInfo {
-    /// Hex-encoded hash of the script (for future lookup)
-    pub script_hash: String,
-    /// Optional analyst note about why this was left unknown
     pub notes: Option<String>,
 }
 
@@ -482,22 +474,13 @@ pub fn parse_opreturn_script(script_hex: &str) -> Option<OpReturnData> {
 ///
 /// This is the single source of truth used by both Stage 1 (CSV) and Stage 2 (RPC).
 pub fn parse_nonstandard_script(script_hex: &str) -> NonstandardInfo {
-    use sha2::{Digest, Sha256};
-
     // Try to decode the script
     let script_bytes = match hex::decode(script_hex) {
         Ok(bytes) => bytes,
         Err(_) => {
             // Can't even decode hex, return unknown
-            let mut hasher = Sha256::new();
-            hasher.update(script_hex.as_bytes());
-            let hash = format!("{:x}", hasher.finalize());
-
             return NonstandardInfo {
-                classification: NonstandardClassification::Unknown(UnknownInfo {
-                    script_hash: hash,
-                    notes: Some("Failed to decode hex".to_string()),
-                }),
+                classification: NonstandardClassification::Unknown,
                 script_size: script_hex.len() / 2,
                 opcodes: vec![],
             };
@@ -522,15 +505,8 @@ pub fn parse_nonstandard_script(script_hex: &str) -> NonstandardInfo {
     }
 
     // If we can't classify it, return as unknown
-    let mut hasher = Sha256::new();
-    hasher.update(&script_bytes);
-    let hash = format!("{:x}", hasher.finalize());
-
     NonstandardInfo {
-        classification: NonstandardClassification::Unknown(UnknownInfo {
-            script_hash: hash,
-            notes: Some("Could not determine script pattern".to_string()),
-        }),
+        classification: NonstandardClassification::Unknown,
         script_size: script_bytes.len(),
         opcodes: script_bytes
             .iter()
