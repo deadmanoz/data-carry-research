@@ -74,8 +74,9 @@ pub use crate::types::analysis_results::{
     SpendabilityDataSizeReport, SpendabilityStatsReport, SpendabilityTemporalReport,
     StampsFeeSummary, StampsVariantTemporalReport, StampsWeeklyFeeReport, TxSizeBucket,
     TxSizeDistributionReport, TxSizePercentiles, ValidNoneStats, ValueAnalysisReport, ValueBucket,
-    ValueDistributionReport, ValuePercentiles, VariantFirstSeen, VariantTotal, WeeklyProtocolStats,
-    WeeklySpendabilityStats, WeeklyStampsFeeStats, WeeklyVariantStats, UNCLASSIFIED_SENTINEL,
+    ValueDistributionReport, ValuePercentiles, VariantFirstSeen, VariantTotal, VariantValueStats,
+    WeeklyProtocolStats, WeeklySpendabilityStats, WeeklyStampsFeeStats, WeeklyVariantStats,
+    UNCLASSIFIED_SENTINEL,
 };
 pub use crate::types::visualisation::PlotlyChart;
 pub use burn_detector::detect_burn_patterns;

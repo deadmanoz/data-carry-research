@@ -10,3 +10,4 @@ pub mod stamps_weekly_fee_analysis;
 pub mod test_ec_diagnostic;
 pub mod test_validator_vs_direct;
 pub mod tx_size_analysis;
+pub mod value_analysis;

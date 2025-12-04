@@ -45,6 +45,62 @@ pub fn format_value_analysis(
                 ));
             }
 
+            // Variant value distribution section
+            // Only show protocols that have variant breakdown data
+            let has_variant_data = report
+                .protocol_value_breakdown
+                .iter()
+                .any(|p| !p.variant_breakdown.is_empty() || p.null_variant_value_sats > 0);
+
+            if has_variant_data {
+                output.push_str("\n=== VARIANT VALUE DISTRIBUTION ===\n");
+
+                for protocol_stats in &report.protocol_value_breakdown {
+                    // Skip protocols with no variant data
+                    if protocol_stats.variant_breakdown.is_empty()
+                        && protocol_stats.null_variant_value_sats == 0
+                    {
+                        continue;
+                    }
+
+                    output.push_str(&format!("\n{}:\n", protocol_stats.protocol.display_name()));
+                    output.push_str(&format!(
+                        "  {:<28} {:>10} {:>14} {:>10}\n",
+                        "Variant", "Outputs", "Total BTC", "%"
+                    ));
+                    output.push_str(&format!("  {}\n", "-".repeat(66)));
+
+                    // Show non-NULL variants
+                    for variant in &protocol_stats.variant_breakdown {
+                        output.push_str(&format!(
+                            "  {:<28} {:>10} {:>14} {:>9.2}%\n",
+                            variant.variant,
+                            format_number(variant.output_count),
+                            format_sats_as_btc(variant.total_btc_value_sats),
+                            variant.percentage,
+                        ));
+                    }
+
+                    // Show NULL/unclassified variant value if non-zero
+                    if protocol_stats.null_variant_value_sats > 0 {
+                        let null_pct = if protocol_stats.total_btc_value_sats > 0 {
+                            (protocol_stats.null_variant_value_sats as f64
+                                / protocol_stats.total_btc_value_sats as f64)
+                                * 100.0
+                        } else {
+                            0.0
+                        };
+                        output.push_str(&format!(
+                            "  {:<28} {:>10} {:>14} {:>9.2}%\n",
+                            "(unclassified)",
+                            "-",
+                            format_sats_as_btc(protocol_stats.null_variant_value_sats),
+                            null_pct,
+                        ));
+                    }
+                }
+            }
+
             // Summary statistics
             output.push_str(&format!("\n{}\n", "=".repeat(120)));
             output.push_str(&format!(

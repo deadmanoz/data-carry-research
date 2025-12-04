@@ -25,6 +25,27 @@ pub struct ProtocolValueStats {
     pub max_btc_value_sats: u64,
     pub percentage_of_total_value: f64,
     pub fee_stats: ProtocolFeeStats,
+
+    /// Breakdown by variant within this protocol
+    pub variant_breakdown: Vec<VariantValueStats>,
+
+    /// Value in outputs with NULL variant (not included in variant_breakdown)
+    pub null_variant_value_sats: u64,
+}
+
+/// Value statistics for a specific protocol variant
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct VariantValueStats {
+    /// Variant name (e.g., "StampsSrc20", "CounterpartyBroadcast")
+    pub variant: String,
+    /// Number of outputs with this variant
+    pub output_count: usize,
+    /// Total value in satoshis
+    pub total_btc_value_sats: u64,
+    /// Percentage of protocol's total value (sums to 100% within floating-point tolerance)
+    pub percentage: f64,
+    /// Average value per output in satoshis
+    pub average_btc_per_output: f64,
 }
 
 /// Overall value statistics across all protocols

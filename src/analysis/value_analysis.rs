@@ -9,9 +9,10 @@ use crate::errors::AppResult;
 use crate::types::analysis_results::{
     FeeAnalysisReport, GlobalValueDistribution, OverallValueStats, ProtocolFeeStats,
     ProtocolValueDistribution, ProtocolValueStats, ValueAnalysisReport, ValueBucket,
-    ValueDistributionReport, ValuePercentiles,
+    ValueDistributionReport, ValuePercentiles, VariantValueStats,
 };
 use crate::types::ProtocolType;
+use std::collections::HashMap;
 use std::str::FromStr;
 
 /// Maximum number of values to load into memory for percentile calculation
@@ -39,23 +40,26 @@ pub fn analyse_value_distribution(
 ) -> AppResult<ValueAnalysisReport> {
     let conn = db.connection();
 
-    // Query protocol-level value statistics from output-level data
+    // Query protocol-level value statistics from p2ms_output_classifications
+    // UNIFIED DATA SOURCE: Uses output-level classification for accurate per-output value
     // CRITICAL: Only count UTXO outputs (is_spent = 0), not spent outputs
     let mut stmt = conn.prepare(
         "SELECT
-                tc.protocol,
+                poc.protocol,
                 COUNT(*) as output_count,
-                COUNT(DISTINCT tc.txid) as tx_count,
-                SUM(to1.amount) as total_value_sats,
-                AVG(to1.amount) as avg_value_sats,
-                MIN(to1.amount) as min_value_sats,
-                MAX(to1.amount) as max_value_sats
-            FROM transaction_classifications tc
-            JOIN transaction_outputs to1 ON tc.txid = to1.txid
-            WHERE to1.script_type = 'multisig'
-            AND to1.is_spent = 0
-            GROUP BY tc.protocol
-            ORDER BY output_count DESC",
+                COUNT(DISTINCT poc.txid) as tx_count,
+                COALESCE(SUM(tout.amount), 0) as total_value_sats,
+                COALESCE(AVG(tout.amount), 0.0) as avg_value_sats,
+                COALESCE(MIN(tout.amount), 0) as min_value_sats,
+                COALESCE(MAX(tout.amount), 0) as max_value_sats
+            FROM p2ms_output_classifications poc
+            JOIN transaction_outputs tout
+                ON poc.txid = tout.txid
+                AND poc.vout = tout.vout
+            WHERE tout.script_type = 'multisig'
+            AND tout.is_spent = 0
+            GROUP BY poc.protocol
+            ORDER BY total_value_sats DESC",
     )?;
 
     let protocol_stats = stmt
@@ -72,7 +76,8 @@ pub fn analyse_value_distribution(
         })?
         .collect::<Result<Vec<_>, _>>()?;
 
-    // Query fee statistics per protocol
+    // Query fee statistics per protocol (still uses transaction_classifications since fees
+    // are per-transaction, and we need to count distinct transactions)
     let mut fee_stmt = conn.prepare(
         "SELECT
                 tc.protocol,
@@ -85,7 +90,7 @@ pub fn analyse_value_distribution(
             GROUP BY tc.protocol",
     )?;
 
-    let fee_stats: std::collections::HashMap<String, ProtocolFeeStats> = fee_stmt
+    let fee_stats: HashMap<String, ProtocolFeeStats> = fee_stmt
         .query_map([], |row| {
             let protocol: String = row.get(0)?;
             let stats = ProtocolFeeStats {
@@ -98,6 +103,9 @@ pub fn analyse_value_distribution(
         })?
         .collect::<Result<_, _>>()?;
 
+    // Query variant value breakdown (same unified data source)
+    let variant_breakdown = get_variant_value_breakdown(conn)?;
+
     // Calculate totals for percentages
     let total_value_sats: i64 = protocol_stats
         .iter()
@@ -108,7 +116,7 @@ pub fn analyse_value_distribution(
         .map(|(_, count, _, _, _, _, _)| count)
         .sum();
 
-    // Build protocol value breakdown with fee stats
+    // Build protocol value breakdown with fee stats and variant data
     let mut protocol_value_breakdown: Vec<ProtocolValueStats> = protocol_stats
         .into_iter()
         .map(
@@ -121,6 +129,25 @@ pub fn analyse_value_distribution(
 
                 // Get fee stats for this protocol, or use defaults if not found
                 let protocol_fee_stats = fee_stats.get(&protocol_str).cloned().unwrap_or_default();
+
+                // Get variant breakdown for this protocol
+                let (variants, null_variant_value) = variant_breakdown
+                    .get(&protocol_str)
+                    .cloned()
+                    .unwrap_or_default();
+
+                // Calculate variant percentages (relative to this protocol's total)
+                let variants_with_percentages: Vec<VariantValueStats> = variants
+                    .into_iter()
+                    .map(|mut v| {
+                        v.percentage = if total_sats > 0 {
+                            (v.total_btc_value_sats as f64 / total_sats as f64) * 100.0
+                        } else {
+                            0.0
+                        };
+                        v
+                    })
+                    .collect();
 
                 // Parse protocol string to enum (parse once at DB boundary)
                 let protocol = ProtocolType::from_str(&protocol_str).unwrap_or_default();
@@ -135,6 +162,8 @@ pub fn analyse_value_distribution(
                     max_btc_value_sats: max_sats as u64,
                     percentage_of_total_value,
                     fee_stats: protocol_fee_stats,
+                    variant_breakdown: variants_with_percentages,
+                    null_variant_value_sats: null_variant_value,
                 }
             },
         )
@@ -155,6 +184,99 @@ pub fn analyse_value_distribution(
         overall_statistics,
         fee_context: fee_report,
     })
+}
+
+/// Query variant-level value statistics for all protocols
+///
+/// Uses the same unified data source (p2ms_output_classifications) as the protocol query
+/// to ensure consistency. Returns a map of protocol -> (variants, null_variant_value_sats).
+///
+/// Variants are sorted by value descending, then by name for deterministic output.
+fn get_variant_value_breakdown(
+    conn: &rusqlite::Connection,
+) -> AppResult<HashMap<String, (Vec<VariantValueStats>, u64)>> {
+    // Query non-NULL variants
+    let mut variant_stmt = conn.prepare(
+        "SELECT
+                poc.protocol,
+                poc.variant,
+                COUNT(*) AS output_count,
+                COALESCE(SUM(tout.amount), 0) AS total_value_sats,
+                COALESCE(AVG(tout.amount), 0.0) AS avg_value_sats
+            FROM p2ms_output_classifications poc
+            JOIN transaction_outputs tout
+                ON poc.txid = tout.txid
+                AND poc.vout = tout.vout
+            WHERE tout.is_spent = 0
+                AND tout.script_type = 'multisig'
+                AND poc.variant IS NOT NULL
+            GROUP BY poc.protocol, poc.variant
+            ORDER BY poc.protocol, total_value_sats DESC",
+    )?;
+
+    let variant_rows = variant_stmt
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?, // protocol
+                row.get::<_, String>(1)?, // variant
+                row.get::<_, i64>(2)?,    // output_count
+                row.get::<_, i64>(3)?,    // total_value_sats
+                row.get::<_, f64>(4)?,    // avg_value_sats
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    // Query NULL variants
+    let mut null_stmt = conn.prepare(
+        "SELECT
+                poc.protocol,
+                COALESCE(SUM(tout.amount), 0) AS null_variant_value_sats
+            FROM p2ms_output_classifications poc
+            JOIN transaction_outputs tout
+                ON poc.txid = tout.txid
+                AND poc.vout = tout.vout
+            WHERE tout.is_spent = 0
+                AND tout.script_type = 'multisig'
+                AND poc.variant IS NULL
+            GROUP BY poc.protocol",
+    )?;
+
+    let null_rows: HashMap<String, u64> = null_stmt
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)? as u64))
+        })?
+        .collect::<Result<_, _>>()?;
+
+    // Build result map
+    let mut result: HashMap<String, (Vec<VariantValueStats>, u64)> = HashMap::new();
+
+    for (protocol, variant, output_count, total_value, avg_value) in variant_rows {
+        let entry = result.entry(protocol).or_insert_with(|| (Vec::new(), 0));
+        entry.0.push(VariantValueStats {
+            variant,
+            output_count: output_count as usize,
+            total_btc_value_sats: total_value as u64,
+            percentage: 0.0, // Will be calculated in the caller with protocol total
+            average_btc_per_output: avg_value,
+        });
+    }
+
+    // Add NULL variant values
+    for (protocol, null_value) in null_rows {
+        let entry = result.entry(protocol).or_insert_with(|| (Vec::new(), 0));
+        entry.1 = null_value;
+    }
+
+    // Sort variants: by value descending, then by name for determinism
+    for (variants, _) in result.values_mut() {
+        variants.sort_by(|a, b| {
+            b.total_btc_value_sats
+                .cmp(&a.total_btc_value_sats)
+                .then_with(|| a.variant.cmp(&b.variant))
+        });
+    }
+
+    Ok(result)
 }
 
 /// Analyse detailed value distribution histograms across all protocols

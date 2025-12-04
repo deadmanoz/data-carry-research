@@ -68,5 +68,5 @@ pub use tx_size::{
 };
 pub use value::{
     GlobalValueDistribution, OverallValueStats, ProtocolValueDistribution, ProtocolValueStats,
-    ValueAnalysisReport, ValueDistributionReport, ValuePercentiles,
+    ValueAnalysisReport, ValueDistributionReport, ValuePercentiles, VariantValueStats,
 };
