@@ -387,8 +387,7 @@ pub fn try_bitcoin_stamps(tx_data: &TransactionData) -> Option<DecodedProtocol> 
 
     // Try multi-output Bitcoin Stamps processing (production code path)
     if let Some(stamps_result) = stamps::process_multioutput_stamps(&p2ms_outputs, &arc4_key) {
-        if let Some((offset, variant)) =
-            stamps::find_stamp_signature(&stamps_result.decrypted_data)
+        if let Some((offset, variant)) = stamps::find_stamp_signature(&stamps_result.decrypted_data)
         {
             info!(
                 "✅ Bitcoin Stamps detected in {} ({} bytes, signature: {:?} at offset {})",

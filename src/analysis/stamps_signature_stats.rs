@@ -16,16 +16,17 @@ const PURE_STAMPS_TRANSPORT: &str = "Pure Bitcoin Stamps";
 
 /// Analyse signature variant distribution across all Bitcoin Stamps transactions
 pub fn analyse_signature_distribution(db: &Database) -> AppResult<StampsSignatureAnalysis> {
-    // Query uses indexed transport_protocol column + JSON extract for efficiency
+    // Query uses indexed transport_protocol column + nested JSON extract
+    // The stamp_signature_variant is inside additional_metadata (a JSON string inside additional_metadata_json)
     // CRITICAL: Cannot use alias in WHERE clause - must use full json_extract expression
     let query = r#"
             SELECT
               COALESCE(transport_protocol, 'Pure Bitcoin Stamps') as transport,
-              json_extract(additional_metadata_json, '$.stamp_signature_variant') as sig_variant,
+              json_extract(json_extract(additional_metadata_json, '$.additional_metadata'), '$.stamp_signature_variant') as sig_variant,
               COUNT(*) as count
             FROM transaction_classifications
             WHERE protocol = 'BitcoinStamps'
-              AND json_extract(additional_metadata_json, '$.stamp_signature_variant') IS NOT NULL
+              AND json_extract(json_extract(additional_metadata_json, '$.additional_metadata'), '$.stamp_signature_variant') IS NOT NULL
             GROUP BY transport, sig_variant
             ORDER BY transport, count DESC
         "#;

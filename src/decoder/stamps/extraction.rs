@@ -4,15 +4,18 @@
 
 use crate::types::stamps::signature::StampSignature;
 
-/// Find stamp signature in decrypted data, returning offset and variant
+/// Find stamp signature in decrypted data, returning offset and actual variant found
 ///
-/// Checks all signature variants (case-insensitive) and returns the first match found.
+/// Checks for stamp/stamps signatures and returns the actual variant present in the data.
+/// Detection is case-sensitive to accurately track signature usage patterns.
 /// Returns: (byte_offset, signature_variant)
 pub fn find_stamp_signature(decrypted_data: &[u8]) -> Option<(usize, StampSignature)> {
+    // Check each variant with exact (case-sensitive) matching
+    // Order: singular before plural (more common), lowercase before uppercase
     for sig_variant in StampSignature::ALL {
         if let Some(pos) = decrypted_data
             .windows(sig_variant.len())
-            .position(|window| window.eq_ignore_ascii_case(sig_variant.as_bytes()))
+            .position(|window| window == sig_variant.as_bytes())
         {
             return Some((pos, sig_variant));
         }

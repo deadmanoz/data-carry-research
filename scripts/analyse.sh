@@ -22,6 +22,7 @@ set -euo pipefail
 #   multisig-configurations    - Show exhaustive multisig configuration breakdown
 #   dust-thresholds            - Show Bitcoin dust threshold analysis
 #   tx-sizes                   - Show transaction size distribution
+#   stamps-signatures          - Show Stamps signature variant breakdown
 #   stamps-weekly-fees         - Show Bitcoin Stamps weekly fee analysis
 #   stamps-variant-temporal    - Show Stamps variant distribution over time
 #   output-counts              - Show P2MS output count distribution per transaction
@@ -44,8 +45,8 @@ if [[ $# -eq 0 ]]; then
     echo "          signatures, spendability, content-types, protocol-data-sizes,"
     echo "          spendability-data-sizes, content-type-spendability,"
     echo "          comprehensive-data-sizes, multisig-configurations, dust-thresholds,"
-    echo "          tx-sizes, stamps-weekly-fees, stamps-variant-temporal, output-counts,"
-    echo "          protocol-temporal, spendability-temporal, full"
+    echo "          tx-sizes, stamps-signatures, stamps-weekly-fees, stamps-variant-temporal,"
+    echo "          output-counts, protocol-temporal, spendability-temporal, full"
     echo ""
     echo "Examples:"
     echo "  $0 value                           # Uses default DB"
@@ -79,14 +80,17 @@ fi
 EXTRA_ARGS=("$@")
 
 # Process EXTRA_ARGS to handle specific flags like --plotly
+# Use ${array[@]+"${array[@]}"} pattern to safely handle empty arrays with set -u
 PROCESSED_EXTRA_ARGS=()
-for arg in "${EXTRA_ARGS[@]}"; do
-    if [[ "$arg" == "--plotly" ]]; then
-        PROCESSED_EXTRA_ARGS+=("--format" "plotly")
-    else
-        PROCESSED_EXTRA_ARGS+=("$arg")
-    fi
-done
+if [[ ${#EXTRA_ARGS[@]} -gt 0 ]]; then
+    for arg in "${EXTRA_ARGS[@]}"; do
+        if [[ "$arg" == "--plotly" ]]; then
+            PROCESSED_EXTRA_ARGS+=("--format" "plotly")
+        else
+            PROCESSED_EXTRA_ARGS+=("$arg")
+        fi
+    done
+fi
 
 # Use default DB if none provided
 if [[ -z "$DB_PATH" ]]; then

@@ -16,11 +16,10 @@
 //! - **JSON**: Raw structured data with all weekly breakdowns
 //! - **Plotly**: Stacked area chart with percentage y-axis
 
-use crate::analysis::reports::ReportFormatter;
 use crate::database::Database;
 use crate::errors::AppResult;
 use crate::types::analysis_results::{SpendabilityTemporalReport, WeeklySpendabilityStats};
-use crate::types::visualisation::{PlotlyAnnotation, PlotlyChart, PlotlyLayout, PlotlyTrace};
+use crate::types::visualisation::{PlotlyChart, PlotlyLayout, PlotlyTrace};
 use crate::utils::time::week_bucket_dates;
 use std::collections::HashMap;
 
@@ -189,17 +188,6 @@ impl SpendabilityTemporalReport {
         layout.xaxis.axis_type = Some("date".to_string());
         layout.yaxis.range = Some(vec![0.0, 100.0]);
         layout.yaxis.ticksuffix = Some("%".to_string());
-
-        // Add stats annotation
-        let total_formatted = ReportFormatter::format_number(self.total_outputs);
-        let stats_text = format!(
-            "Total P2MS Outputs: {}<br>Avg Spendable: {:.1}%<br>Avg Unspendable: {:.1}%",
-            total_formatted,
-            self.overall_spendable_pct,
-            100.0 - self.overall_spendable_pct
-        );
-        layout =
-            layout.with_annotations(vec![PlotlyAnnotation::stats_box(&stats_text, 0.02, 0.02)]);
 
         PlotlyChart {
             data: vec![spendable_trace, unspendable_trace],

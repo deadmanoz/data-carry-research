@@ -348,8 +348,8 @@ impl TxSizeDistributionReport {
 
         let mut traces: Vec<PlotlyTrace> = Vec::new();
 
-        // Add "All P2MS Transactions" trace first (hidden by default)
-        // Users can toggle this on via the legend to see the total distribution
+        // Add "All P2MS Transactions" trace first (visible by default)
+        // Uses overlay mode so this doesn't stack with protocol traces
         let all_counts: Vec<f64> = self
             .global_distribution
             .buckets
@@ -361,22 +361,19 @@ impl TxSizeDistributionReport {
             all_counts,
             "All P2MS Transactions",
             "#34495E",
-        )
-        .hidden_by_default();
+        );
         traces.push(all_trace);
 
-        // Add per-protocol bar traces (stacked)
+        // Add per-protocol bar traces (hidden by default, overlay mode)
         for proto_dist in &self.protocol_distributions {
             let colour = get_protocol_colour(proto_dist.protocol);
             let display_name = proto_dist.protocol.display_name();
 
             let counts: Vec<f64> = proto_dist.buckets.iter().map(|b| b.count as f64).collect();
 
-            let mut trace = PlotlyTrace::bar(x_labels.clone(), counts, display_name, colour);
-            // Hide protocols with zero transactions by default
-            if proto_dist.total_transactions == 0 {
-                trace = trace.hidden_by_default();
-            }
+            // All protocol traces hidden by default (user can toggle via legend)
+            let trace = PlotlyTrace::bar(x_labels.clone(), counts, display_name, colour)
+                .hidden_by_default();
             traces.push(trace);
         }
 
@@ -389,8 +386,8 @@ impl TxSizeDistributionReport {
         .with_legend("v", 1.02, 1.0, "left");
         // Rotate x-axis labels for readability
         layout.xaxis.tickangle = Some(-45);
-        // Stack bars for per-protocol breakdown
-        layout.barmode = Some("stack".to_string());
+        // Overlay mode: "All P2MS Transactions" doesn't stack with protocol traces
+        layout.barmode = Some("overlay".to_string());
 
         PlotlyChart {
             data: traces,
