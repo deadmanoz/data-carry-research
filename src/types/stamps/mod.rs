@@ -27,9 +27,10 @@ mod tests {
     #[test]
     fn test_arc4_decrypt() {
         let data = b"hello";
-        let key = b"key";
-        let encrypted = arc4::decrypt(data, key).unwrap();
-        let decrypted = arc4::decrypt(&encrypted, key).unwrap();
+        let key = hex::decode("abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890")
+            .unwrap();
+        let encrypted = arc4::decrypt(data, &key).unwrap();
+        let decrypted = arc4::decrypt(&encrypted, &key).unwrap();
         assert_eq!(decrypted, data);
     }
 

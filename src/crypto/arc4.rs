@@ -1,32 +1,26 @@
-/// ARC4 encryption/decryption implementation for Bitcoin data-carrying protocols
+/// ARC4 encryption/decryption wrapper around the `rc4` crate
 ///
 /// ARC4 (also known as RC4) is used by both Bitcoin Stamps and Counterparty protocols
 /// to encrypt data embedded in P2MS outputs. The encryption key is typically derived
-/// from transaction inputs.
-///
-/// # Implementation Notes
-///
-/// This implementation follows the standard ARC4 algorithm:
-/// 1. Key-scheduling algorithm (KSA) to initialise the S-box
-/// 2. Pseudo-random generation algorithm (PRGA) to generate keystream
-/// 3. XOR the data with the keystream
+/// from transaction inputs (32-byte transaction IDs).
 ///
 /// # Usage
 ///
 /// ```rust
 /// use data_carry_research::crypto::arc4;
 ///
+/// let key = hex::decode("abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890").unwrap();
 /// let data = b"hello world";
-/// let key = b"secret";
 ///
 /// // Encrypt the data
-/// let encrypted = arc4::decrypt(data, key).unwrap();
+/// let encrypted = arc4::decrypt(data, &key).unwrap();
 ///
 /// // Decrypt the data (ARC4 is symmetric)
-/// let decrypted = arc4::decrypt(&encrypted, key).unwrap();
+/// let decrypted = arc4::decrypt(&encrypted, &key).unwrap();
 /// assert_eq!(decrypted, data);
 /// ```
 use hex;
+use rc4::{consts::U32, Key, KeyInit, Rc4, StreamCipher};
 
 /// Decrypt data using ARC4 algorithm with the given key
 ///
@@ -36,38 +30,21 @@ use hex;
 /// # Arguments
 ///
 /// * `data` - The data to decrypt
-/// * `key` - The encryption key
+/// * `key` - The encryption key (must be exactly 32 bytes)
 ///
 /// # Returns
 ///
-/// Returns `Some(Vec<u8>)` with the decrypted data, or `None` if the key or data is empty
+/// Returns `Some(Vec<u8>)` with the decrypted data, or `None` if the key is not
+/// exactly 32 bytes, or if the data is empty
 pub fn decrypt(data: &[u8], key: &[u8]) -> Option<Vec<u8>> {
-    if key.is_empty() || data.is_empty() {
+    if key.len() != 32 || data.is_empty() {
         return None;
     }
 
-    // Initialise S-box
-    let mut s: Vec<u8> = (0..=255).collect();
-    let mut j = 0u8;
-
-    // Key-scheduling algorithm (KSA)
-    for i in 0..256 {
-        j = j.wrapping_add(s[i]).wrapping_add(key[i % key.len()]);
-        s.swap(i, j as usize);
-    }
-
-    // Pseudo-random generation algorithm (PRGA)
-    let mut result = Vec::with_capacity(data.len());
-    let mut i = 0u8;
-    j = 0;
-
-    for &byte in data {
-        i = i.wrapping_add(1);
-        j = j.wrapping_add(s[i as usize]);
-        s.swap(i as usize, j as usize);
-        let k = s[(s[i as usize].wrapping_add(s[j as usize])) as usize];
-        result.push(byte ^ k);
-    }
+    let rc4_key = Key::<U32>::from_slice(key);
+    let mut cipher = Rc4::new(rc4_key);
+    let mut result = data.to_vec();
+    cipher.apply_keystream(&mut result);
 
     Some(result)
 }
@@ -92,28 +69,55 @@ pub fn prepare_key_from_txid(txid_hex: &str) -> Option<Vec<u8>> {
 mod tests {
     use super::*;
 
+    const TEST_KEY_HEX: &str = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
+
+    fn test_key() -> Vec<u8> {
+        hex::decode(TEST_KEY_HEX).unwrap()
+    }
+
     #[test]
     fn test_arc4_decrypt_symmetric() {
         let data = b"hello";
-        let key = b"key";
-        let encrypted = decrypt(data, key).unwrap();
-        let decrypted = decrypt(&encrypted, key).unwrap();
+        let key = test_key();
+        let encrypted = decrypt(data, &key).unwrap();
+        let decrypted = decrypt(&encrypted, &key).unwrap();
         assert_eq!(decrypted, data);
     }
 
     #[test]
     fn test_arc4_empty_inputs() {
+        let key = test_key();
         assert_eq!(decrypt(b"data", b""), None);
-        assert_eq!(decrypt(b"", b"key"), None);
+        assert_eq!(decrypt(b"", &key), None);
         assert_eq!(decrypt(b"", b""), None);
     }
 
     #[test]
+    fn test_arc4_rejects_short_key() {
+        assert_eq!(decrypt(b"data", b"key"), None);
+        assert_eq!(decrypt(b"data", b"short_key_16bytes"), None);
+    }
+
+    #[test]
+    fn test_arc4_known_vector() {
+        // Verify against a known RC4 test vector with a 32-byte key
+        let key = test_key();
+        let data = b"test data for verification";
+        let encrypted = decrypt(data, &key).unwrap();
+
+        // Encrypting again with the same key must recover the original
+        let decrypted = decrypt(&encrypted, &key).unwrap();
+        assert_eq!(decrypted, data);
+
+        // Encrypted output must differ from input
+        assert_ne!(encrypted, data.to_vec());
+    }
+
+    #[test]
     fn test_prepare_key_from_txid() {
-        let txid = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
-        let key = prepare_key_from_txid(txid).unwrap();
+        let key = prepare_key_from_txid(TEST_KEY_HEX).unwrap();
         assert_eq!(key.len(), 32);
-        assert_eq!(hex::encode(&key), txid);
+        assert_eq!(hex::encode(&key), TEST_KEY_HEX);
     }
 
     #[test]
